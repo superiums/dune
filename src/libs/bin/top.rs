@@ -11,7 +11,7 @@ use crate::{
         BuiltinFunc, BuiltinInfo, LIBS_INFO,
         bin::{
             boolean_lib::not,
-            table_lib::{select, sortby},
+            table_lib::{select, sort_by},
         },
         helper::{check_args_len, check_exact_args_len, get_string_ref},
         pretty_printer,
@@ -24,7 +24,7 @@ pub fn regist_all() -> HashMap<&'static str, Rc<BuiltinFunc>> {
     reg_all!({
         exit, cd, cwd, symof,
         tap, print, pprint, println, eprint, eprintln, read,
-        get, len, rev, flatten,  select, sortby,
+        get, len, rev, flatten,  select, sort_by,
         not,
         eval, exec, eval_str, exec_str, include, import,
         help,

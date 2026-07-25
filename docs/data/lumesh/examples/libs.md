@@ -211,7 +211,7 @@ filter <list> <fn>
 filter_map <list> <fn>
 find <list> <item|fn> [skip_n]
 find_last <list> <item|fn> [skip_n]
-first <list>
+first <list> [n]
 flatten <collection>
 foldl <list> <fn> <init>
 foldr <list> <fn> <init>
@@ -223,7 +223,7 @@ insert <list> <index> <value>
 is_empty <list>
 items <list>
 join <list> <separator>
-last <list>
+last <list> [n]
 len <list>
 map <list> <fn>
 max <num1> <num2> ... | <array>
@@ -471,21 +471,25 @@ vars
 
 ### table
 
-append <table> <list|set>
-at <table> <index> <to_map?>
-filter <list> <cell|fn>
-find <list> <cell|fn> [start_index]
-find_last <list> <cell|fn> [start_index]
-first <table> <to_map?>
-getcol <table> <header|index>
-grep <table> <string>
-header_len <table>
-headers <table>
-last <table> <to_map?>
 len <table>
-rows <table> <to_map?>
+header_len <table>
+getcol <table> <header|index>
 select <table> <cols...>
+headers <table>
+rows <table>
+first <table> [n]
+last <table> [n]
+at <table> <index>
+rows_list <table>
+first_list <table> [n]
+last_list <table> [n]
+at_list <table> <index>
+grep <table> <string>
+find <table> <cell|fn> [start_index]
+find_last <table> <cell|fn> [start_index]
+filter <table> <cell|fn>
 sortby <table> <col>
+append <table> <list|set>
 
 ### time
 

@@ -14,7 +14,8 @@ pub fn regist_lazy() -> LazyModule {
         len, header_len,
         getcol, select, headers,
         at, rows, first, last, grep, find, find_last, filter,
-        sortby,
+        rows_list, first_list, last_list, at_list,
+        sort_by,
         append
     })
 }
@@ -25,14 +26,18 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         getcol => "get column by header/index", "<table> <header|index>"
         select => "select columns", "<table> <cols...>"
         headers => "list headers", "<table>"
-        rows => "list rows", "<table> <to_map?>"
-        first => "get first row", "<table> <to_map?>"
-        last => "get last row", "<table> <to_map?>"
-        at => "get nth row", "<table> <index> <to_map?>"
+        rows => "list rows as maps", "<table>"
+        first => "get first n row as maps", "<table> [n]"
+        last => "get last n row as maps", "<table> [n]"
+        at => "get nth row as map", "<table> <index>"
+        rows_list => "list rows as lists", "<table>"
+        first_list => "get first n row as lists", "<table> [n]"
+        last_list => "get last n row as lists", "<table> [n]"
+        at_list => "get nth row as list", "<table> <index>"
         grep => "grep rows which contains the string", "<table> <string>"
-        find => "find first row index of matching cell", "<list> <cell|fn> [start_index]"
-        find_last => "find last row index of matching cell", "<list> <cell|fn> [start_index]"
-        filter => "filter rows by condition/cell match", "<list> <cell|fn>"
+        find => "find first row index of matching cell", "<table> <cell|fn> [start_index]"
+        find_last => "find last row index of matching cell", "<table> <cell|fn> [start_index]"
+        filter => "filter rows by condition/cell match", "<table> <cell|fn>"
         sortby => "sort a table by column", "<table> <col>"
         append => "append a row", "<table> <list|set>"
     })
@@ -132,79 +137,120 @@ fn headers(
     Ok(Expression::from(table.headers().to_vec()))
 }
 
+///every row as a map
 fn rows(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_args_len("rows", &args, 1..=2, ctx)?;
+    check_exact_args_len("rows", &args, 1, ctx)?;
     let mut it = args.into_iter();
     let data = it.next().unwrap();
     let table = get_table_arg(data, ctx)?;
-    let to_map = it.next().is_some_and(|x| x.is_truthy());
-    if to_map {
-        let r: Vec<BTreeMap<String, Expression>> = table
-            .rows()
-            .iter()
-            .map(|row| {
-                row.iter()
-                    .enumerate()
-                    .map(|(i, x)| {
-                        (
-                            table
-                                .headers()
-                                .get(i)
-                                .cloned()
-                                .unwrap_or("unkown".to_string()),
-                            x.clone(),
-                        )
-                    })
-                    .collect::<BTreeMap<_, _>>()
-            })
-            .collect();
-        Ok(Expression::from(r))
-    } else {
-        Ok(Expression::from(table.rows().to_vec()))
-    }
+
+    Ok(table.to_list_map())
+}
+fn rows_list(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("rows_list", &args, 1, ctx)?;
+    let mut it = args.into_iter();
+    let data = it.next().unwrap();
+    let table = get_table_arg(data, ctx)?;
+
+    Ok(Expression::from(table.rows().to_vec()))
 }
 
+///first row as map
 fn first(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_args_len("frist", &args, 1..=2, ctx)?;
+    check_args_len("first", &args, 1..=2, ctx)?;
     let mut it = args.into_iter();
     let data = it.next().unwrap();
     let table = get_table_arg(data, ctx)?;
-    let to_map = it.next().is_some_and(|x| x.is_truthy());
-
-    let row = table.rows().first();
-    match row {
-        None => Ok(Expression::None),
-        Some(row) => {
-            if to_map {
-                let r = row
-                    .iter()
-                    .enumerate()
-                    .map(|(i, x)| {
-                        (
-                            table
-                                .headers()
-                                .get(i)
-                                .cloned()
-                                .unwrap_or("unkown".to_string()),
-                            x.clone(),
-                        )
-                    })
-                    .collect::<BTreeMap<_, _>>();
-                Ok(Expression::from(r))
-            } else {
-                Ok(Expression::from(row.clone()))
+    match it.next() {
+        Some(Expression::Integer(i)) if i > 1 => {
+            let r = table
+                .rows()
+                .iter()
+                .take(i as usize)
+                .map(|row| {
+                    let map: BTreeMap<String, Expression> = table
+                        .headers()
+                        .iter()
+                        .enumerate()
+                        .map(|(i, header)| {
+                            let value = row.get(i).cloned().unwrap_or(Expression::None);
+                            (header.clone(), value)
+                        })
+                        .collect();
+                    Expression::from(map)
+                })
+                .collect::<Vec<_>>();
+            return Ok(Expression::from(r));
+        }
+        _ => {
+            let row = table.rows().first();
+            match row {
+                None => Ok(Expression::None),
+                Some(row) => {
+                    let r = row
+                        .iter()
+                        .enumerate()
+                        .map(|(i, x)| {
+                            (
+                                table
+                                    .headers()
+                                    .get(i)
+                                    .cloned()
+                                    .unwrap_or("unkown".to_string()),
+                                x.clone(),
+                            )
+                        })
+                        .collect::<BTreeMap<_, _>>();
+                    Ok(Expression::from(r))
+                }
             }
         }
     }
 }
+///first row as list
+fn first_list(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_args_len("first_list", &args, 1..=2, ctx)?;
+    let mut it = args.into_iter();
+    let data = it.next().unwrap();
+    let table = get_table_arg(data, ctx)?;
+
+    match it.next() {
+        Some(Expression::Integer(i)) if i > 1 => {
+            let r = table
+                .rows()
+                .iter()
+                .take(i as usize)
+                .cloned()
+                .collect::<Vec<_>>();
+            Ok(Expression::from(r))
+        }
+        _ => {
+            let row = table.rows().first();
+            match row {
+                None => Ok(Expression::None),
+                Some(row) => Ok(Expression::from(row.clone())),
+            }
+        }
+    }
+}
+
+///last row as map
 fn last(
     args: Vec<Expression>,
     _env: &mut Environment,
@@ -214,80 +260,147 @@ fn last(
     let mut it = args.into_iter();
     let data = it.next().unwrap();
     let table = get_table_arg(data, ctx)?;
-    let to_map = it.next().is_some_and(|x| x.is_truthy());
-
-    let row = table.rows().last();
-    match row {
-        None => Ok(Expression::None),
-        Some(row) => {
-            if to_map {
-                let r = row
-                    .iter()
-                    .enumerate()
-                    .map(|(i, x)| {
-                        (
-                            table
-                                .headers()
-                                .get(i)
-                                .cloned()
-                                .unwrap_or("unkown".to_string()),
-                            x.clone(),
-                        )
-                    })
-                    .collect::<BTreeMap<_, _>>();
-                Ok(Expression::from(r))
-            } else {
-                Ok(Expression::from(row.clone()))
+    match it.next() {
+        Some(Expression::Integer(i)) if i > 1 => {
+            let r = table
+                .rows()
+                .iter()
+                .rev()
+                .take(i as usize)
+                .rev()
+                .map(|row| {
+                    let map: BTreeMap<String, Expression> = table
+                        .headers()
+                        .iter()
+                        .enumerate()
+                        .map(|(i, header)| {
+                            let value = row.get(i).cloned().unwrap_or(Expression::None);
+                            (header.clone(), value)
+                        })
+                        .collect();
+                    Expression::from(map)
+                })
+                .collect::<Vec<_>>();
+            return Ok(Expression::from(r));
+        }
+        _ => {
+            let row = table.rows().last();
+            match row {
+                None => Ok(Expression::None),
+                Some(row) => {
+                    let r = row
+                        .iter()
+                        .enumerate()
+                        .map(|(i, x)| {
+                            (
+                                table
+                                    .headers()
+                                    .get(i)
+                                    .cloned()
+                                    .unwrap_or("unkown".to_string()),
+                                x.clone(),
+                            )
+                        })
+                        .collect::<BTreeMap<_, _>>();
+                    Ok(Expression::from(r))
+                }
             }
         }
     }
 }
+///first row as list
+fn last_list(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_args_len("last_list", &args, 1..=2, ctx)?;
+    let mut it = args.into_iter();
+    let data = it.next().unwrap();
+    let table = get_table_arg(data, ctx)?;
+
+    match it.next() {
+        Some(Expression::Integer(i)) if i > 1 => {
+            let r = table
+                .rows()
+                .iter()
+                .rev()
+                .take(i as usize)
+                .rev()
+                .cloned()
+                .collect::<Vec<_>>();
+            Ok(Expression::from(r))
+        }
+        _ => {
+            let row = table.rows().last();
+            match row {
+                None => Ok(Expression::None),
+                Some(row) => Ok(Expression::from(row.clone())),
+            }
+        }
+    }
+}
+
 fn at(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_args_len("at", &args, 2..=3, ctx)?;
+    check_exact_args_len("at", &args, 1, ctx)?;
     let mut it = args.into_iter();
     let data = it.next().unwrap();
     let table = get_table_arg(data, ctx)?;
     let index = it.next().unwrap();
     let idx = get_integer_arg(index, ctx)? as usize;
-    let to_map = it.next().is_some_and(|x| x.is_truthy());
 
     let row = table.rows().get(idx);
     match row {
         None => Ok(Expression::None),
         Some(row) => {
-            if to_map {
-                let r = row
-                    .iter()
-                    .enumerate()
-                    .map(|(i, x)| {
-                        (
-                            table
-                                .headers()
-                                .get(i)
-                                .cloned()
-                                .unwrap_or("unkown".to_string()),
-                            x.clone(),
-                        )
-                    })
-                    .collect::<BTreeMap<_, _>>();
-                Ok(Expression::from(r))
-            } else {
-                Ok(Expression::from(row.clone()))
-            }
+            let r = row
+                .iter()
+                .enumerate()
+                .map(|(i, x)| {
+                    (
+                        table
+                            .headers()
+                            .get(i)
+                            .cloned()
+                            .unwrap_or("unkown".to_string()),
+                        x.clone(),
+                    )
+                })
+                .collect::<BTreeMap<_, _>>();
+            Ok(Expression::from(r))
         }
     }
 }
 
-pub fn sortby(
+fn at_list(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("sortby", &args, 2, ctx)?;
+    check_exact_args_len("at_list", &args, 1, ctx)?;
+    let mut it = args.into_iter();
+    let data = it.next().unwrap();
+    let table = get_table_arg(data, ctx)?;
+    let index = it.next().unwrap();
+    let idx = get_integer_arg(index, ctx)? as usize;
+
+    let row = table.rows().get(idx);
+    match row {
+        None => Ok(Expression::None),
+        Some(row) => Ok(Expression::from(row.clone())),
+    }
+}
+
+pub fn sort_by(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("sort_by", &args, 2, ctx)?;
     let mut it = args.into_iter();
     let list = it.next().unwrap();
     let key = it.next().unwrap();
@@ -354,9 +467,8 @@ fn find(
     match &target {
         Expression::Function(..) | Expression::Lambda(..) => {
             let state = &mut State::new();
-            for (i, row) in table.rows().iter().enumerate().skip(start) {
-                let r =
-                    &target.eval_apply(&target, &[Expression::from(row.clone())], state, env, 0)?;
+            for (i, row) in table.to_maps().into_iter().enumerate().skip(start) {
+                let r = &target.eval_apply(&target, &[row], state, env, 0)?;
                 if let Expression::Boolean(true) = r {
                     return Ok(Expression::Integer(i as i64));
                 }
@@ -397,9 +509,8 @@ fn find_last(
     match &target {
         Expression::Function(..) | Expression::Lambda(..) => {
             let state = &mut State::new();
-            for (i, row) in table.rows().iter().enumerate().rev().skip(start) {
-                let r =
-                    &target.eval_apply(&target, &[Expression::from(row.clone())], state, env, 0)?;
+            for (i, row) in table.to_maps().into_iter().enumerate().rev().skip(start) {
+                let r = &target.eval_apply(&target, &[row], state, env, 0)?;
                 if let Expression::Boolean(true) = r {
                     return Ok(Expression::Integer(i as i64));
                 }
@@ -436,16 +547,18 @@ fn filter(
     let result: Vec<Vec<Expression>> = match &target {
         Expression::Function(..) | Expression::Lambda(..) => {
             let state = &mut State::new();
-            table
-                .rows()
-                .iter()
-                .filter(|&row| {
+            let r = table
+                .to_maps()
+                .into_iter()
+                .filter(|row| {
                     target
-                        .eval_apply(&target, &[Expression::from(row.clone())], state, env, 0)
+                        .eval_apply(&target, &[row.clone()], state, env, 0)
                         .is_ok_and(|r| r.is_truthy())
                 })
-                .cloned()
-                .collect()
+                // .cloned()
+                // .map(Expression::from)
+                .collect::<Vec<_>>();
+            return Ok(Expression::from(r));
         }
         _ => table
             .rows()

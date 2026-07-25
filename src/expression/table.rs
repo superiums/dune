@@ -132,10 +132,12 @@ impl TableData {
 
     /// 转换为 List<Map> 格式（向后兼容）
     pub fn to_list_map(&self) -> Expression {
+        Expression::from(self.to_maps())
+    }
+    pub fn to_maps(&self) -> Vec<Expression> {
         use std::collections::BTreeMap;
 
-        let rows: Vec<Expression> = self
-            .rows
+        self.rows
             .iter()
             .map(|row| {
                 let map: BTreeMap<String, Expression> = self
@@ -149,9 +151,7 @@ impl TableData {
                     .collect();
                 Expression::from(map)
             })
-            .collect();
-
-        Expression::from(rows)
+            .collect::<Vec<_>>()
     }
 }
 
