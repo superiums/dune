@@ -370,40 +370,6 @@ fn cursor_show(
         .map_err(|_| RuntimeError::common("Failed to show cursor".into(), _ctx.clone(), 0))?;
     Ok(Expression::None)
 }
-// Input Functions
-fn read_line(
-    args: Vec<Expression>,
-    _env: &mut Environment,
-    ctx: &Expression,
-) -> Result<Expression, RuntimeError> {
-    match args.len() {
-        0 => {
-            let mut input = String::new();
-            std::io::stdin().read_line(&mut input).map_err(|e| {
-                RuntimeError::common(format!("Failed to read line: {e}").into(), ctx.clone(), 0)
-            })?;
-            Ok(Expression::String(input.trim_end().to_string()))
-        }
-        1 => {
-            let prompt = args[0].to_string();
-            print!("{prompt}");
-            stdout().flush().map_err(|e| {
-                RuntimeError::common(format!("Flush failed: {e}").into(), ctx.clone(), 0)
-            })?;
-
-            let mut input = String::new();
-            std::io::stdin().read_line(&mut input).map_err(|e| {
-                RuntimeError::common(format!("Failed to read line: {e}").into(), ctx.clone(), 0)
-            })?;
-            Ok(Expression::String(input.trim_end().to_string()))
-        }
-        _ => Err(RuntimeError::common(
-            "read_line expects 0 or 1 arguments".into(),
-            ctx.clone(),
-            0,
-        )),
-    }
-}
 
 // Key mapping constants shared between read_key and keys
 const SPECIAL_KEY_MAPPINGS: &[(&str, KeyCode)] = &[
@@ -457,12 +423,28 @@ fn keys(
     ))
 }
 
+// Input Functions
+fn read_line(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    if let Some(prompt) = args.get(0) {
+        println!("{}", prompt.to_string())
+    }
+    let mut input = String::new();
+    std::io::stdin().read_line(&mut input).map_err(|e| {
+        RuntimeError::common(format!("Failed to read line: {e}").into(), ctx.clone(), 0)
+    })?;
+    Ok(Expression::String(input.trim_end_matches("\n").to_string()))
+}
+
 fn read_password(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_args_len("read_password", &args, 0..1, ctx)?;
+    check_args_len("read_password", &args, 0..=1, ctx)?;
     let rst = if !args.is_empty() {
         rpassword::prompt_password(args[0].to_string())
     } else {
