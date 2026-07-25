@@ -10,7 +10,7 @@ use crate::{
         bin::time_lib,
         helper::{check_args_len, check_exact_args_len, convert_list_map_to_table, get_string_ref},
         lazy_module::LazyModule,
-        pprint::strip_ansi_escapes,
+        pprint::{pretty_formatter, strip_ansi_escapes},
     },
     reg_info, reg_lazy,
 };
@@ -27,7 +27,7 @@ pub fn regist_lazy() -> LazyModule {
         time,
         table,
         // 数据格式序列化
-        toml, json, csv,
+        toml, json, csv, pretty,
         highlighted, striped,
     })
 }
@@ -45,6 +45,7 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         toml => "serialize lumesh expression to TOML", "<expr>"
         json => "serialize lumesh expression to JSON", "<expr>"
         csv => "serialize lumesh expression to CSV", "<expr>"
+        pretty => "serialize lumesh expression to Pretty String", "<expr>"
         highlighted => "highlight script str with ANSI", "<script_string>"
         striped => "remove all ANSI escape codes from string", "<string>"
     })
@@ -775,6 +776,15 @@ pub fn csv(
     };
     result.map(Expression::from)
     // Ok(Expression::String(result))
+}
+
+pub fn pretty(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("pretty", &args, 1, ctx)?;
+    Ok(Expression::String(pretty_formatter(&args[0])))
 }
 
 fn highlighted(

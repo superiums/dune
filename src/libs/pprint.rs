@@ -29,15 +29,24 @@ pub fn strip_ansi_escapes(text: &str) -> String {
 
 pub fn pretty_printer(arg: &Expression) -> Result<Expression, crate::RuntimeError> {
     match arg {
-        Expression::Table(table_data) => print_table_with_tabled(table_data),
-        Expression::Map(exprs) => println!("{}", pprint_map(exprs.as_ref())),
-        Expression::HMap(exprs) => println!("{}", pprint_hmap(exprs.as_ref())),
-        Expression::List(exprs) => pprint_list(exprs.as_ref()),
+        Expression::Table(table_data) => println!("{}", print_table_with_tabled(table_data, true)),
+        Expression::Map(exprs) => println!("{}", pprint_map(exprs.as_ref(), true)),
+        Expression::HMap(exprs) => println!("{}", pprint_hmap(exprs.as_ref(), true)),
+        Expression::List(exprs) => println!("{}", pprint_list(exprs.as_ref(), true)),
         _ => {
             println!("{arg:?}");
         }
     }
     Ok(Expression::None)
+}
+pub fn pretty_formatter(arg: &Expression) -> String {
+    match arg {
+        Expression::Table(table_data) => print_table_with_tabled(table_data, false).to_string(),
+        Expression::Map(exprs) => pprint_map(exprs.as_ref(), false).to_string(),
+        Expression::HMap(exprs) => pprint_hmap(exprs.as_ref(), false).to_string(),
+        Expression::List(exprs) => pprint_list(exprs.as_ref(), false).to_string(),
+        _ => format!("{arg:?}"),
+    }
 }
 
 #[derive(Tabled, PartialEq, Eq, PartialOrd, Ord)]
@@ -47,7 +56,7 @@ struct KeyValueRow {
     #[tabled(rename = "VALUE")]
     value: String,
 }
-fn pprint_map_internal<I>(items: I, is_hmap: bool) -> Table
+fn pprint_map_internal<I>(items: I, is_hmap: bool, with_color: bool) -> Table
 where
     I: Iterator<Item = (String, Expression)>,
 {
@@ -94,29 +103,41 @@ where
     }
     let mut table = Table::new(rows);
     if is_hmap {
+        if with_color {
+            table.modify(Columns::first(), Color::FG_BLUE);
+        }
+
         table
-            .modify(Columns::first(), Color::FG_BLUE)
             .modify(Columns::first(), Width::increase(key_column_width))
             .with(Style::ascii());
     } else {
-        table
-            .modify(Columns::first(), Color::FG_GREEN)
-            .with(Style::rounded());
+        if with_color {
+            table.modify(Columns::first(), Color::FG_GREEN);
+        }
+        table.with(Style::rounded());
     }
 
     table.with(Width::wrap(specified_width).keep_words(true));
     table
 }
 
-fn pprint_map(exprs: &BTreeMap<String, Expression>) -> Table {
-    pprint_map_internal(exprs.iter().map(|(k, v)| (k.clone(), v.clone())), false)
+fn pprint_map(exprs: &BTreeMap<String, Expression>, with_color: bool) -> Table {
+    pprint_map_internal(
+        exprs.iter().map(|(k, v)| (k.clone(), v.clone())),
+        false,
+        with_color,
+    )
 }
 
-pub fn pprint_hmap(exprs: &HashMap<String, Expression>) -> Table {
-    pprint_map_internal(exprs.iter().map(|(k, v)| (k.clone(), v.clone())), true)
+pub fn pprint_hmap(exprs: &HashMap<String, Expression>, with_color: bool) -> Table {
+    pprint_map_internal(
+        exprs.iter().map(|(k, v)| (k.clone(), v.clone())),
+        true,
+        with_color,
+    )
 }
 
-fn pprint_list(exprs: &[Expression]) {
+fn pprint_list(exprs: &[Expression], with_color: bool) -> Table {
     let specified_width = crossterm::terminal::size().unwrap_or((120, 0)).0 as usize;
 
     let (rows, heads_opt) = TableRow {
@@ -127,7 +148,7 @@ fn pprint_list(exprs: &[Expression]) {
     .split_into_rows();
 
     if rows.is_empty() {
-        return;
+        return Table::default();
     }
     let mut builder;
 
@@ -151,11 +172,12 @@ fn pprint_list(exprs: &[Expression]) {
     // builder.insert_column(0, once(String::new()).chain((0..X).map(|i| i.to_string())));
     let mut table = builder.build();
 
-    table
-        .modify(Rows::first(), Color::FG_BLUE)
-        .with(Width::wrap(specified_width).keep_words(true));
+    table.with(Width::wrap(specified_width).keep_words(true));
 
     if has_header {
+        if with_color {
+            table.modify(Rows::first(), Color::FG_BLUE);
+        }
         table
             .with(
                 Modify::new(Rows::first()).with(tabled::settings::format::Format::content(|s| {
@@ -166,10 +188,10 @@ fn pprint_list(exprs: &[Expression]) {
     } else {
         table.with(Style::modern_rounded());
     }
-    println!("{table}");
+    table
 }
 
-fn print_table_with_tabled(table: &TableData) {
+fn print_table_with_tabled(table: &TableData, with_color: bool) -> Table {
     let mut builder = Builder::with_capacity(table.row_count(), table.column_count());
 
     builder.push_record(table.headers());
@@ -179,12 +201,13 @@ fn print_table_with_tabled(table: &TableData) {
 
     let mut table = builder.build();
     let specified_width = crossterm::terminal::size().unwrap_or((120, 0)).0 as usize;
-    table
-        .modify(Rows::first(), Color::FG_BLUE)
-        .with(Width::wrap(specified_width).keep_words(true));
+    if with_color {
+        table.modify(Rows::first(), Color::FG_BLUE);
+    }
+    table.with(Width::wrap(specified_width).keep_words(true));
 
     table.with(Style::rounded());
-    println!("{table}");
+    table
 }
 
 struct TableRow<'a> {
