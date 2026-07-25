@@ -105,6 +105,7 @@ fn r#where(
 }
 
 // args should be lazy evaled
+/// pipe action NOT supported
 fn repeat(
     args: &[Expression],
     env: &mut Environment,
@@ -219,15 +220,31 @@ fn r#typeof(
 }
 
 // Print Formated
+/// format need template to be first arg,
+/// but pipe alwasy takes 1st place.
+/// so we need to adjust it auto.
 fn format(
     args: &[Expression],
     env: &mut Environment,
     state: &mut State,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_args_len("format", args, 1.., ctx)?;
-    let template_expr = args[0].eval_mut(state, env, 0)?;
-    let template = get_string_arg(template_expr, ctx)?;
+    check_args_len("format", args, 2.., ctx)?;
+    let data0 = args[0].eval_mut(state, env, 0)?;
+    let data1 = args[1].eval_mut(state, env, 0)?;
+
+    let (template, data_first) = match args[0] {
+        Expression::Blank => {
+            let template = get_string_arg(data1, ctx)?;
+            (template, data0)
+        }
+        _ => {
+            let template = get_string_arg(data0, ctx)?;
+            (template, data1)
+        }
+    };
+
+    // let template = get_string_arg(template_expr, ctx)?;
     let re = FORMAT_RE.get_or_init(|| Regex::new(r#"\{(\w+)\}"#).unwrap());
     let mut result = template.clone();
     for (full, [var]) in re.captures_iter(&template).map(|m| m.extract()) {
@@ -237,7 +254,9 @@ fn format(
 
     // position arg
     let placeholders = result.matches("{}").count();
-    for arg in args.iter().skip(1).take(placeholders) {
+
+    result = result.replacen("{}", &data_first.to_string(), 1);
+    for arg in args.iter().skip(2).take(placeholders) {
         result = result.replacen("{}", &arg.eval_mut(state, env, 0)?.to_string(), 1);
     }
 
