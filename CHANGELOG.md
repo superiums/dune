@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.16.12]
+- pipe support for format
+- support align in format
+`format '{:*>20}' 'right align with *'`
+- add into.pretty
+now pretty output could be redirect or operated
+
+- split map/list output fn for table
+- pass map insteadof list to find/filter fn
+- allow first(n)/last(n) for list
+- console.read* improve
+- featured read
+now support `-t time -p prompt -n number_of_chars -s silent` params
+
+- fix arg bounds tip
+
 ## [0.16.11]
 - fix fuzzy cd
 - improve ai tip and uncallable err tip
