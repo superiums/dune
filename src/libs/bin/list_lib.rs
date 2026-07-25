@@ -60,8 +60,8 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         flatten => "flatten nested structure", "<collection>"
         is_empty => "is this list empty?", "<list>"
 
-        first => "get the first element of a list", "<list>"
-        last => "get the last element of a list", "<list>"
+        first => "get the first element of a list", "<list> [n]"
+        last => "get the last element of a list", "<list> [n]"
         at => "get the nth element of a list", "<list> <index>"
         take => "take the first n elements of a list", "<list> <count>"
         drop => "drop the first n elements of a list", "<list> <count>"
@@ -241,12 +241,23 @@ fn first(
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("first", &args, 1, ctx)?;
-    let list = get_list_ref(&args[0], ctx)?;
-
-    list.as_ref().first().cloned().ok_or_else(|| {
-        RuntimeError::common("cannot get first of empty list".into(), ctx.clone(), 0)
-    })
+    check_args_len("first", &args, 1..=2, ctx)?;
+    let mut it = args.iter();
+    let list = get_list_ref(&it.next().unwrap(), ctx)?;
+    match it.next() {
+        Some(Expression::Integer(i)) if *i > 1 => {
+            let r = list
+                .as_ref()
+                .iter()
+                .take(*i as usize)
+                .cloned()
+                .collect::<Vec<_>>();
+            Ok(Expression::from(r))
+        }
+        _ => list.as_ref().first().cloned().ok_or_else(|| {
+            RuntimeError::common("cannot get first of empty list".into(), ctx.clone(), 0)
+        }),
+    }
 }
 
 fn last(
@@ -254,13 +265,25 @@ fn last(
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("last", &args, 1, ctx)?;
-    let list = get_list_ref(&args[0], ctx)?;
-
-    list.as_ref()
-        .last()
-        .cloned()
-        .ok_or_else(|| RuntimeError::common("cannot get last of empty list".into(), ctx.clone(), 0))
+    check_args_len("last", &args, 1..=2, ctx)?;
+    let mut it = args.iter();
+    let list = get_list_ref(&it.next().unwrap(), ctx)?;
+    match it.next() {
+        Some(Expression::Integer(i)) if *i > 1 => {
+            let r = list
+                .as_ref()
+                .iter()
+                .rev()
+                .take(*i as usize)
+                .rev()
+                .cloned()
+                .collect::<Vec<_>>();
+            Ok(Expression::from(r))
+        }
+        _ => list.as_ref().first().cloned().ok_or_else(|| {
+            RuntimeError::common("cannot get first of empty list".into(), ctx.clone(), 0)
+        }),
+    }
 }
 fn clamp(n: Int, len: usize) -> usize {
     if n < 0 {
