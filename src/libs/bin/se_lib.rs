@@ -16,7 +16,8 @@ use crate::{
     },
     reg_info,
 };
-static FORMAT_RE: OnceLock<Regex> = OnceLock::new();
+static NAMED_RE: OnceLock<Regex> = OnceLock::new();
+static POSITION_RE: OnceLock<Regex> = OnceLock::new();
 
 pub fn regist_se() -> HashMap<&'static str, SelfExpandFunc> {
     let mut module: HashMap<&'static str, SelfExpandFunc> = HashMap::new();
@@ -219,7 +220,57 @@ fn r#typeof(
     Ok(Expression::from(t))
 }
 
-// Print Formated
+/// 解析格式说明符，返回 (填充字符, 对齐方向, 宽度)
+/// 支持：
+///   "10"    → (' ', '<', 10)  仅宽度，默认左对齐
+///   "<10"   → (' ', '<', 10)  左对齐
+///   ">10"   → (' ', '>', 10)  右对齐
+///   "^10"   → (' ', '^', 10)  居中
+///   "0>10"  → ('0', '>', 10)  右对齐，0填充
+///   "*^5"   → ('*', '^', 5)   居中，*填充
+fn parse_format_spec(spec: &str) -> (char, char, usize) {
+    if spec.is_empty() {
+        return (' ', '<', 0);
+    }
+    let chars: Vec<char> = spec.chars().collect();
+
+    // [填充字符][对齐方向][宽度]：第二个字符是 < > ^
+    if chars.len() >= 2 && matches!(chars[1], '<' | '>' | '^') {
+        let width: usize = chars[2..].iter().collect::<String>().parse().unwrap_or(0);
+        return (chars[0], chars[1], width);
+    }
+
+    // [对齐方向][宽度]：第一个字符是 < > ^
+    if matches!(chars[0], '<' | '>' | '^') {
+        let width: usize = chars[1..].iter().collect::<String>().parse().unwrap_or(0);
+        return (' ', chars[0], width);
+    }
+
+    // 只有宽度
+    (' ', '<', spec.parse().unwrap_or(0))
+}
+
+/// 应用对齐，使用字符数（chars().count()）而非字节数，支持中文等多字节字符
+fn apply_align(s: &str, pad_ch: char, align: char, width: usize) -> String {
+    if width == 0 {
+        return s.to_string();
+    }
+    let char_len = s.chars().count();
+    if char_len >= width {
+        return s.to_string();
+    }
+    let pad = width - char_len;
+    let make_pad = |n: usize| -> String { std::iter::repeat_n(pad_ch, n).collect() };
+    match align {
+        '>' => format!("{}{s}", make_pad(pad)),
+        '^' => {
+            let left = pad / 2;
+            format!("{}{s}{}", make_pad(left), make_pad(pad - left))
+        }
+        _ => format!("{s}{}", make_pad(pad)), // '<' 或默认
+    }
+}
+
 /// format need template to be first arg,
 /// but pipe alwasy takes 1st place.
 /// so we need to adjust it auto.
@@ -244,23 +295,50 @@ fn format(
         }
     };
 
-    // let template = get_string_arg(template_expr, ctx)?;
-    let re = FORMAT_RE.get_or_init(|| Regex::new(r#"\{(\w+)\}"#).unwrap());
-    let mut result = template.clone();
-    for (full, [var]) in re.captures_iter(&template).map(|m| m.extract()) {
-        let value = ctx.handle_variable(var, false, state, env, 0)?;
-        result = result.replace(full, &value.to_string());
+    // 第一步：替换命名参数 {name} 或 {name:spec}
+    // 注意：有可选捕获组，不能用 extract()，改用 cap.get(n)
+    let named_re = NAMED_RE.get_or_init(|| Regex::new(r"\{(\w+)(?::([^}]*))?\}").unwrap());
+    let mut result = String::new();
+    let mut last_end = 0;
+    for cap in named_re.captures_iter(&template) {
+        let m = cap.get(0).unwrap();
+        result.push_str(&template[last_end..m.start()]);
+        let var = cap.get(1).unwrap().as_str();
+        let spec = cap.get(2).map_or("", |m| m.as_str());
+        let value = ctx.handle_variable(var, false, state, env, 0)?.to_string();
+        let (pad_ch, align, width) = parse_format_spec(spec);
+        result.push_str(&apply_align(&value, pad_ch, align, width));
+        last_end = m.end();
+    }
+    result.push_str(&template[last_end..]);
+
+    // 第二步：替换位置参数 {} 或 {:spec}
+    // 收集所有位置参数：data_first 排第一，args[2..] 依次跟随
+    let mut pos_args: Vec<String> = vec![data_first.to_string()];
+    for arg in args.iter().skip(2) {
+        pos_args.push(arg.eval_mut(state, env, 0)?.to_string());
     }
 
-    // position arg
-    let placeholders = result.matches("{}").count();
-
-    result = result.replacen("{}", &data_first.to_string(), 1);
-    for arg in args.iter().skip(2).take(placeholders) {
-        result = result.replacen("{}", &arg.eval_mut(state, env, 0)?.to_string(), 1);
+    let pos_re = POSITION_RE.get_or_init(|| Regex::new(r"\{(?::([^}]*))?\}").unwrap());
+    let template2 = result;
+    let mut result = String::new();
+    let mut last_end = 0;
+    let mut pos_idx = 0;
+    for cap in pos_re.captures_iter(&template2) {
+        let m = cap.get(0).unwrap();
+        result.push_str(&template2[last_end..m.start()]);
+        let spec = cap.get(1).map_or("", |m| m.as_str());
+        if let Some(val) = pos_args.get(pos_idx) {
+            let (pad_ch, align, width) = parse_format_spec(spec);
+            result.push_str(&apply_align(val, pad_ch, align, width));
+            pos_idx += 1;
+        } else {
+            result.push_str(m.as_str()); // 参数不足时保留原占位符
+        }
+        last_end = m.end();
     }
+    result.push_str(&template2[last_end..]);
 
-    // println!("{}", result);
     Ok(Expression::String(result))
 }
 
