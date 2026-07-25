@@ -54,7 +54,7 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         eprintln => "print to stderr with newline", "<args>..."
         // debug => "print debug representation", "<args>..."
         // ddebug => "pretty debug", "<args>..."
-        read => "get user input", "[prompt]"
+        read => "get user input", "[-p prompt] [-n count] [-s] [-t secs]"
         throw => "return a runtime error", "<msg>"
 
         // Data manipulation
@@ -496,15 +496,155 @@ fn eprintln(
 
 fn read(
     args: Vec<Expression>,
-    env: &mut Environment,
+    _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    print(args, env, ctx)?;
-    // let _ = std::io::stdout().flush();
+    use crossterm::event::{Event, KeyCode};
+    use std::io::Write;
+    use std::time::{Duration, Instant};
 
-    let mut input = String::new();
-    let _ = std::io::stdin().read_line(&mut input);
-    Ok(Expression::String(input.trim().to_owned()))
+    // 解析参数
+    let mut prompt = String::new();
+    let mut max_chars: Option<usize> = None;
+    let mut silent = false;
+    let mut timeout_secs: Option<f64> = None;
+
+    let mut i = 0;
+    while i < args.len() {
+        let s = args[i].to_string();
+        match s.as_str() {
+            "-p" => {
+                i += 1;
+                if i < args.len() {
+                    prompt = args[i].to_string();
+                }
+            }
+            "-n" => {
+                i += 1;
+                if i < args.len() {
+                    if let Ok(n) = args[i].to_string().parse::<usize>() {
+                        max_chars = Some(n);
+                    }
+                }
+            }
+            "-s" => {
+                silent = true;
+            }
+            "-t" => {
+                i += 1;
+                if i < args.len() {
+                    if let Ok(t) = args[i].to_string().parse::<f64>() {
+                        timeout_secs = Some(t);
+                    }
+                }
+            }
+            _ => {
+                // 兼容旧行为：单个非选项参数视为 prompt
+                if prompt.is_empty() {
+                    prompt = s;
+                }
+            }
+        }
+        i += 1;
+    }
+
+    // 显示 prompt
+    if !prompt.is_empty() {
+        print!("{}", prompt);
+        std::io::stdout().flush().map_err(|e| {
+            RuntimeError::common(format!("Flush failed: {e}").into(), ctx.clone(), 0)
+        })?;
+    }
+
+    // 判断是否需要 crossterm raw mode（-n、-s、-t 都需要）
+    let use_raw = max_chars.is_some() || silent || timeout_secs.is_some();
+
+    if !use_raw {
+        // 简单模式：兼容旧行为
+        let mut input = String::new();
+        let _ = std::io::stdin().read_line(&mut input);
+        return Ok(Expression::String(input.trim().to_owned()));
+    }
+
+    // Raw mode 处理
+    crossterm::terminal::enable_raw_mode().map_err(|e| {
+        RuntimeError::common(
+            format!("Failed to enable raw mode: {e}").into(),
+            ctx.clone(),
+            0,
+        )
+    })?;
+
+    let mut chars: Vec<char> = Vec::new();
+    let max = max_chars.unwrap_or(usize::MAX);
+    let total_timeout = timeout_secs.map(|t| Duration::from_millis((t * 1000.0) as u64));
+    let start = Instant::now();
+
+    let result = loop {
+        // 计算剩余超时时间
+        let poll_duration = if let Some(total) = total_timeout {
+            let elapsed = start.elapsed();
+            if elapsed >= total {
+                break None; // 已超时
+            }
+            total - elapsed
+        } else {
+            Duration::from_secs(u64::MAX) // 无超时，实际上阻塞
+        };
+
+        match crossterm::event::poll(poll_duration) {
+            Ok(true) => {}
+            _ => break None, // 超时或错误
+        }
+
+        match crossterm::event::read() {
+            Ok(Event::Key(key)) => match key.code {
+                KeyCode::Enter => {
+                    if !silent {
+                        println!();
+                    }
+                    break Some(chars.iter().collect::<String>());
+                }
+                KeyCode::Char(c) => {
+                    if !silent {
+                        print!("{c}");
+                        let _ = std::io::stdout().flush();
+                    }
+                    chars.push(c);
+                    if chars.len() >= max {
+                        if !silent {
+                            println!();
+                        }
+                        break Some(chars.iter().collect::<String>());
+                    }
+                }
+                KeyCode::Backspace => {
+                    if !chars.is_empty() {
+                        chars.pop();
+                        if !silent {
+                            print!("\x08 \x08");
+                            let _ = std::io::stdout().flush();
+                        }
+                    }
+                }
+                _ => {}
+            },
+            _ => {}
+        }
+    };
+
+    crossterm::terminal::disable_raw_mode().map_err(|e| {
+        RuntimeError::common(
+            format!("Failed to disable raw mode: {e}").into(),
+            ctx.clone(),
+            0,
+        )
+    })?;
+
+    match result {
+        Some(s) => Ok(Expression::String(s)),
+        None => Ok(Expression::None), // 超时返回 None
+    }
 }
 
 pub fn len(
