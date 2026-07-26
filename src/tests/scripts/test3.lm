@@ -21,10 +21,10 @@ for i in 1..4 {
 let i = 0
 while i < 3 {
     print(i)
-    i = i + 1
+    set i = i + 1
 }
 
-"hello" | string.upper | string.length |> print
+"hello" | string.to_upper | string.len |> print
 
 [1, 2, 3] |> print
 
@@ -52,7 +52,7 @@ print(val2)
 
 let count = 0
 loop {
-    count = count + 1
+    set count = count + 1
     if count > 2 {
         break
     }
@@ -67,7 +67,7 @@ print(m)
 
 print("hello".len())
 
-"hello" | string.upper |> print
+"hello" | string.to_upper |> print
 
 print(math.sin(1.0))
 
@@ -100,10 +100,10 @@ print(bool_test)
 let dealt_test = (throw "err") ?: "fallback"
 print(dealt_test)
 
-let r = 1..5 |> list.from
+let r = 1..5 | list.from
 print(r)
 
-let s = {1, 2, 3}
+let s = S{1, 2, 3}
 print(s)
 
 let m2 = {a: 1, b: 2}
