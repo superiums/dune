@@ -52,11 +52,12 @@ impl Ctx {
             TokenKind::Whitespace | TokenKind::Comment => Ctx::Space,
             TokenKind::LineBreak => Ctx::Start,
             TokenKind::IntegerLiteral | TokenKind::FloatLiteral => Ctx::Number,
-            TokenKind::Symbol => Ctx::Letter,
+            // TokenKind::Symbol => Ctx::Letter,
             _ => match last_char {
                 // Some(c) if c.is_ascii_whitespace() => Ctx::Space,
                 // Some(c) if c.is_ascii_digit() => Ctx::Number,
-                Some(c) if c.is_ascii_alphabetic() => Ctx::Letter,
+                // Some(c) if c.is_ascii_alphabetic() => Ctx::Letter,
+                Some(c) if c.is_ascii_alphanumeric() => Ctx::Letter,
                 Some(')' | ']' | '}' | '\'' | '"' | '`' | '_') => Ctx::Word,
                 Some('(' | '[' | '{' | '|') => Ctx::Start,
                 _ => Ctx::Open,
@@ -367,7 +368,10 @@ fn minus_dispatch(
             map_valid_token(punctuation_tag("-"), TokenKind::Operator), //a-b as operator
                                                                         // map_valid_token(symbol, TokenKind::Symbol),
         ))(input),
-        Ctx::Start => alt((map_valid_token(prefix_minus_tag, TokenKind::OperatorPrefix),))(input),
+        Ctx::Start => alt((
+            map_valid_token(prefix_minus_tag, TokenKind::OperatorPrefix),
+            map_valid_token(punctuation_tag("-"), TokenKind::Symbol), //never useful
+        ))(input),
         Ctx::Space if is_cfm => alt((
             map_valid_token(punctuation_tag("-="), TokenKind::Operator),
             map_valid_token(punctuation_tag("->"), TokenKind::Operator),
@@ -377,6 +381,7 @@ fn minus_dispatch(
             map_valid_token(postfix_break_tag("-"), TokenKind::StringRaw), //ls | cat -
             // `--flag`/`-s`  → argument symbol
             map_valid_token(whole_word("-"), TokenKind::StringRaw),
+            map_valid_token(punctuation_tag("-"), TokenKind::Symbol), //never useful
         ))(input),
         Ctx::Space => alt((
             map_valid_token(punctuation_tag("-="), TokenKind::Operator),
@@ -389,10 +394,12 @@ fn minus_dispatch(
             map_valid_token(space_followed_tag("-"), TokenKind::Operator),
             // must after '- ' to exclude it
             map_valid_token(postfix_break_tag("-"), TokenKind::StringRaw), //ls | cat -
+            map_valid_token(punctuation_tag("-"), TokenKind::Symbol),      //never useful
         ))(input),
         Ctx::Open => alt((
             map_valid_token(prefix_minus_tag, TokenKind::OperatorPrefix),
-            map_valid_token(punctuation_tag("-"), TokenKind::Symbol),
+            map_valid_token(space_followed_tag("-"), TokenKind::Operator), //not useful
+            map_valid_token(punctuation_tag("-"), TokenKind::Symbol),      //never useful
         ))(input),
     }
 }
@@ -488,22 +495,27 @@ fn question_dispatch(input: Input<'_>, _ctx: Ctx) -> TokenizationResult<'_, (Tok
 fn underscore_dispatch(input: Input<'_>, ctx: Ctx) -> TokenizationResult<'_, (Token, Diagnostic)> {
     match ctx {
         Ctx::Letter | Ctx::Word | Ctx::Number => alt((
-            map_valid_token(punct_seq_tag("__"), TokenKind::OperatorPostfix),
+            map_valid_token(punct_seq_tag("__"), TokenKind::OperatorPostfix), //custom op use
             map_valid_token(punctuation_tag("_"), TokenKind::Symbol),
         ))(input),
-        _ => map_valid_token(
-            |input| {
-                input
-                    .strip_prefix("_")
-                    .filter(|(rest, _)| {
-                        rest.is_empty()
-                            || rest.starts_with(&[' ', '\n', ')', ']', '}', ';'])
-                            || rest.starts_with("..")
-                    })
-                    .ok_or(NOT_FOUND)
-            },
-            TokenKind::ValueSymbol,
-        )(input), //`ls _` `[0.._]` `[_..9]`
+        _ => alt((
+            map_valid_token(punct_seq_tag("__"), TokenKind::Operator), //custom op define
+            map_valid_token(
+                |input| {
+                    input
+                        .strip_prefix("_")
+                        .filter(|(rest, _)| {
+                            rest.is_empty()
+                                || rest.starts_with(&[' ', '\n', ')', ']', '}', ';'])
+                                || rest.starts_with("..")
+                        })
+                        .ok_or(NOT_FOUND)
+                },
+                TokenKind::ValueSymbol,
+            ),
+            // cfm never affect _
+            map_valid_token(|input| symbol(input, false, ctx, ctx), TokenKind::Symbol), // failback to symbol: _foo
+        ))(input), //`ls _` `[0.._]` `[_..9]`
     }
 }
 
@@ -592,7 +604,7 @@ fn colon_dispatch(input: Input<'_>, ctx: Ctx) -> TokenizationResult<'_, (Token, 
 /// Requires non-Word context (standalone `@` before identifier).
 fn at_dispatch(input: Input<'_>, ctx: Ctx) -> TokenizationResult<'_, (Token, Diagnostic)> {
     match ctx {
-        Ctx::Start => alt((
+        Ctx::Start | Ctx::Space => alt((
             map_valid_token(prefix_tag("@"), TokenKind::OperatorPrefix), // @deco, @(expr)
         ))(input),
         _ => {
@@ -644,7 +656,7 @@ fn punct_seq_tag(punct: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResult<'
     move |input: Input<'_>| {
         if input.starts_with(punct) {
             let places = input.chars().take_while(char::is_ascii_punctuation).count();
-            if places > 1 + punct.len() {
+            if places > punct.len() {
                 return Ok(input.split_at(places));
             }
         }
