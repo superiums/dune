@@ -1,8 +1,16 @@
 # Changelog
 
 ## [0.16.13]
-- rewrite unescape
-- fix cfm affect stringtemplate
+- rewrite unescape for all string
+- fix cfm affect stringtemplate parse
+- improve bare - tokinize
+- fix customop parse
+- allow `_foo` sym
+- allow `@deco` after space
+- fix `m2.a`
+- Update test3.lm
+- imporve editor render
+- fix quote, fix lazzy assign
 
 ## [0.16.12]
 - pipe support for format
