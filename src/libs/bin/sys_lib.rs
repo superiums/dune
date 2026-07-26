@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use common_macros::hash_map;
 
 use crate::libs::BuiltinInfo;
@@ -17,7 +15,7 @@ use crate::{reg_info, reg_lazy};
 pub fn regist_lazy() -> LazyModule {
     reg_lazy!({
         dirs, env, vars, has, defined,
-        quote, ecodes_rt, ecodes_lm,
+        ecodes_rt, ecodes_lm,
 
         info,modes,
         // throw,
@@ -37,7 +35,6 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         has => "check if a variable is defined in current environment", "<var>"
         defined => "check if a variable is defined in current environment tree", "<var>"
 
-        quote => "quote an expression", "<expr>"
         ecodes_rt => "display runtime error codes", ""
         ecodes_lm => "display Lmerror codes", ""
         // throw => "return a runtime error", "<msg>"
@@ -109,15 +106,6 @@ fn modes(
         String::from("strict") => STRICT_ENABLED.with_borrow(|c|c==&true),
         String::from("pdm") => PRINT_DIRECT.with_borrow(|c|c==&true),
     }))
-}
-
-fn quote(
-    mut args: Vec<Expression>,
-    _env: &mut Environment,
-    ctx: &Expression,
-) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("quote", &args, 1, ctx)?;
-    Ok(Expression::Quote(Rc::new(args.pop().unwrap())))
 }
 
 fn env(

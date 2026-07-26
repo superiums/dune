@@ -1489,11 +1489,7 @@ pub fn unescape_str(s: &str) -> String {
 fn parse_string(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
     let (input, expr) = kind(TokenKind::StringLiteral)(input)?;
     let raw_str = expr.to_str(input.str);
-    let cs = raw_str
-        .strip_prefix('"')
-        .unwrap_or_default()
-        .strip_suffix('"')
-        .unwrap_or_default();
+    let cs = raw_str.trim_start_matches('"').trim_end_matches('"');
     let r = unescape_str(cs);
     Ok((input, Expression::String(r)))
 }
@@ -1501,12 +1497,9 @@ fn parse_string(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErro
 fn parse_string_raw_inner(input: Tokens<'_>) -> IResult<Tokens<'_>, String, SyntaxErrorKind> {
     let (input, expr) = kind(TokenKind::StringRaw)(input)?;
     let raw_str = expr.to_str(input.str);
-    let cs = raw_str
-        .strip_prefix("'")
-        .unwrap_or_default()
-        .strip_suffix("'")
-        .unwrap_or_default();
-    Ok((input, cs.replace("\\'", "'")))
+    let cs = raw_str.trim_start_matches('\'').trim_end_matches('\'');
+    let r = cs.replace("\\'", "'").replace("\\\\", "\\");
+    Ok((input, r))
 }
 #[inline]
 fn parse_string_raw(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
@@ -1517,23 +1510,15 @@ fn parse_string_raw(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, Syntax
 fn parse_regex(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
     let (input, expr) = kind(TokenKind::Regex)(input)?;
     let raw_str = expr.to_str(input.str);
-    let cs = raw_str
-        .strip_prefix("r'")
-        .unwrap_or_default()
-        .strip_suffix("'")
-        .unwrap_or_default();
-    let r = cs.replace("\\'", "'");
+    let cs = raw_str.trim_start_matches("r'").trim_end_matches('\'');
+    let r = cs.replace("\\'", "'").replace("\\\\", "\\");
     Ok((input, Expression::RegexDef(r)))
 }
 fn parse_time(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
     let (input, expr) = kind(TokenKind::Time)(input)?;
     let raw_str = expr.to_str(input.str);
-    let cs = raw_str
-        .strip_prefix("t'")
-        .unwrap_or_default()
-        .strip_suffix("'")
-        .unwrap_or_default();
-    let r = cs.replace("\\'", "'");
+    let cs = raw_str.trim_start_matches("t'").trim_end_matches('\'');
+    let r = cs.replace("\\'", "'").replace("\\\\", "\\");
     Ok((input, Expression::TimeDef(r)))
 }
 // #[inline]
@@ -1692,11 +1677,7 @@ fn split_template_segments(template: &str) -> Vec<Expression> {
 fn parse_string_template(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
     let (input, expr) = kind(TokenKind::StringTemplate)(input)?;
     let raw_str = expr.to_str(input.str);
-    let cs = raw_str
-        .strip_prefix('`')
-        .unwrap_or_default()
-        .strip_suffix('`')
-        .unwrap_or_default();
+    let cs = raw_str.trim_start_matches('`').trim_end_matches('`');
     let r = unescape_str(cs);
     let segments = split_template_segments(&r);
     Ok((input, Expression::StringTemplate(segments)))
@@ -2639,7 +2620,7 @@ fn parse_lazy_assign(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, Synta
     // dbg!(&expr);
     Ok((
         input,
-        Expression::Assign(symbol, Rc::new(Expression::Quote(Rc::new(expr)))),
+        Expression::Declare(symbol, Rc::new(Expression::Quote(Rc::new(expr)))),
     ))
 }
 

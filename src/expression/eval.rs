@@ -292,9 +292,15 @@ impl Expression {
                     // dbg!("declare---->", &name, &expr.type_name());
                     // 块级作用域
                     if state.contains(State::IN_LOCAL) {
-                        state.set(State::IN_ASSIGN);
-                        let value = expr.as_ref().eval_mut(state, env, depth + 1)?;
-                        state.clear(State::IN_ASSIGN);
+                        let value = match expr.as_ref() {
+                            Expression::Quote(inner) => inner.as_ref().clone(), // 不求值，直接存
+                            other => {
+                                state.set(State::IN_ASSIGN);
+                                let v = other.eval_mut(state, env, depth + 1)?;
+                                state.clear(State::IN_ASSIGN);
+                                v
+                            }
+                        };
                         state.set_local_var(name.to_string(), value);
                         return Ok(Self::None);
                     }
@@ -317,9 +323,15 @@ impl Expression {
                     //     }
                     //     env.define(name, value); // 新增 declare
                     // } else {
-                    state.set(State::IN_ASSIGN);
-                    let value = expr.as_ref().eval_mut(state, env, depth + 1)?;
-                    state.clear(State::IN_ASSIGN);
+                    let value = match expr.as_ref() {
+                        Expression::Quote(inner) => inner.as_ref().clone(), // 不求值，直接存
+                        other => {
+                            state.set(State::IN_ASSIGN);
+                            let v = other.eval_mut(state, env, depth + 1)?;
+                            state.clear(State::IN_ASSIGN);
+                            v
+                        }
+                    };
                     env.define(name, value);
 
                     return Ok(Self::None);
