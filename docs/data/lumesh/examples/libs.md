@@ -37,7 +37,7 @@ exec_str <string>
 exit [status]
 flatten <collection>
 format <template> <args>...
-  formatted string with vars
+  print formatted string with named/position vars, aligned, template like `'hi {a:*>20} {}'`
 get <map|list|range> <path>
   get value from nested map/list/range using dot notation path
 help [module]

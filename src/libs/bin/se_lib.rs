@@ -44,7 +44,7 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
       typeof => "get type of data value", "<value>"
 
       // Data manipulation
-      format => "print formatted string with vars", "<template> <args>..."
+      format => "print formatted string with named/position vars, aligned", "'tmpl {a:*>20}' <args>..."
       where => "filter rows by condition", "<table> <condition> "
 
       // Execution control
