@@ -52,6 +52,7 @@ impl Ctx {
             TokenKind::Whitespace | TokenKind::Comment => Ctx::Space,
             TokenKind::LineBreak => Ctx::Start,
             TokenKind::IntegerLiteral | TokenKind::FloatLiteral => Ctx::Number,
+            TokenKind::Symbol => Ctx::Letter,
             _ => match last_char {
                 // Some(c) if c.is_ascii_whitespace() => Ctx::Space,
                 // Some(c) if c.is_ascii_digit() => Ctx::Number,
