@@ -1,14 +1,15 @@
 use core::option::Option::None;
 use detached_str::Str;
 use std::{
-    borrow::Cow,
     collections::{BTreeMap, BTreeSet, HashMap},
     rc::Rc,
 };
 
 use crate::{
-    Diagnostic, Expression, Int, MAX_SYNTAX_RECURSION, SyntaxErrorKind, Token, TokenKind,
+    CFM_ENABLED, Diagnostic, Expression, Int, MAX_SYNTAX_RECURSION, SyntaxErrorKind, Token,
+    TokenKind,
     expression::{CatchType, ChainCall, DestructurePattern, FileSize},
+    set_cfm_enabled,
     tokens::{Input, Tokens},
     with_cfm_enabled,
 };
@@ -1358,174 +1359,182 @@ fn parse_variable(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxEr
     preceded(text("$"), map(parse_symbol_string, Expression::Variable))(input)
 }
 
-/// 将非法转义序列 \X 转义为 \\X，以使 snailquote 能够处理
-fn escape_invalid_escapes(s: &str) -> String {
+/// 自定义转义处理器，替换 snailquote::unescape
+/// 输入为去掉外层引号后的裸字符串内容
+/// 对于无法识别的转义序列，保留 \X 原样（宽容模式）
+pub fn unescape_str(s: &str) -> String {
     let mut result = String::with_capacity(s.len());
     let mut chars = s.chars().peekable();
+
     while let Some(c) = chars.next() {
-        if c == '\\' {
-            if let Some(&next) = chars.peek() {
-                match next {
-                    'n' | 't' | 'r' | '0' | '\\' | '"' | '\'' | 'u' => {
-                        result.push('\\');
-                        result.push(next);
-                        chars.next();
-                    }
-                    _ => {
-                        // \X → \\X
-                        result.push('\\');
-                        result.push('\\');
-                        result.push(next);
-                        chars.next();
-                    }
-                }
-            } else {
+        if c != '\\' {
+            result.push(c);
+            continue;
+        }
+
+        match chars.next() {
+            None => {
+                // 末尾孤立的反斜杠，保留
                 result.push('\\');
             }
-        } else {
-            result.push(c);
-        }
-    }
-    result
-}
+            Some(next) => match next {
+                // 标准转义
+                'n' => result.push('\n'),
+                'r' => result.push('\r'),
+                't' => result.push('\t'),
+                '0' => result.push('\0'),
+                'a' => result.push('\x07'),       // 响铃
+                'b' => result.push('\x08'),       // 退格
+                'f' => result.push('\x0c'),       // 换页
+                'v' => result.push('\x0b'),       // 垂直制表符
+                'e' | 'E' => result.push('\x1b'), // ESC（统一处理，不再需要预处理）
+                '\\' => result.push('\\'),
+                '"' => result.push('"'),
+                '\'' => result.push('\''),
+                '`' => result.push('`'),
 
-/// 辅助函数：解析字符串字面量的通用逻辑
-#[inline]
-fn parse_string_common(
-    input: Tokens<'_>,
-    kind_token: TokenKind,
-    enable_ansi_escape: bool,
-    enable_normal_escape: bool,
-) -> IResult<Tokens<'_>, Cow<'_, str>, SyntaxErrorKind> {
-    // 提取字符串字面量
-    let (input, expr) = kind(kind_token)(input)?;
-    let raw_str = expr.to_str(input.str);
-    // 检查是否符合格式要求
-    if raw_str.len() >= 2 {
-        // 如果启用了 ANSI 转义序列替换，则进行处理
-        let ansi_escaped = if enable_ansi_escape {
-            Cow::Owned(
-                raw_str
-                    .replace("\\x1b", "\x1b")
-                    .replace("\\033", "\x1b")
-                    .replace("\\007", "\x07"),
-            )
-        } else {
-            Cow::Borrowed(raw_str)
-        };
-
-        // 验证开头和结尾是否为指定字符
-        let quote_char = match kind_token {
-            TokenKind::StringLiteral => '"', //never replace "", snailquote need.
-            TokenKind::StringTemplate => '`',
-            TokenKind::StringRaw | TokenKind::Regex | TokenKind::Time => '\'',
-            _ => unreachable!(),
-        };
-        let start_chars = match kind_token {
-            TokenKind::StringRaw => "'",
-            TokenKind::StringLiteral => "\"", //never replace "", snailquote need.
-            TokenKind::StringTemplate => "`",
-            TokenKind::Regex => "r'",
-            TokenKind::Time => "t'",
-            _ => unreachable!(),
-        };
-        // 如果有右侧引号，则调整结束位置
-        let start = match ansi_escaped.starts_with(start_chars) {
-            true => expr.start() + start_chars.len(),
-            false => expr.start(),
-        };
-        let end = match ansi_escaped.ends_with(quote_char) {
-            true => expr.end() - 1,
-            false => expr.end(),
-        };
-
-        // 截取中间的内容并进行转义替换
-        let cs = input.str.get(start..end);
-        let content: Cow<'_, str> = match kind_token {
-            TokenKind::StringLiteral => ansi_escaped, //never replace "", snailquote need.
-            TokenKind::StringTemplate => {
-                let inner = cs
-                    .to_str(input.str)
-                    .replace("\\x1b", "\x1b")
-                    .replace("\\033", "\x1b")
-                    .replace("\\007", "\x07");
-                // snailquote 只在 "..." 中处理转义，将内容用双引号包裹
-                let mut escaped = String::with_capacity(inner.len() + 2);
-                escaped.push('"');
-                let mut chars = inner.chars().peekable();
-                while let Some(c) = chars.next() {
-                    if c == '\\' {
-                        escaped.push('\\');
-                        if let Some(&next) = chars.peek() {
-                            escaped.push(next);
-                            chars.next();
+                // \xNN 十六进制字节
+                'x' => {
+                    let hex: String = chars.by_ref().take(2).collect();
+                    if hex.len() == 2 {
+                        if let Ok(n) = u8::from_str_radix(&hex, 16) {
+                            // 作为 Unicode 标量值处理，支持 ASCII 范围
+                            result.push(n as char);
+                        } else {
+                            result.push('\\');
+                            result.push('x');
+                            result.push_str(&hex);
                         }
-                    } else if c == '"' {
-                        escaped.push('\\');
-                        escaped.push('"');
                     } else {
-                        escaped.push(c);
+                        result.push('\\');
+                        result.push('x');
+                        result.push_str(&hex);
                     }
                 }
-                escaped.push('"');
-                Cow::Owned(escaped)
-            }
-            _ => Cow::Borrowed(cs.to_str(input.str)),
-        };
 
-        if enable_normal_escape {
-            let raw_fallback = cs.to_str(input.str).to_string();
-            let r = match snailquote::unescape(content.as_ref()) {
-                Ok(s) => s,
-                Err(_) => {
-                    // 第一次失败：将非法转义 \X 转为 \\X 后重试
-                    let fixed = escape_invalid_escapes(content.as_ref());
-                    snailquote::unescape(&fixed).unwrap_or(raw_fallback)
+                // \033 \007 等八进制（3位）
+                '0'..='7' => {
+                    let mut oct = String::with_capacity(3);
+                    oct.push(next);
+                    for _ in 0..2 {
+                        if matches!(chars.peek(), Some('0'..='7')) {
+                            oct.push(chars.next().unwrap());
+                        } else {
+                            break;
+                        }
+                    }
+                    if let Ok(n) = u32::from_str_radix(&oct, 8) {
+                        if let Some(ch) = char::from_u32(n) {
+                            result.push(ch);
+                        } else {
+                            result.push('\\');
+                            result.push_str(&oct);
+                        }
+                    } else {
+                        result.push('\\');
+                        result.push_str(&oct);
+                    }
                 }
-            };
-            //     .map_err(|e| {
-            //     nom::Err::Error(SyntaxErrorKind::InvalidEscapeSequence(
-            //         e.to_string(),
-            //         input.get_str_slice(),
-            //     ))
-            // })?;
-            Ok((input, r.into()))
-        } else {
-            Ok((input, content))
-        }
 
-        // 返回解析结果
-        // Ok((input, result))
-    } else {
-        // 如果不符合格式要求，返回错误
-        // Err(SyntaxErrorKind::failure(
-        //     expr,
-        //     "string enclosed",
-        //     Some(raw_str.to_string()),
-        //     Some("check string surrounds"),
-        // ))
-        Ok((input, Cow::Borrowed(raw_str)))
+                // \u{NNNN} 或 \uNNNN（4位）
+                'u' => {
+                    if chars.peek() == Some(&'{') {
+                        chars.next(); // consume '{'
+                        let hex: String = chars.by_ref().take_while(|&c| c != '}').collect();
+                        match u32::from_str_radix(&hex, 16).ok().and_then(char::from_u32) {
+                            Some(ch) => result.push(ch),
+                            None => {
+                                result.push_str("\\u{");
+                                result.push_str(&hex);
+                                result.push('}');
+                            }
+                        }
+                    } else {
+                        let hex: String = chars.by_ref().take(4).collect();
+                        match u32::from_str_radix(&hex, 16).ok().and_then(char::from_u32) {
+                            Some(ch) => result.push(ch),
+                            None => {
+                                result.push_str("\\u");
+                                result.push_str(&hex);
+                            }
+                        }
+                    }
+                }
+
+                // \UNNNNNNNN（8位 Unicode）
+                'U' => {
+                    let hex: String = chars.by_ref().take(8).collect();
+                    match u32::from_str_radix(&hex, 16).ok().and_then(char::from_u32) {
+                        Some(ch) => result.push(ch),
+                        None => {
+                            result.push_str("\\U");
+                            result.push_str(&hex);
+                        }
+                    }
+                }
+
+                // 无法识别的转义序列：保留原始 \X
+                other => {
+                    result.push('\\');
+                    result.push(other);
+                }
+            },
+        }
     }
+
+    result
 }
 
 #[inline]
 fn parse_string(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
-    let (input, r) = parse_string_common(input, TokenKind::StringLiteral, true, true)?;
-    Ok((input, Expression::String(r.into())))
+    let (input, expr) = kind(TokenKind::StringLiteral)(input)?;
+    let raw_str = expr.to_str(input.str);
+    let cs = raw_str
+        .strip_prefix('"')
+        .unwrap_or_default()
+        .strip_suffix('"')
+        .unwrap_or_default();
+    let r = unescape_str(cs);
+    Ok((input, Expression::String(r)))
+}
+#[inline]
+fn parse_string_raw_inner(input: Tokens<'_>) -> IResult<Tokens<'_>, String, SyntaxErrorKind> {
+    let (input, expr) = kind(TokenKind::StringRaw)(input)?;
+    let raw_str = expr.to_str(input.str);
+    let cs = raw_str
+        .strip_prefix("'")
+        .unwrap_or_default()
+        .strip_suffix("'")
+        .unwrap_or_default();
+    Ok((input, cs.replace("\\'", "'")))
 }
 #[inline]
 fn parse_string_raw(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
-    let (input, r) = parse_string_common(input, TokenKind::StringRaw, false, false)?;
-    Ok((input, Expression::String(r.into())))
+    let (input, r) = parse_string_raw_inner(input)?;
+    Ok((input, Expression::String(r)))
 }
 
 fn parse_regex(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
-    let (input, r) = parse_string_common(input, TokenKind::Regex, false, false)?;
-    Ok((input, Expression::RegexDef(r.into())))
+    let (input, expr) = kind(TokenKind::Regex)(input)?;
+    let raw_str = expr.to_str(input.str);
+    let cs = raw_str
+        .strip_prefix("r'")
+        .unwrap_or_default()
+        .strip_suffix("'")
+        .unwrap_or_default();
+    let r = cs.replace("\\'", "'");
+    Ok((input, Expression::RegexDef(r)))
 }
 fn parse_time(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
-    let (input, r) = parse_string_common(input, TokenKind::Time, false, false)?;
-    Ok((input, Expression::TimeDef(r.into())))
+    let (input, expr) = kind(TokenKind::Time)(input)?;
+    let raw_str = expr.to_str(input.str);
+    let cs = raw_str
+        .strip_prefix("t'")
+        .unwrap_or_default()
+        .strip_suffix("'")
+        .unwrap_or_default();
+    let r = cs.replace("\\'", "'");
+    Ok((input, Expression::TimeDef(r)))
 }
 // #[inline]
 // fn parse_string_template(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
@@ -1557,10 +1566,22 @@ fn find_matching_brace(s: &str, start: usize) -> Option<usize> {
 fn parse_brace_segment(template: &str, start: usize, prefix: &str) -> Option<(Expression, usize)> {
     let end = find_matching_brace(template, start)?;
     let inner = &template[start..end];
+
+    // shutdown cfm
+    let changed = if CFM_ENABLED.with_borrow(|cfm| cfm == &true) {
+        set_cfm_enabled(false);
+        true
+    } else {
+        false
+    };
     let expr = match parse_script(inner) {
         Ok(expr) => expr,
         Err(_) => Expression::String(format!("{prefix}{{{inner}}}")),
     };
+    // restore cfm
+    if changed {
+        set_cfm_enabled(true);
+    }
     Some((expr, end + 1)) // end + 1 跳过 '}'
 }
 /// 将模板字符串内容分解为表达式片段列表
@@ -1669,8 +1690,15 @@ fn split_template_segments(template: &str) -> Vec<Expression> {
 
 #[inline]
 fn parse_string_template(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
-    let (input, raw) = parse_string_common(input, TokenKind::StringTemplate, true, false)?;
-    let segments = split_template_segments(&raw);
+    let (input, expr) = kind(TokenKind::StringTemplate)(input)?;
+    let raw_str = expr.to_str(input.str);
+    let cs = raw_str
+        .strip_prefix('`')
+        .unwrap_or_default()
+        .strip_suffix('`')
+        .unwrap_or_default();
+    let r = unescape_str(cs);
+    let segments = split_template_segments(&r);
     Ok((input, Expression::StringTemplate(segments)))
 }
 // -- 字面量解析 --
@@ -2884,10 +2912,7 @@ fn parse_module_selective(input: Tokens<'_>) -> IResult<Tokens<'_>, ModuleInfo, 
 
 fn parse_use_statement(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
     let (input, _) = text("use")(input)?;
-    let (input, module_path) = cut(alt((parse_symbol_string, |input| {
-        parse_string_common(input, TokenKind::StringRaw, false, false)
-            .map(|(tk, s)| (tk, s.into_owned()))
-    })))(input)?;
+    let (input, module_path) = cut(alt((parse_symbol_string, parse_string_raw_inner)))(input)?;
     let (input, alias) = opt(preceded(text("as"), parse_symbol_string))(input)?;
 
     // 暂时创建空环境，后续会被替换

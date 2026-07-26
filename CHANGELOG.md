@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.16.13]
+- rewrite unescape
+- fix cfm affect stringtemplate
+
 ## [0.16.12]
 - pipe support for format
 - support align in format

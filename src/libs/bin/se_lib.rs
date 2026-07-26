@@ -178,11 +178,19 @@ fn debug(
     let mut results = Vec::new();
     for x in args.iter() {
         let expr_repr = format!("{x:?}");
-        let y = x.eval_with_assign(state, env)?;
+        let y = x.eval_with_assign(state, env);
         let mut map = BTreeMap::new();
         map.insert("expr".to_string(), Expression::String(expr_repr));
-        map.insert("type".to_string(), Expression::String(y.type_name()));
-        map.insert("value".to_string(), y);
+        match y {
+            Ok(r) => {
+                map.insert("type".to_string(), Expression::String(r.type_name()));
+                map.insert("value".to_string(), r);
+            }
+            Err(e) => {
+                map.insert("type".to_string(), Expression::String("Err".to_string()));
+                map.insert("value".to_string(), Expression::String(e.kind.to_string()));
+            }
+        };
         results.push(Expression::from(map));
     }
     Ok(Expression::from(results))
@@ -198,11 +206,19 @@ fn ddebug(
     let mut results = Vec::new();
     for x in args.iter() {
         let expr_repr = format!("{x:#}");
-        let y = x.eval_with_assign(state, env)?;
+        let y = x.eval_with_assign(state, env);
         let mut map = BTreeMap::new();
         map.insert("expr".to_string(), Expression::String(expr_repr));
-        map.insert("type".to_string(), Expression::String(y.type_name()));
-        map.insert("value".to_string(), y);
+        match y {
+            Ok(r) => {
+                map.insert("type".to_string(), Expression::String(r.type_name()));
+                map.insert("value".to_string(), r);
+            }
+            Err(e) => {
+                map.insert("type".to_string(), Expression::String("Err".to_string()));
+                map.insert("value".to_string(), Expression::String(e.kind.to_string()));
+            }
+        };
         results.push(Expression::from(map));
     }
     Ok(Expression::from(results))
@@ -216,8 +232,10 @@ fn r#typeof(
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
     check_exact_args_len("typeof", args, 1, ctx)?;
-    let t = args[0].eval_with_assign(state, env)?.type_name();
-    Ok(Expression::from(t))
+    match args[0].eval_with_assign(state, env) {
+        Ok(r) => Ok(Expression::from(r.type_name())),
+        _ => Ok(Expression::String("Err".to_string())),
+    }
 }
 
 /// 解析格式说明符，返回 (填充字符, 对齐方向, 宽度)
