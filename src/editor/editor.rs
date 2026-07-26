@@ -1239,15 +1239,21 @@ impl Editor {
             .unwrap_or(0)
     }
 
+    // 步骤	修正内容
+    // 步骤 3	用 visual_rows_per_line 统一计算折行，替代原来分支里重复的 total_lines 逻辑
+    // 步骤 4	每行用 MoveTo(0, render_row) 定位，不再用 Print("\r\n")，消除 prompt_row 漂移
+    // 步骤 5	逐段累加折行数计算 cursor_row，而非只加 \n 计数
+    // 步骤 6	单独计算 end_row/end_col（文本末尾），used_rows 基于全文而非光标
+    // 步骤 7	hint 渲染到 (end_col, end_row)，不再覆盖光标处的文本
     // ---- Rendering ----
     fn render(&mut self) -> Result<(), ReadlineError> {
-        // 补全弹窗空间不足时，向上滚动腾出空间（修复原来的无效 let _ = 写法）
+        // ── 1. 补全弹窗空间检查 ──────────────────────────────────────────────
         if matches!(self.mode, EditorMode::CompletionSelect { .. }) {
             let est_space =
                 (self.terminal_height as usize).saturating_sub(self.prompt_row as usize + 2);
             if est_space < 3 {
                 let scroll: u16 = 3;
-                let _ = crossterm::queue!(std::io::stdout(), ScrollUp(scroll),);
+                let _ = crossterm::queue!(std::io::stdout(), ScrollUp(scroll));
                 self.prompt_row = self.prompt_row.saturating_sub(scroll);
                 self.popup_rendered = None;
             }
@@ -1256,8 +1262,9 @@ impl Editor {
         let mut stdout = stdout();
         let line = self.buffer.text();
         let cursor = self.buffer.cursor();
+        let vis_width = self.terminal_width as usize;
 
-        // 清除上次渲染的补全弹窗
+        // ── 2. 清除上次渲染的补全弹窗 ────────────────────────────────────────
         if let Some((start, end)) = self.popup_rendered {
             for row in start..=end {
                 let _ = queue!(stdout, MoveTo(0, row), Clear(ClearType::CurrentLine));
@@ -1265,102 +1272,130 @@ impl Editor {
             self.popup_rendered = None;
         }
 
-        if line.contains('\n') {
-            // 多行输入：计算需要多少行，不足时向上滚动，不清全屏
-            let total_lines = line.matches('\n').count() + 1;
-            let needed_rows = total_lines + 1;
-            // 多保留一行，以供hint使用
-            let available_rows =
-                (self.terminal_height as usize).saturating_sub(self.prompt_row as usize + 1);
-            if needed_rows > available_rows {
-                let extra = (needed_rows - available_rows) as u16;
-                queue!(stdout, ScrollUp(extra)).map_err(ReadlineError::Io)?;
-                self.prompt_row = self.prompt_row.saturating_sub(extra);
-            }
-            queue!(
-                stdout,
-                MoveTo(0, self.prompt_row),
-                Clear(ClearType::FromCursorDown)
-            )
-            .map_err(ReadlineError::Io)?;
-        } else {
-            let est_visual_rows =
-                1 + (self.prompt_width + line.len()) / self.terminal_width as usize;
-            let available_rows =
-                (self.terminal_height as usize).saturating_sub(self.prompt_row as usize + 1);
-            if est_visual_rows > available_rows {
-                // 内容超出底部：向上滚动腾出空间，不清全屏
-                let extra = (est_visual_rows - available_rows) as u16;
-                queue!(stdout, ScrollUp(extra)).map_err(ReadlineError::Io)?;
-                self.prompt_row = self.prompt_row.saturating_sub(extra);
-            }
-            queue!(
-                stdout,
-                MoveTo(0, self.prompt_row),
-                Clear(ClearType::FromCursorDown)
-            )
-            .map_err(ReadlineError::Io)?;
+        // ── 3. 计算全文视觉行数（含折行），不足时向上滚动 ────────────────────
+        //   Bug4修正：不再依赖 \r\n 自动滚动，改为逐行 MoveTo，
+        //   所以这里只需要计算总视觉行数用于滚动判断。
+        let all_parts: Vec<&str> = line.split('\n').collect();
+
+        // 计算每一逻辑行的视觉行数（含折行）
+        let visual_rows_per_line: Vec<usize> = all_parts
+            .iter()
+            .enumerate()
+            .map(|(i, part)| {
+                let prefix_w = if i == 0 {
+                    self.prompt_width
+                } else {
+                    self.cont_prompt_width
+                };
+                let w = prefix_w + visible_width(part);
+                // 至少占 1 行，超宽则折行
+                1 + w.saturating_sub(1) / vis_width
+            })
+            .collect();
+
+        let total_visual_rows: usize = visual_rows_per_line.iter().sum();
+        // 多保留一行供 hint 使用
+        let needed_rows = total_visual_rows + 1;
+        let available_rows =
+            (self.terminal_height as usize).saturating_sub(self.prompt_row as usize);
+
+        if needed_rows > available_rows {
+            let extra = (needed_rows - available_rows) as u16;
+            queue!(stdout, ScrollUp(extra)).map_err(ReadlineError::Io)?;
+            self.prompt_row = self.prompt_row.saturating_sub(extra);
         }
 
-        // 渲染输入内容
-        if line.contains('\n') {
-            let parts: Vec<&str> = line.split('\n').collect();
-            for (i, part) in parts.iter().enumerate() {
+        // 从 prompt_row 向下清屏
+        queue!(
+            stdout,
+            MoveTo(0, self.prompt_row),
+            Clear(ClearType::FromCursorDown)
+        )
+        .map_err(ReadlineError::Io)?;
+
+        // ── 4. 渲染输入内容（Bug4修正：用 MoveTo 逐行定位，避免 \r\n 漂移）──
+        {
+            let mut render_row = self.prompt_row;
+            for (i, part) in all_parts.iter().enumerate() {
                 let prefix = if i == 0 {
                     &self.prompt
                 } else {
                     &self.cont_prompt
                 };
-                queue!(stdout, Print(prefix)).map_err(ReadlineError::Io)?;
+                queue!(stdout, MoveTo(0, render_row), Print(prefix)).map_err(ReadlineError::Io)?;
                 if let Some(ref hl) = self.highlighter {
                     queue!(stdout, Print(&hl.highlight(part))).map_err(ReadlineError::Io)?;
                 } else {
                     queue!(stdout, Print(part)).map_err(ReadlineError::Io)?;
                 }
-                if i + 1 < parts.len() {
-                    queue!(stdout, Print("\r\n")).map_err(ReadlineError::Io)?;
-                }
-            }
-        } else {
-            queue!(stdout, Print(&self.prompt)).map_err(ReadlineError::Io)?;
-            if let Some(ref hl) = self.highlighter {
-                queue!(stdout, Print(&hl.highlight(&line))).map_err(ReadlineError::Io)?;
-            } else {
-                queue!(stdout, Print(&line)).map_err(ReadlineError::Io)?;
+                render_row += visual_rows_per_line[i] as u16;
             }
         }
 
-        // 计算光标位置
+        // ── 5. 计算光标位置（Bug2修正：逐行累加折行，而非只加 \n 数量）────────
         let byte_cursor = line
             .char_indices()
             .nth(cursor)
             .map(|(i, _)| i)
             .unwrap_or(line.len());
-        let lines_before_cursor: Vec<&str> = line[..byte_cursor].split('\n').collect();
-        let cursor_row_offset = lines_before_cursor.len() - 1;
-        let col_in_last = visible_width(lines_before_cursor.last().copied().unwrap_or(""));
-        let total_col = if cursor_row_offset == 0 {
-            self.prompt_width + col_in_last
-        } else {
-            self.cont_prompt_width + col_in_last
-        };
-        let vis_width = self.terminal_width as usize;
-        let used_rows = cursor_row_offset + 1 + total_col / vis_width;
-        let cursor_row =
-            self.prompt_row + cursor_row_offset as u16 + (total_col / vis_width) as u16;
-        let cursor_col = (total_col % vis_width) as u16;
 
-        // hint 显示
+        let lines_before_cursor: Vec<&str> = line[..byte_cursor].split('\n').collect();
+        let mut cursor_row = self.prompt_row;
+        let mut cursor_col = 0u16;
+
+        for (i, part) in lines_before_cursor.iter().enumerate() {
+            let prefix_w = if i == 0 {
+                self.prompt_width
+            } else {
+                self.cont_prompt_width
+            };
+            let line_visual_w = prefix_w + visible_width(part);
+
+            if i + 1 < lines_before_cursor.len() {
+                // 不是光标所在段：整段（含折行）都要跳过
+                cursor_row += 1 + (line_visual_w.saturating_sub(1) / vis_width) as u16;
+            } else {
+                // 光标所在段：折行数加到行，列取余数
+                cursor_row += (line_visual_w / vis_width) as u16;
+                cursor_col = (line_visual_w % vis_width) as u16;
+            }
+        }
+
+        // ── 6. 计算内容末尾位置（Bug1&3修正：用于 hint 和 used_rows）──────────
+        let mut end_row = self.prompt_row;
+        let mut end_col = 0usize;
+
+        for (i, part) in all_parts.iter().enumerate() {
+            let prefix_w = if i == 0 {
+                self.prompt_width
+            } else {
+                self.cont_prompt_width
+            };
+            let line_visual_w = prefix_w + visible_width(part);
+            if i + 1 < all_parts.len() {
+                end_row += visual_rows_per_line[i] as u16;
+                end_col = 0;
+            } else {
+                end_row += (line_visual_w / vis_width) as u16;
+                end_col = line_visual_w % vis_width;
+            }
+        }
+
+        // used_rows 基于全文末尾，而非光标位置（Bug1修正）
+        let used_rows = (end_row - self.prompt_row) as usize + 1;
+
+        // ── 7. hint 显示（Bug3修正：渲染在文本末尾，而非光标处）──────────────
         if !self.is_ai_hinting {
             if self.show_hint {
                 if let Some(ref hinter) = self.hinter {
-                    if let Some(hint) = hinter.hint(&line, byte_cursor) {
+                    let byte_end = line.len();
+                    if let Some(hint) = hinter.hint(&line, byte_end) {
                         self.current_hint = Some(hint);
                     } else if let Some(hint) = self.history.search_hint(&line) {
                         self.current_hint = Some(hint);
                     } else {
                         self.current_hint = None;
-                    };
+                    }
                 }
             }
         }
@@ -1369,7 +1404,7 @@ impl Editor {
             let display = strip_ansi(hint);
             queue!(
                 stdout,
-                MoveTo(cursor_col, cursor_row),
+                MoveTo(end_col as u16, end_row), // ← 末尾位置，不是光标位置
                 SetForegroundColor(self.theme.hint_color),
                 Print(&display),
                 ResetColor
@@ -1377,7 +1412,7 @@ impl Editor {
             .map_err(ReadlineError::Io)?;
         }
 
-        // 渲染补全弹窗
+        // ── 8. 渲染补全弹窗（传入修正后的 used_rows）────────────────────────
         let popup_data = match &self.mode {
             EditorMode::CompletionSelect {
                 completions,
@@ -1390,7 +1425,7 @@ impl Editor {
             self.render_completion_popup(&mut stdout, &completions, selected, used_rows)?;
         }
 
-        // 定位光标
+        // ── 9. 定位光标并刷新 ────────────────────────────────────────────────
         queue!(stdout, MoveTo(cursor_col, cursor_row)).map_err(ReadlineError::Io)?;
         stdout.flush().map_err(ReadlineError::Io)?;
         Ok(())
