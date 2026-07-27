@@ -118,6 +118,10 @@ impl State {
         self.3.insert(name, value);
     }
     #[inline]
+    pub fn remove_local_var(&mut self, name: &str) {
+        self.3.remove(name);
+    }
+    #[inline]
     pub fn has_local_var(&mut self, name: &str) -> bool {
         self.3.contains_key(name)
     }
@@ -337,13 +341,14 @@ impl Expression {
                     return Ok(Self::None);
                 }
                 Self::SetParent(name, expr) => {
-                    // 新增：先检查 local_vars 中是否有该变量
+                    // 先删除 local_vars 中的同名变量
                     if state.contains(State::IN_LOCAL) && state.has_local_var(name) {
-                        state.set(State::IN_ASSIGN);
-                        let value = expr.as_ref().eval_mut(state, env, depth + 1)?;
-                        state.clear(State::IN_ASSIGN);
-                        state.set_local_var(name.to_string(), value);
-                        return Ok(Self::None);
+                        // state.set(State::IN_ASSIGN);
+                        // let value = expr.as_ref().eval_mut(state, env, depth + 1)?;
+                        // state.clear(State::IN_ASSIGN);
+                        // state.set_local_var(name.to_string(), value);
+                        // return Ok(Self::None);
+                        state.remove_local_var(&name);
                     }
                     // 检查env
                     if env.has(name) {
