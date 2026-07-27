@@ -1591,7 +1591,7 @@ fn split_template_segments(template: &str) -> Vec<Expression> {
                 // 转义：\{ \$ 输出字面量，其余保留反斜杠
                 if let Some(next) = template[i + char_len..].chars().next() {
                     match next {
-                        '{' | '$' => {
+                        '{' | '$' | '}' => {
                             literal.push(next);
                             i += char_len + next.len_utf8();
                         }

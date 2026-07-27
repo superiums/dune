@@ -333,7 +333,7 @@ fn dot_dispatch(input: Input<'_>, ctx: Ctx) -> TokenizationResult<'_, (Token, Di
             map_valid_token(prefix_range_tag("..."), TokenKind::OperatorInfix),
             map_valid_token(prefix_range_tag("..="), TokenKind::OperatorInfix),
             map_valid_token(prefix_range_tag(".."), TokenKind::OperatorInfix), //a..b range
-            map_valid_token(postfix_break_tag(".."), TokenKind::OperatorPostfix), //a.. range
+            map_valid_token(postfix_range_tag(".."), TokenKind::OperatorPostfix), //a.. range
             map_valid_token(alpha_followed_tag("."), TokenKind::OperatorPostfix), //call
         ))(input),
         Ctx::Start | Ctx::Space | Ctx::Open => alt((
@@ -418,15 +418,30 @@ fn prefix_minus_tag(input: Input<'_>) -> TokenizationResult<'_> {
 }
 
 /// Maches range prefix, allow followed by literal/number/(_:]
-/// a..-2  a.._  a..(a+b)  a..:2  [a..]
+/// prefix: ..b  .._ ..-2 ..(c)
+/// infix : a..-2  a.._  a..(c)
 fn prefix_range_tag(prefix: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResult<'_> {
     move |input: Input<'_>| {
         input
             .strip_prefix(prefix)
             .filter(|(rest, _)| {
                 rest.starts_with(|c: char| {
-                    c.is_ascii_alphanumeric() || matches!(c, '(' | '-' | '_' | ':' | ']')
+                    c.is_ascii_alphanumeric() || matches!(c, '(' | '-' | '_')
                 })
+            })
+            .ok_or(NOT_FOUND)
+    }
+}
+
+/// a..:2  [a..]
+/// a..  _.. followed by space/:/] or end delimeter
+fn postfix_range_tag(prefix: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResult<'_> {
+    move |input: Input<'_>| {
+        input
+            .strip_prefix(prefix)
+            .filter(|(rest, _)| {
+                rest.is_empty()
+                    || rest.starts_with(|c: char| is_path_delimiter(c) || matches!(c, ':' | ']'))
             })
             .ok_or(NOT_FOUND)
     }
@@ -434,11 +449,11 @@ fn prefix_range_tag(prefix: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResu
 
 fn circum_dispatch(input: Input<'_>, ctx: Ctx) -> TokenizationResult<'_, (Token, Diagnostic)> {
     match ctx {
-        Ctx::Letter | Ctx::Word | Ctx::Number => alt((map_valid_token(
+        Ctx::Letter | Ctx::Word => alt((map_valid_token(
             punctuation_tag("^"),
             TokenKind::OperatorPostfix,
         ),))(input), //5%
-        Ctx::Start | Ctx::Space | Ctx::Open => {
+        Ctx::Start | Ctx::Space | Ctx::Open | Ctx::Number => {
             map_valid_token(punctuation_tag("^"), TokenKind::Operator)(input)
         }
     }
