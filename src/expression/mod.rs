@@ -36,6 +36,7 @@ pub enum Expression {
     Bytes(Vec<u8>), // 这个保持值类型，因为Rc<Vec>反而增加复杂度
     String(String),
     StringTemplate(Vec<Self>),
+    StringSafe(String),
     RegexDef(String),
     TimeDef(String),
     Regex(LumeRegex),

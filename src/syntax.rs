@@ -159,6 +159,11 @@ pub fn highlight(line: &str, theme: &HashMap<String, String>) -> String {
                 is_colored = true;
                 result.push_str(s);
             }
+            (TokenKind::StringSafe, s) => {
+                result.push_str(get_color("string_safe", theme));
+                is_colored = true;
+                result.push_str(s);
+            }
         }
 
         // 非空白才更新
@@ -223,6 +228,7 @@ pub fn get_dark_theme() -> HashMap<String, String> {
         String::from("string_raw") => "\x1b[38;5;114m".to_string(),        // 绿色 (#98C379)
         String::from("string_template") => "\x1b[38;5;120m".to_string(),   // 亮绿色
         String::from("string_literal") => "\x1b[38;5;107m".to_string(),    // 橄榄绿
+        String::from("string_safte") => "\x1b[38;5;127m".to_string(),      //
         String::from("string_error") => "\x1b[38;5;204m".to_string(),      // 红色 (#E06C75)
 
         // 数字和字面量
@@ -290,6 +296,7 @@ pub fn get_ayu_dark_theme() -> HashMap<String, String> {
         String::from("string_raw") => "\x1b[38;5;107m".to_string(),        // 绿色 (#AAD94C)
         String::from("string_template") => "\x1b[38;5;113m".to_string(),   // 亮绿色
         String::from("string_literal") => "\x1b[38;5;114m".to_string(),    // 草绿色
+        String::from("string_safte") => "\x1b[38;5;120m".to_string(),      //
         String::from("string_error") => "\x1b[38;5;203m".to_string(),      // 红色 (#F07178)
 
         // 数字和字面量
@@ -358,6 +365,7 @@ pub fn get_light_theme() -> HashMap<String, String> {
         String::from("string_raw") => "\x1b[38;5;64m".to_string(),         // 深绿色 (#86B300)
         String::from("string_template") => "\x1b[38;5;70m".to_string(),    // 草绿色
         String::from("string_literal") => "\x1b[38;5;76m".to_string(),     // 亮绿色
+        String::from("string_safte") => "\x1b[38;5;79m".to_string(),      //
         String::from("string_error") => "\x1b[38;5;124m".to_string(),      // 深红色 (#F51818)
 
         // 数字和字面量

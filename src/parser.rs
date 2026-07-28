@@ -275,6 +275,7 @@ impl PrattParser {
                 | TokenKind::StringLiteral
                 | TokenKind::StringRaw
                 | TokenKind::StringTemplate
+                | TokenKind::StringSafe
                 | TokenKind::IntegerLiteral
                 | TokenKind::FloatLiteral
                 | TokenKind::ValueSymbol
@@ -428,6 +429,7 @@ impl PrattParser {
             TokenKind::StringLiteral if PREC_LITERAL >= min_prec => parse_string(input),
             TokenKind::StringRaw if PREC_LITERAL >= min_prec => parse_string_raw(input),
             TokenKind::StringTemplate if PREC_LITERAL >= min_prec => parse_string_template(input),
+            TokenKind::StringSafe if PREC_LITERAL >= min_prec => parse_string_safe(input),
             TokenKind::IntegerLiteral if PREC_LITERAL >= min_prec => parse_integer(input),
             TokenKind::FloatLiteral if PREC_LITERAL >= min_prec => parse_float(input),
             TokenKind::ValueSymbol if PREC_LITERAL >= min_prec => parse_value_symbol(input),
@@ -1520,6 +1522,13 @@ fn parse_time(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorK
     let cs = raw_str.trim_start_matches("t'").trim_end_matches('\'');
     let r = cs.replace("\\'", "'").replace("\\\\", "\\");
     Ok((input, Expression::TimeDef(r)))
+}
+fn parse_string_safe(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
+    let (input, expr) = kind(TokenKind::StringSafe)(input)?;
+    let raw_str = expr.to_str(input.str);
+    let cs = raw_str.trim_start_matches("s'").trim_end_matches('\'');
+    let r = cs.replace("\\'", "'").replace("\\\\", "\\");
+    Ok((input, Expression::StringSafe(r)))
 }
 // #[inline]
 // fn parse_string_template(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {

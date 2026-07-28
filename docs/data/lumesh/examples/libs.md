@@ -462,7 +462,8 @@ max_syntax [int]
 max_usemode [int]
 modes
 print_tty <arg>
-quote <expr>
+safe <str>
+  make a string safe and never eval
 set_cfm <boolean>
 set_pdm <boolean>
 set_strict <boolean>

@@ -120,6 +120,7 @@ pub enum TokenKind {
     StringLiteral,
     StringRaw,
     StringTemplate,
+    StringSafe,
     IntegerLiteral,
     FloatLiteral,
     ValueSymbol,

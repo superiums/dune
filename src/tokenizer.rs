@@ -569,6 +569,7 @@ fn alpha_dispatch(
         map_valid_token(value_symbol, TokenKind::ValueSymbol),
         regex_literal,
         time_literal,
+        stringsafe_literal,
         map_valid_token(protocols, TokenKind::StringRaw),
         map_valid_token(
             |input| symbol(input, is_cfm, ctx, last_ctx),
@@ -900,6 +901,14 @@ fn regex_literal(input: Input<'_>) -> TokenizationResult<'_, (Token, Diagnostic)
 fn time_literal(input: Input<'_>) -> TokenizationResult<'_, (Token, Diagnostic)> {
     if input.as_ref().starts_with("t'") {
         parse_prefixed_string(input, "t'", TokenKind::Time)
+    } else {
+        Err(NOT_FOUND)
+    }
+}
+
+fn stringsafe_literal(input: Input<'_>) -> TokenizationResult<'_, (Token, Diagnostic)> {
+    if input.as_ref().starts_with("s'") {
+        parse_prefixed_string(input, "s'", TokenKind::StringSafe)
     } else {
         Err(NOT_FOUND)
     }

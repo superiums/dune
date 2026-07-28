@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.17.0]
+- introduce `StringSafe`
+- rm local var and modify env while using `set`
+- support `\}` for StringTemplate;
+- allow `2^x` without space;
+- fix .. as postfix for range
+now unclosed range could work well without `_`
+
 ## [0.16.13]
 - rewrite unescape for all string
 - fix cfm affect stringtemplate parse

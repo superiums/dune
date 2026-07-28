@@ -65,6 +65,7 @@ impl Expression {
             Self::Integer(it) => write!(f, "{}{it}", idt(i)),
             Self::Float(n) => write!(f, "{}{n}", idt(i)),
             Self::String(s) => write!(f, "{}{s}", idt(i)),
+            Self::StringSafe(s) => write!(f, "{}s'{s}'", idt(i)),
             Self::StringTemplate(segments) => {
                 write!(f, "{}`", idt(i))?;
                 for seg in segments.iter() {
@@ -663,8 +664,9 @@ impl Expression {
             Self::Blank => write!(f, "{}_", prefix),
 
             // 字符串相关
+            Self::StringSafe(s) => write!(f, "{}StringSafe〈{s:?}〉", prefix),
             Self::StringTemplate(segments) => {
-                write!(f, "{}StringTemplate〈`", prefix)?;
+                write!(f, "{}StringTemplate〈", prefix)?;
                 for seg in segments.iter() {
                     match seg {
                         Self::String(s) => write!(f, "{s}")?,
@@ -672,7 +674,7 @@ impl Expression {
                         other => write!(f, "${{{other}}}")?,
                     }
                 }
-                write!(f, "`〉")
+                write!(f, "〉")
             }
             Self::Bytes(b) => write!(f, "{}Bytes〈{:?}〉", prefix, String::from_utf8_lossy(b)),
             Self::RegexDef(s) => write!(f, "{}RegexDef〈{s:?}〉", prefix),
@@ -1002,6 +1004,7 @@ impl Expression {
             Self::FileSize(_) => "FileSize".into(),
             Self::Map(_) => "Map".into(),
             Self::String(_) => "String".into(),
+            Self::StringSafe(_) => "StringSafe".into(),
             Self::StringTemplate(_) => "StringTemplate".into(),
             Self::Integer(_) => "Integer".into(),
             Self::DateTime(_) => "DateTime".into(),

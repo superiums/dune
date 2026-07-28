@@ -277,6 +277,7 @@ impl Expression {
                     }
                     return Ok(Expression::String(result));
                 }
+                Self::StringSafe(safe) => return Ok(Self::StringSafe(safe.clone())),
                 Self::Variable(name) => return job.handle_variable(name, false, state, env, depth),
                 // {
                 //     // dbg!("2.--->variable----", &name);

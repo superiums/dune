@@ -18,6 +18,7 @@ pub fn regist_lazy() -> LazyModule {
         ecodes_rt, ecodes_lm,
 
         info,modes,
+        safe,
         // throw,
         max_syntax,
         max_runtime,
@@ -41,6 +42,7 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
 
         info => "get os info", ""
         modes => "get lume modes", ""
+        safe => "make a string safe and never eval","<str>"
 
         max_syntax => "get/set max syntax recursion","[int]"
         max_runtime=> "get/set max runtime recursion","[int]"
@@ -106,6 +108,18 @@ fn modes(
         String::from("strict") => STRICT_ENABLED.with_borrow(|c|c==&true),
         String::from("pdm") => PRINT_DIRECT.with_borrow(|c|c==&true),
     }))
+}
+
+fn safe(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    _ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    let str = args
+        .into_iter()
+        .next()
+        .map_or("".to_string(), |exp| exp.to_string());
+    Ok(Expression::StringSafe(str))
 }
 
 fn env(
