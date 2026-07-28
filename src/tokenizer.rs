@@ -240,11 +240,13 @@ fn plus_dispatch(
         Ctx::Space if is_cfm => alt((
             map_valid_token(punctuation_tag("+="), TokenKind::Operator),
             map_valid_token(space_followed_tag("+"), TokenKind::Operator),
-            map_valid_token(whole_word("+"), TokenKind::Symbol), //important for `chmod +x`
+            map_valid_token(postfix_break_tag("+"), TokenKind::Operator), // for not fail: `1 +`
+            map_valid_token(whole_word("+"), TokenKind::Symbol),          //important for `chmod +x`
         ))(input),
         Ctx::Space => alt((
             map_valid_token(punctuation_tag("+="), TokenKind::Operator),
             map_valid_token(space_followed_tag("+"), TokenKind::Operator),
+            map_valid_token(postfix_break_tag("+"), TokenKind::Operator), // for not fail: `1 +`
             map_valid_token(operator_tag("+"), TokenKind::OperatorPrefix), //important for `chmod +x`
         ))(input),
         _ => alt((
@@ -441,7 +443,7 @@ fn postfix_range_tag(prefix: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationRes
             .strip_prefix(prefix)
             .filter(|(rest, _)| {
                 rest.is_empty()
-                    || rest.starts_with(|c: char| is_path_delimiter(c) || matches!(c, ':' | ']'))
+                    || rest.starts_with(|c: char| is_path_delimiter(c) || matches!(c, ':'))
             })
             .ok_or(NOT_FOUND)
     }
@@ -515,13 +517,14 @@ fn underscore_dispatch(input: Input<'_>, ctx: Ctx) -> TokenizationResult<'_, (To
         ))(input),
         _ => alt((
             map_valid_token(punct_seq_tag("__"), TokenKind::Operator), //custom op define
+            //`ls _` `[0.._]` `[_..9]` `a[.._:2]
             map_valid_token(
                 |input| {
                     input
                         .strip_prefix("_")
                         .filter(|(rest, _)| {
                             rest.is_empty()
-                                || rest.starts_with(&[' ', '\n', ')', ']', '}', ';'])
+                                || rest.starts_with(&[' ', '\n', ')', ']', '}', ':', ';'])
                                 || rest.starts_with("..")
                         })
                         .ok_or(NOT_FOUND)
@@ -530,7 +533,7 @@ fn underscore_dispatch(input: Input<'_>, ctx: Ctx) -> TokenizationResult<'_, (To
             ),
             // cfm never affect _
             map_valid_token(|input| symbol(input, false, ctx, ctx), TokenKind::Symbol), // failback to symbol: _foo
-        ))(input), //`ls _` `[0.._]` `[_..9]`
+        ))(input),
     }
 }
 
@@ -608,6 +611,10 @@ fn colon_dispatch(input: Input<'_>, ctx: Ctx) -> TokenizationResult<'_, (Token, 
             map_valid_token(alpha_followed_tag("::"), TokenKind::OperatorInfix),
             map_valid_token(punctuation_tag(":="), TokenKind::Operator),
             map_valid_token(operator_tag(":"), TokenKind::Operator), //{k:v} a?b:c
+        ))(input),
+        Ctx::Start => alt((
+            map_valid_token(punctuation_tag(":="), TokenKind::Operator),
+            map_valid_token(operator_tag(":"), TokenKind::OperatorPrefix), // a[:2]
         ))(input),
         _ => alt((
             map_valid_token(punctuation_tag(":="), TokenKind::Operator),

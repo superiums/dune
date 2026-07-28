@@ -35,12 +35,12 @@ const PREC_COMPARISON: u8 = 8; // 比较运算
 const PREC_CMD_ARG: u8 = 9;
 const PREC_FUNC_ARG: u8 = 3;
 
+const PREC_RANGE: u8 = 10; // range         ..
 const PREC_ADD_SUB: u8 = 11; // 加减
 const PREC_MUL_DIV: u8 = 12; // 乘除模 custom_op _*
 const PREC_POWER: u8 = 13; // 幂运算 ^
 const PREC_CUSTOM: u8 = 14; // 自定义
 // 其他
-const PREC_RANGE: u8 = 19; // range         ..
 // prefix
 const PREC_UNARY: u8 = 20; // 单目运算符     ! -
 // const PREC_PRIFIX: u8 = 21; // 单目运算符     ++ --
@@ -298,6 +298,18 @@ impl PrattParser {
                     match &lhs {
                         Expression::Symbol(_)|Expression::Variable(_)| Expression::String(_)
                         |Expression::Index(.. ) | Expression::Property(..)=>{}
+                        Expression::Integer(_) | Expression::Float(_) | Expression::Range(.. )
+                        | Expression::List(_)| Expression::BSet(_)
+                        | Expression::Map(_)| Expression::HMap(_)
+                        | Expression::RegexDef(_) | Expression::TimeDef(_) | Expression::FileSize(_)
+                        | Expression::Bytes(_) => {
+                            return Err(SyntaxErrorKind::failure(
+                                input.get_str_slice(),
+                                "operator or separator",
+                                Some(format!("{operator}")),
+                                Some("numbers/data cannot be followed by symbols without an operator"),
+                            ));
+                        }
                         _ => break
                     }
                     if input.len() == 1 {
@@ -414,6 +426,22 @@ impl PrattParser {
                                 Rc::new(Expression::Blank),
                                 Rc::new(rhs),
                                 steps.map(Rc::new),
+                            ),
+                        ))
+                    }
+                    ":" => {
+                        // :2 as range
+                        let input = input.skip_n(1);
+
+                        let (input, steps) =
+                            cut(alt((parse_symbol, parse_integer, parse_variable)))(input)?;
+                        Ok((
+                            input,
+                            Expression::RangeOp(
+                                "..".to_string(),
+                                Rc::new(Expression::Blank),
+                                Rc::new(Expression::Blank),
+                                Some(Rc::new(steps)),
                             ),
                         ))
                     }
@@ -1491,7 +1519,8 @@ pub fn unescape_str(s: &str) -> String {
 fn parse_string(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
     let (input, expr) = kind(TokenKind::StringLiteral)(input)?;
     let raw_str = expr.to_str(input.str);
-    let cs = raw_str.trim_start_matches('"').trim_end_matches('"');
+    let s = raw_str.strip_prefix('"').unwrap_or(raw_str);
+    let cs = s.strip_suffix('"').unwrap_or(s);
     let r = unescape_str(cs);
     Ok((input, Expression::String(r)))
 }
@@ -1499,7 +1528,8 @@ fn parse_string(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErro
 fn parse_string_raw_inner(input: Tokens<'_>) -> IResult<Tokens<'_>, String, SyntaxErrorKind> {
     let (input, expr) = kind(TokenKind::StringRaw)(input)?;
     let raw_str = expr.to_str(input.str);
-    let cs = raw_str.trim_start_matches('\'').trim_end_matches('\'');
+    let s = raw_str.strip_prefix('\'').unwrap_or(raw_str);
+    let cs = s.strip_suffix('\'').unwrap_or(s);
     let r = cs.replace("\\'", "'").replace("\\\\", "\\");
     Ok((input, r))
 }
@@ -1512,21 +1542,24 @@ fn parse_string_raw(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, Syntax
 fn parse_regex(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
     let (input, expr) = kind(TokenKind::Regex)(input)?;
     let raw_str = expr.to_str(input.str);
-    let cs = raw_str.trim_start_matches("r'").trim_end_matches('\'');
+    let s = raw_str.strip_prefix("r'").unwrap_or(raw_str);
+    let cs = s.strip_suffix('\'').unwrap_or(s);
     let r = cs.replace("\\'", "'").replace("\\\\", "\\");
     Ok((input, Expression::RegexDef(r)))
 }
 fn parse_time(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
     let (input, expr) = kind(TokenKind::Time)(input)?;
     let raw_str = expr.to_str(input.str);
-    let cs = raw_str.trim_start_matches("t'").trim_end_matches('\'');
+    let s = raw_str.strip_prefix("t'").unwrap_or(raw_str);
+    let cs = s.strip_suffix('\'').unwrap_or(s);
     let r = cs.replace("\\'", "'").replace("\\\\", "\\");
     Ok((input, Expression::TimeDef(r)))
 }
 fn parse_string_safe(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
     let (input, expr) = kind(TokenKind::StringSafe)(input)?;
     let raw_str = expr.to_str(input.str);
-    let cs = raw_str.trim_start_matches("s'").trim_end_matches('\'');
+    let s = raw_str.strip_prefix("s'").unwrap_or(raw_str);
+    let cs = s.strip_suffix('\'').unwrap_or(s);
     let r = cs.replace("\\'", "'").replace("\\\\", "\\");
     Ok((input, Expression::StringSafe(r)))
 }
@@ -2776,7 +2809,7 @@ fn parse_index(
 ) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
     let (input, expr) = delimited(
         text("["),
-        |inp| PrattParser::parse_expr_with_precedence(inp, PREC_ADD_SUB, depth + 1),
+        |inp| PrattParser::parse_expr_with_precedence(inp, PREC_RANGE, depth + 1),
         cut(text_close("]")),
     )(input)?;
 
