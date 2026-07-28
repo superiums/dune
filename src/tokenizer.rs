@@ -454,7 +454,7 @@ fn circum_dispatch(input: Input<'_>, ctx: Ctx) -> TokenizationResult<'_, (Token,
         Ctx::Letter | Ctx::Word => alt((map_valid_token(
             punctuation_tag("^"),
             TokenKind::OperatorPostfix,
-        ),))(input), //5%
+        ),))(input), //for SymbolRaw
         Ctx::Start | Ctx::Space | Ctx::Open | Ctx::Number => {
             map_valid_token(punctuation_tag("^"), TokenKind::Operator)(input)
         }

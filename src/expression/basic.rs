@@ -61,6 +61,7 @@ impl Expression {
         match self {
             // 基础类型 - 支持缩进
             Self::Symbol(name) => write!(f, "{}{name}", idt(i)),
+            Self::SymbolRaw(name) => write!(f, "{}{name}^", idt(i)),
             Self::Variable(name) => write!(f, "{}${name}", idt(i)),
             Self::Integer(it) => write!(f, "{}{it}", idt(i)),
             Self::Float(n) => write!(f, "{}{n}", idt(i)),
@@ -506,7 +507,7 @@ impl Expression {
                 write!(f, ")")
             }
 
-            Self::Command(cmd, args) | Self::CommandRaw(cmd, args) => {
+            Self::Command(cmd, args) => {
                 write!(f, "{}", idt(i))?;
                 cmd.fmt_display_indent(f, 0)?;
                 for arg in args.iter() {
@@ -652,6 +653,7 @@ impl Expression {
         match &self {
             // 基础类型 - 统一格式
             Self::Symbol(s) => write!(f, "{}Symbol〈{s:?}〉", prefix),
+            Self::SymbolRaw(s) => write!(f, "{}SymbolRaw〈{s:?}〉", prefix),
             Self::Variable(s) => write!(f, "{}Variable〈{s:?}〉", prefix),
             Self::String(s) => write!(f, "{}String〈{s:?}〉", prefix),
             Self::Integer(s) => write!(f, "{}Integer〈{s:?}〉", prefix),
@@ -903,7 +905,7 @@ impl Expression {
                 }
                 Ok(())
             }
-            Self::Command(cmd, args) | Self::CommandRaw(cmd, args) => {
+            Self::Command(cmd, args) => {
                 writeln!(f, "{}Command", prefix)?;
                 cmd.fmt_indent(f, indent + 1)?;
                 write!(f, "\n{}Args", idt(indent + 1))?;
@@ -1033,7 +1035,7 @@ impl Expression {
             Self::If(_, _, _) => "If".into(),
             Self::Apply(_, _) => "Apply".into(),
             Self::Command(_, _) => "Command".into(),
-            Self::CommandRaw(_, _) => "CommandRaw".into(),
+            Self::SymbolRaw(_) => "SymboRaw".into(),
             Self::ModuleCall(_, _) => "ModuleCall".into(),
             Self::Lambda(..) => "Lambda".into(),
             // Self::Macro(_, _) => "Macro".into(),
@@ -1258,7 +1260,7 @@ impl Expression {
             )),
             // symbol maybe alias, but also maybe var/string, so let user decide.
             // Blank injection is handled by ensure_has_receiver for builtins only.
-            Expression::Symbol(_) => {
+            Expression::Symbol(_) | Expression::SymbolRaw(_) => {
                 Cow::Owned(Expression::Command(Rc::new(self.clone()), Rc::new(vec![])))
             }
             _ => Cow::Borrowed(self), //others, like binop,group,pipe...
@@ -1373,6 +1375,8 @@ impl Expression {
             Self::Integer(i) => *i != 0,
             Self::Float(f) => *f != 0.0,
             Self::String(s) => !s.is_empty(),
+            Self::StringSafe(s) => !s.is_empty(),
+            Self::StringTemplate(s) => !s.is_empty(),
             Self::Bytes(b) => !b.is_empty(),
             Self::FileSize(b) => b.size != 0,
             Self::Boolean(b) => *b,
@@ -1385,6 +1389,9 @@ impl Expression {
             Self::Lambda(..) => true,
             Self::Function(..) => true,
             Self::DateTime(..) => true,
+            Self::Table(t) => t.row_count() > 0,
+            Self::AliasDef(_, c) => c.is_truthy(),
+            Self::Group(c) => c.is_truthy(),
             _ => false,
         }
     }

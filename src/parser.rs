@@ -296,8 +296,10 @@ impl PrattParser {
                     //
                     // dbg!("--> Args: trying next loop", input.len(), PREC_CMD_ARG);
                     match &lhs {
-                        Expression::Symbol(_)|Expression::Variable(_)| Expression::String(_)
+                        Expression::Symbol(_)|Expression::SymbolRaw(_)
+                        |Expression::Variable(_)| Expression::String(_)
                         |Expression::Index(.. ) | Expression::Property(..)=>{}
+                        // not allowed
                         Expression::Integer(_) | Expression::Float(_) | Expression::Range(.. )
                         | Expression::List(_)| Expression::BSet(_)
                         | Expression::Map(_)| Expression::HMap(_)
@@ -559,12 +561,15 @@ impl PrattParser {
                 })(input.skip_n(1))?;
                 Ok((input, Expression::Apply(Rc::new(lhs), Rc::new(args))))
             }
-            "^" => {
-                let (input, args) = many0(|inp| {
-                    PrattParser::parse_expr_with_precedence(inp, PREC_CMD_ARG, depth + 1)
-                })(input.skip_n(1))?;
-                Ok((input, Expression::CommandRaw(Rc::new(lhs), Rc::new(args))))
-            }
+            "^" => match lhs {
+                Expression::Symbol(s) => Ok((input.skip_n(1), Expression::SymbolRaw(s))),
+                _ => Err(SyntaxErrorKind::failure(
+                    input.get_str_slice(),
+                    "symbol",
+                    Some(format!("{lhs:?}")),
+                    Some("only symbol need to skip eval"),
+                )),
+            },
             "[" => {
                 // 数组索引或切片
                 parse_index(lhs, input, depth)

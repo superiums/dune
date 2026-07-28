@@ -274,6 +274,9 @@ pub fn handle_command(
                     cmd_args.push(s.into())
                 }
             }
+            Expression::SymbolRaw(s) => {
+                cmd_args.push(s.into());
+            }
             Expression::String(st) => {
                 let s = expand_home(&st).to_string();
 

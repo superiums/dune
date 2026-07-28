@@ -518,7 +518,9 @@ impl Expression {
                 }
             }
             // 符号
-            Expression::Symbol(_) => self.eval_symbo(args, true, state, env, depth + 1),
+            Expression::Symbol(_) | Expression::SymbolRaw(_) => {
+                self.eval_symbo(args, true, state, env, depth + 1)
+            }
             // 延迟赋值命令 let x := ls
             Expression::Command(cmd_sym, cmd_args) => {
                 let mut new_vec = Vec::with_capacity(cmd_args.len() + args.len());
@@ -700,6 +702,7 @@ impl Expression {
                       // }
                 }
             }
+            Self::SymbolRaw(cmd_sym) => handle_command(self, cmd_sym, args, state, env, depth + 1),
             other => Err(RuntimeError::new(
                 RuntimeErrorKind::TypeError {
                     expected: "symbol".into(),
@@ -815,7 +818,7 @@ impl Expression {
                 eval_cmd.eval_command(args.as_ref(), state, env, depth + 1)
             }
             // 这里的symbol不再当变量解析，全部按原始symbol含义处理
-            Expression::Symbol(_) | Expression::String(_) => {
+            Expression::Symbol(_) | Expression::SymbolRaw(_) | Expression::String(_) => {
                 cmd.eval_command(args.as_ref(), state, env, depth + 1)
             }
             _ => Err(RuntimeError::new(

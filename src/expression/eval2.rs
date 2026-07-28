@@ -742,7 +742,7 @@ impl Expression {
                 vars
             }
 
-            Self::Command(cmd, args) | Self::CommandRaw(cmd, args) => {
+            Self::Command(cmd, args) => {
                 let mut vars = cmd.get_free_variables();
                 for arg in args.iter() {
                     vars.extend(arg.get_free_variables());

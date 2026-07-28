@@ -261,6 +261,9 @@ impl Expression {
                 | Self::Table(_) => {
                     return Ok(job.clone());
                 }
+                Self::SymbolRaw(_) => {
+                    break Ok(job.clone());
+                }
 
                 Self::Symbol(name) => {
                     if state.contains(State::STRICT) {
@@ -1282,9 +1285,7 @@ impl Expression {
                 Self::Command(cmd, args) => {
                     break self.handle_builtin_n_normal_cmd(cmd, args, state, env, depth + 1);
                 }
-                Self::CommandRaw(cmd, args) => {
-                    break cmd.eval_command(args.as_ref(), state, env, depth + 1);
-                }
+
                 // break Self::eval_command(self, env, depth+1),
                 // 简单控制流表达式
                 Self::If(cond, true_expr, false_expr) => {

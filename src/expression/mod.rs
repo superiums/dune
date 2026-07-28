@@ -67,7 +67,7 @@ pub enum Expression {
     If(Rc<Self>, Rc<Self>, Rc<Self>),
     Apply(Rc<Self>, Rc<Vec<Self>>),
     Command(Rc<Self>, Rc<Vec<Self>>),
-    CommandRaw(Rc<Self>, Rc<Vec<Self>>),
+    SymbolRaw(String),
     Lambda(Vec<String>, Rc<Self>, Option<HashMap<String, Self>>),
     Function(
         String,
@@ -270,10 +270,26 @@ impl PartialOrd for Expression {
             (Self::String(a), Self::Float(b)) => a.parse::<f64>().ok()?.partial_cmp(b),
             (Self::Float(a), Self::String(b)) => b.parse::<f64>().ok()?.partial_cmp(a),
 
+            // 字符串之间比较
+            (Self::String(a), Self::StringSafe(b)) => a.partial_cmp(b),
+            (Self::String(a), Self::Symbol(b)) => a.partial_cmp(b),
+            (Self::String(a), Self::SymbolRaw(b)) => a.partial_cmp(b),
+            (Self::StringSafe(a), Self::String(b)) => a.partial_cmp(b),
+            (Self::StringSafe(a), Self::Symbol(b)) => a.partial_cmp(b),
+            (Self::StringSafe(a), Self::SymbolRaw(b)) => a.partial_cmp(b),
+            (Self::Symbol(a), Self::String(b)) => a.partial_cmp(b),
+            (Self::Symbol(a), Self::StringSafe(b)) => a.partial_cmp(b),
+            (Self::Symbol(a), Self::SymbolRaw(b)) => a.partial_cmp(b),
+            (Self::SymbolRaw(a), Self::String(b)) => a.partial_cmp(b),
+            (Self::SymbolRaw(a), Self::Symbol(b)) => a.partial_cmp(b),
+            (Self::SymbolRaw(a), Self::StringSafe(b)) => a.partial_cmp(b),
+
             // ===== 同类型简单比较 =====
             (Self::String(a), Self::String(b)) => a.partial_cmp(b),
             (Self::StringTemplate(a), Self::StringTemplate(b)) => a.partial_cmp(b),
+            (Self::StringSafe(a), Self::StringSafe(b)) => a.partial_cmp(b),
             (Self::Symbol(a), Self::Symbol(b)) => a.partial_cmp(b),
+            (Self::SymbolRaw(a), Self::SymbolRaw(b)) => a.partial_cmp(b),
             (Self::Variable(a), Self::Variable(b)) => a.partial_cmp(b),
             (Self::Bytes(a), Self::Bytes(b)) => a.partial_cmp(b),
             (Self::Boolean(a), Self::Boolean(b)) => a.partial_cmp(b),
@@ -283,6 +299,21 @@ impl PartialOrd for Expression {
             (Self::TimeDef(a), Self::TimeDef(b)) => a.partial_cmp(b),
             (Self::DateTime(a), Self::DateTime(b)) => a.partial_cmp(b),
             (Self::FileSize(a), Self::FileSize(b)) => a.partial_cmp(b),
+            // 文件大小与数值比较
+            (Self::FileSize(a), Self::Integer(b)) => {
+                Some(if *b < 0 {
+                    Ordering::Greater // u64 >= 0 > i64 负数
+                } else {
+                    a.to_bytes().cmp(&(*b as u64))
+                })
+            }
+            (Self::Integer(a), Self::FileSize(b)) => {
+                Some(if *a < 0 {
+                    Ordering::Less // u64 >= 0 > i64 负数
+                } else {
+                    (*a as u64).cmp(&b.to_bytes())
+                })
+            }
 
             // ===== 集合类型按长度比较 =====
             (Self::List(a), Self::List(b)) => match a.len().cmp(&b.len()) {
