@@ -371,10 +371,20 @@ pub fn handle_command(
 
 pub fn to_expr(bytes_out: Option<Vec<u8>>) -> Expression {
     match bytes_out {
-        Some(b) => Expression::String(String::from_utf8_lossy(&b).trim().to_string()),
+        Some(b) => match String::from_utf8(b) {
+            Ok(s) => Expression::String(s.trim().to_string()),
+            Err(e) => Expression::Bytes(e.into_bytes()), // 保留原始字节，不做有损转换
+                                                         // TODO 检查管道接收bytes情况
+        },
         _ => Expression::None,
     }
 }
 fn to_bytes(expr_out: Option<Expression>) -> Option<Vec<u8>> {
-    expr_out.map(|p| p.to_string().as_bytes().to_owned())
+    expr_out.map(|p| {
+        if let Expression::Bytes(b) = p {
+            b
+        } else {
+            p.to_string().as_bytes().to_owned()
+        }
+    })
 }

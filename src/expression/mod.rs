@@ -274,6 +274,7 @@ impl PartialOrd for Expression {
             (Self::String(a), Self::StringSafe(b)) => a.partial_cmp(b),
             (Self::String(a), Self::Symbol(b)) => a.partial_cmp(b),
             (Self::String(a), Self::SymbolRaw(b)) => a.partial_cmp(b),
+
             (Self::StringSafe(a), Self::String(b)) => a.partial_cmp(b),
             (Self::StringSafe(a), Self::Symbol(b)) => a.partial_cmp(b),
             (Self::StringSafe(a), Self::SymbolRaw(b)) => a.partial_cmp(b),
@@ -283,6 +284,17 @@ impl PartialOrd for Expression {
             (Self::SymbolRaw(a), Self::String(b)) => a.partial_cmp(b),
             (Self::SymbolRaw(a), Self::Symbol(b)) => a.partial_cmp(b),
             (Self::SymbolRaw(a), Self::StringSafe(b)) => a.partial_cmp(b),
+
+            // bytes
+            (Self::Bytes(a), Self::String(b)) => {
+                // 只有 Bytes 是合法 UTF-8 才能比较
+                let a_str = std::str::from_utf8(a).ok()?;
+                a_str.as_bytes().partial_cmp(b.as_bytes())
+            }
+            (Self::String(a), Self::Bytes(b)) => {
+                let b_str = std::str::from_utf8(b).ok()?;
+                a.as_bytes().partial_cmp(b_str.as_bytes())
+            }
 
             // ===== 同类型简单比较 =====
             (Self::String(a), Self::String(b)) => a.partial_cmp(b),

@@ -61,7 +61,7 @@ impl Expression {
         match self {
             // 基础类型 - 支持缩进
             Self::Symbol(name) => write!(f, "{}{name}", idt(i)),
-            Self::SymbolRaw(name) => write!(f, "{}{name}^", idt(i)),
+            Self::SymbolRaw(name) => write!(f, "{}{name}", idt(i)),
             Self::Variable(name) => write!(f, "{}${name}", idt(i)),
             Self::Integer(it) => write!(f, "{}{it}", idt(i)),
             Self::Float(n) => write!(f, "{}{n}", idt(i)),
@@ -79,7 +79,7 @@ impl Expression {
                 write!(f, "`")
             }
             Self::Boolean(b) => write!(f, "{}{}", idt(i), if *b { "true" } else { "false" }),
-            Self::Bytes(b) => write!(f, "{}b\"{}\"", idt(i), String::from_utf8_lossy(b)),
+            Self::Bytes(b) => write!(f, "{}b'{}'", idt(i), String::from_utf8_lossy(b)),
             Self::DateTime(n) => write!(f, "{}{}", idt(i), n.format("%Y-%m-%d %H:%M:%S")),
             Self::FileSize(fsz) => write!(f, "{}{}", idt(i), fsz.to_human_readable()),
             Self::None => write!(f, "{}", idt(i)),

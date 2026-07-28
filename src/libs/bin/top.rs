@@ -423,13 +423,10 @@ fn print(
     // let is_tty = std::io::stdout().is_terminal();
     let mut stdout = std::io::stdout().lock();
     for x in args.iter() {
-        let s = format!("{x} ");
-        // if is_tty {
-        //     let _ = write!(&mut stdout, "{}", s);
-        //     // let _ = write!(&mut stdout, "{}", s.replace('\n', "\r\n"));
-        // } else {
-        let _ = write!(&mut stdout, "{s}");
-        // }
+        let _ = match x {
+            Expression::Bytes(b) => stdout.write_all(&b),
+            _ => write!(&mut stdout, "{x} "),
+        };
     }
     // if is_tty {
     //     let _ = write!(&mut stdout, "\r\n");
@@ -446,8 +443,10 @@ fn println(
 ) -> Result<Expression, RuntimeError> {
     let mut stdout = std::io::stdout().lock();
     for x in args.iter() {
-        let s = format!("{x}");
-        let _ = writeln!(&mut stdout, "{s}");
+        let _ = match x {
+            Expression::Bytes(b) => stdout.write_all(&b),
+            _ => write!(&mut stdout, "{x} "),
+        };
     }
     // let _ = stdout.flush();
     Ok(Expression::None)
@@ -471,11 +470,16 @@ fn eprint(
     let mut stderr = std::io::stderr().lock();
     for (i, x) in args.iter().enumerate() {
         let s = format!("\x1b[38;5;9m{x}\x1b[m\x1b[0m");
-        if i < args.len() - 1 {
-            let _ = write!(&mut stderr, "{s} ");
-        } else {
-            let _ = writeln!(&mut stderr, "{s}");
-        }
+        let _ = match x {
+            Expression::Bytes(b) => stderr.write_all(&b),
+            _ => {
+                if i < args.len() - 1 {
+                    write!(&mut stderr, "{s} ")
+                } else {
+                    writeln!(&mut stderr, "{s}")
+                }
+            }
+        };
     }
     // let _ = stderr.flush();
     Ok(Expression::None)

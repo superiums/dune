@@ -176,6 +176,18 @@ impl Add for Expression {
                 a.extend(n.into_bytes());
                 Ok(Self::Bytes(a))
             }
+            (Self::Bytes(mut a), Self::Integer(n)) => {
+                a.push(n as u8);
+                Ok(Self::Bytes(a))
+            }
+            (Self::String(m), Self::Bytes(n)) => {
+                let result = format!("{}{}", m, String::from_utf8_lossy(n.as_ref()));
+                Ok(Self::String(result))
+            }
+            // (Self::Integer(n), Self::Bytes(mut a)) => {
+            //     a.insert(0, n as u8);
+            //     Ok(Self::Bytes(a))
+            // }
 
             // 其他情况
             (m, n) => Err(RuntimeErrorKind::CommandFailed2(
@@ -239,7 +251,6 @@ impl Sub for Expression {
             }
             (Self::String(m), Self::Integer(n)) => {
                 // 字符串首尾截取
-                // let n = n as usize;
                 if n >= 0 {
                     if m.len() >= n as usize {
                         let l = m.len() - n as usize;
@@ -366,6 +377,46 @@ impl Sub for Expression {
                 let d = a - b;
                 Ok(Self::from(d.num_milliseconds()))
             }
+            // bytes
+            (Self::Bytes(m), Self::Bytes(n)) => {
+                if let Some(pos) = subslice(&m, &n) {
+                    let mut result = m[..pos].to_vec();
+                    result.extend_from_slice(&m[pos + n.len()..]);
+                    Ok(Self::Bytes(result))
+                } else {
+                    Ok(Self::Bytes(m))
+                }
+            }
+            (Self::Bytes(m), Self::String(n)) => {
+                let n_bytes = n.into_bytes();
+                if let Some(pos) = subslice(&m, &n_bytes) {
+                    let mut result = m[..pos].to_vec();
+                    result.extend_from_slice(&m[pos + n_bytes.len()..]);
+                    Ok(Self::Bytes(result))
+                } else {
+                    Ok(Self::Bytes(m))
+                }
+            }
+            (Self::Bytes(m), Self::Integer(n)) => {
+                if n >= 0 {
+                    let n = n as usize;
+                    if m.len() >= n {
+                        Ok(Self::Bytes(m[..m.len() - n].to_vec()))
+                    } else {
+                        Ok(Self::Bytes(Vec::new()))
+                    }
+                } else {
+                    let n = n
+                        .checked_neg()
+                        .ok_or_else(|| RuntimeErrorKind::Overflow(format!("-{n}")))?
+                        as usize;
+                    if n <= m.len() {
+                        Ok(Self::Bytes(m[n..].to_vec()))
+                    } else {
+                        Ok(Self::Bytes(Vec::new()))
+                    }
+                }
+            }
 
             // 其他情况
             (n, m) => Err(RuntimeErrorKind::CommandFailed2(
@@ -381,7 +432,12 @@ impl Sub for Expression {
         }
     }
 }
-
+fn subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    if needle.is_empty() {
+        return Some(0);
+    }
+    haystack.windows(needle.len()).position(|w| w == needle)
+}
 impl Mul for Expression {
     type Output = Result<Self, RuntimeErrorKind>;
 
@@ -539,6 +595,15 @@ impl Mul for Expression {
                 Ok(Self::BSet(Rc::new(new_set)))
             }
 
+            // bytes
+            (Self::Bytes(m), Self::Integer(n)) => {
+                let n = n as usize;
+                if n > 0 && n < usize::MAX {
+                    Ok(Self::Bytes(m.repeat(n)))
+                } else {
+                    Ok(Self::None)
+                }
+            }
             // 其他情况
             (m, n) => Err(RuntimeErrorKind::CommandFailed2(
                 "*".into(),

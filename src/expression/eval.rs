@@ -1211,16 +1211,20 @@ impl Expression {
                             // handle_stdin_redirect(lhs, rhs, state, env, depth, true)
                             let path = rhs.eval_mut(state, env, depth + 1)?;
                             let cpath = canon(&path.to_string(), env)?;
-                            let contents = std::fs::read_to_string(cpath)
-                                .map(Self::String)
-                                .map_err(|e| {
-                                    RuntimeError::from_io_error(
-                                        e,
-                                        "read file".into(),
-                                        self.clone(),
-                                        depth,
-                                    )
-                                })?;
+                            let contents = match std::fs::read_to_string(&cpath) {
+                                Ok(s) => Self::String(s),
+                                Err(_) => {
+                                    let bytes = std::fs::read(&cpath).map_err(|e| {
+                                        RuntimeError::from_io_error(
+                                            e,
+                                            "read file".into(),
+                                            self.clone(),
+                                            depth,
+                                        )
+                                    })?;
+                                    Self::Bytes(bytes)
+                                }
+                            };
 
                             state.pipe_in(contents);
 
@@ -1491,6 +1495,20 @@ impl Expression {
                 }
                 Ok(Self::BSet(Rc::new(result)))
             }
+            Expression::Bytes(bytes) => {
+                if step == 1 {
+                    let (start, end) = clamp(start_int, end_int, step as Int, bytes.len() as Int);
+                    Ok(Expression::Bytes(
+                        bytes[start as usize..end as usize].to_vec(),
+                    ))
+                } else {
+                    Err(RuntimeError::common(
+                        "bytes slice step not supported.".into(),
+                        self.clone(),
+                        depth,
+                    ))
+                }
+            }
             _ => Err(RuntimeError::new(
                 RuntimeErrorKind::TypeError {
                     expected: "sliceable type (List/String)".into(),
@@ -1595,7 +1613,24 @@ impl Expression {
                     })
                 }
             }
-
+            Expression::Bytes(bytes) => {
+                if let Expression::Integer(index) = r {
+                    bytes
+                        .get(index as usize)
+                        .copied()
+                        .map(|b| Expression::Integer(b as Int))
+                        .ok_or_else(|| RuntimeErrorKind::IndexOutOfBounds {
+                            index: index as Int,
+                            len: bytes.len(),
+                        })
+                } else {
+                    Err(RuntimeErrorKind::TypeError {
+                        expected: "Integer to index Bytes".into(),
+                        sym: r.to_string(),
+                        found: r.type_name(),
+                    })
+                }
+            }
             _ => Err(RuntimeErrorKind::TypeError {
                 expected: "indexable type (List/Range/Map/String)".into(),
                 sym: l.to_string(),

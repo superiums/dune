@@ -276,6 +276,7 @@ impl PrattParser {
                 | TokenKind::StringRaw
                 | TokenKind::StringTemplate
                 | TokenKind::StringSafe
+                | TokenKind::Bytes
                 | TokenKind::IntegerLiteral
                 | TokenKind::FloatLiteral
                 | TokenKind::ValueSymbol
@@ -460,6 +461,7 @@ impl PrattParser {
             TokenKind::StringRaw if PREC_LITERAL >= min_prec => parse_string_raw(input),
             TokenKind::StringTemplate if PREC_LITERAL >= min_prec => parse_string_template(input),
             TokenKind::StringSafe if PREC_LITERAL >= min_prec => parse_string_safe(input),
+            TokenKind::Bytes if PREC_LITERAL >= min_prec => parse_bytes(input),
             TokenKind::IntegerLiteral if PREC_LITERAL >= min_prec => parse_integer(input),
             TokenKind::FloatLiteral if PREC_LITERAL >= min_prec => parse_float(input),
             TokenKind::ValueSymbol if PREC_LITERAL >= min_prec => parse_value_symbol(input),
@@ -1568,6 +1570,125 @@ fn parse_string_safe(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, Synta
     let r = cs.replace("\\'", "'").replace("\\\\", "\\");
     Ok((input, Expression::StringSafe(r)))
 }
+fn parse_bytes(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
+    let (input, expr) = kind(TokenKind::Bytes)(input)?;
+    let raw_str = expr.to_str(input.str);
+    let s = raw_str.strip_prefix("b'").unwrap_or(raw_str);
+    let cs = s.strip_suffix('\'').unwrap_or(s);
+    let r = unescape_bytes(cs);
+    Ok((input, Expression::Bytes(r)))
+}
+/// 字节字面量专用转义处理器：输出 Vec<u8> 而非 String
+/// \xNN 表示原始字节值（可以是任意 0x00-0xFF，不做 UTF-8 编码）
+/// 其它转义（\n \t \uXXXX 等）按其对应字符的 UTF-8 编码写入
+pub fn unescape_bytes(s: &str) -> Vec<u8> {
+    let mut result: Vec<u8> = Vec::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            let mut buf = [0u8; 4];
+            result.extend_from_slice(c.encode_utf8(&mut buf).as_bytes());
+            continue;
+        }
+
+        match chars.next() {
+            None => result.push(b'\\'),
+            Some(next) => match next {
+                'n' => result.push(b'\n'),
+                'r' => result.push(b'\r'),
+                't' => result.push(b'\t'),
+                '0' => result.push(0),
+                'a' => result.push(0x07),
+                'b' => result.push(0x08),
+                'f' => result.push(0x0c),
+                'v' => result.push(0x0b),
+                'e' | 'E' => result.push(0x1b),
+                '\\' => result.push(b'\\'),
+                '"' => result.push(b'"'),
+                '\'' => result.push(b'\''),
+                '`' => result.push(b'`'),
+
+                // \xNN -> 原始字节，不经过 UTF-8 编码
+                'x' => {
+                    let hex: String = chars.by_ref().take(2).collect();
+                    match u8::from_str_radix(&hex, 16) {
+                        Ok(n) => result.push(n),
+                        Err(_) => {
+                            result.push(b'\\');
+                            result.push(b'x');
+                            result.extend_from_slice(hex.as_bytes());
+                        }
+                    }
+                }
+
+                // \033 八进制（3位）——同样直接作为字节值，而非 char::from_u32
+                '0'..='7' => {
+                    let mut oct = String::with_capacity(3);
+                    oct.push(next);
+                    for _ in 0..2 {
+                        if matches!(chars.peek(), Some('0'..='7')) {
+                            oct.push(chars.next().unwrap());
+                        } else {
+                            break;
+                        }
+                    }
+                    match u32::from_str_radix(&oct, 8) {
+                        Ok(n) if n <= 0xFF => result.push(n as u8),
+                        _ => {
+                            result.push(b'\\');
+                            result.extend_from_slice(oct.as_bytes());
+                        }
+                    }
+                }
+
+                // \u{...} / \uXXXX / \UXXXXXXXX 表示 Unicode 字符，仍按 UTF-8 编码写入字节流
+                'u' => {
+                    let hex: String = if chars.peek() == Some(&'{') {
+                        chars.next();
+                        chars.by_ref().take_while(|&c| c != '}').collect()
+                    } else {
+                        chars.by_ref().take(4).collect()
+                    };
+                    match u32::from_str_radix(&hex, 16).ok().and_then(char::from_u32) {
+                        Some(ch) => {
+                            let mut buf = [0u8; 4];
+                            result.extend_from_slice(ch.encode_utf8(&mut buf).as_bytes());
+                        }
+                        None => {
+                            result.push(b'\\');
+                            result.push(b'u');
+                            result.extend_from_slice(hex.as_bytes());
+                        }
+                    }
+                }
+                'U' => {
+                    let hex: String = chars.by_ref().take(8).collect();
+                    match u32::from_str_radix(&hex, 16).ok().and_then(char::from_u32) {
+                        Some(ch) => {
+                            let mut buf = [0u8; 4];
+                            result.extend_from_slice(ch.encode_utf8(&mut buf).as_bytes());
+                        }
+                        None => {
+                            result.push(b'\\');
+                            result.push(b'U');
+                            result.extend_from_slice(hex.as_bytes());
+                        }
+                    }
+                }
+
+                other => {
+                    result.push(b'\\');
+                    let mut buf = [0u8; 4];
+                    result.extend_from_slice(other.encode_utf8(&mut buf).as_bytes());
+                }
+            },
+        }
+    }
+
+    result
+}
+
 // #[inline]
 // fn parse_string_template(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
 //     let (input, r) = parse_string_common(input, TokenKind::StringTemplate, true, true)?;
