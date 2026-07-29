@@ -668,51 +668,51 @@ impl Expression {
             // 字符串相关
             Self::StringSafe(s) => write!(f, "{}StringSafe〈{s:?}〉", prefix),
             Self::StringTemplate(segments) => {
-                write!(f, "{}StringTemplate〈", prefix)?;
+                writeln!(f, "{}StringTemplate〈", prefix)?;
                 for seg in segments.iter() {
                     match seg {
-                        Self::String(s) => write!(f, "{s}")?,
-                        Self::Variable(v) => write!(f, "${v}")?,
-                        other => write!(f, "${{{other}}}")?,
+                        Self::String(s) => writeln!(f, "{}{s}", idt(indent + 1))?,
+                        Self::Variable(v) => writeln!(f, "{}${v}", idt(indent + 1))?,
+                        other => write!(f, "{}${{{other}}}", idt(indent + 1))?,
                     }
                 }
-                write!(f, "〉")
+                writeln!(f, "{}〉", prefix)
             }
-            Self::Bytes(b) => write!(f, "{}Bytes〈{:?}〉", prefix, String::from_utf8_lossy(b)),
+            Self::Bytes(b) => writeln!(f, "{}Bytes〈{:?}〉", prefix, String::from_utf8_lossy(b)),
             Self::RegexDef(s) => write!(f, "{}RegexDef〈{s:?}〉", prefix),
             Self::Regex(s) => write!(f, "{}Regex〈{:?}〉", prefix, s.regex.as_str()),
             Self::TimeDef(s) => write!(f, "{}TimeDef〈{s:?}〉", prefix),
 
             // 复合表达式
             Self::Group(inner) => {
-                write!(f, "{}Group\n{}(", prefix, idt(indent + 1))?;
+                writeln!(f, "{}Group\n{}(", prefix, idt(indent + 1))?;
                 inner.fmt_indent(f, indent + 2)?;
-                write!(f, "\n{})", idt(indent + 1))
+                writeln!(f, "\n{})", idt(indent + 1))
             }
 
             Self::Quote(inner) => write!(f, "{}Quote〈{:?}〉", prefix, inner),
 
             // 声明和赋值
             Self::Declare(name, expr) => {
-                write!(f, "{}Declare〈{}〉 = ", prefix, name)?;
+                writeln!(f, "{}Declare〈{}〉 = ", prefix, name)?;
                 expr.fmt_indent(f, indent + 1)
             }
             Self::DestructureAssign(pattern, expr) => {
-                write!(f, "{}DestructureAssign〈{:?}〉 = ", prefix, pattern)?;
+                writeln!(f, "{}DestructureAssign〈{:?}〉 = ", prefix, pattern)?;
                 expr.fmt_indent(f, indent + 1)
             }
             Self::Assign(name, expr) => {
-                write!(f, "{}Assign〈{}〉 = ", prefix, name)?;
+                writeln!(f, "{}Assign〈{}〉 = ", prefix, name)?;
                 expr.fmt_indent(f, indent + 1)
             }
             Self::SetParent(name, expr) => {
-                write!(f, "{}Set〈{}〉 = ", prefix, name)?;
+                writeln!(f, "{}Set〈{}〉 = ", prefix, name)?;
                 expr.fmt_indent(f, indent + 1)
             }
             Self::Export(name, expr) => {
                 write!(f, "{}Export〈{}〉", prefix, name)?;
                 if let Some(exp) = expr {
-                    write!(f, " = ")?;
+                    write!(f, " =\n")?;
                     exp.fmt_indent(f, indent + 1)?;
                 }
                 Ok(())
@@ -722,16 +722,16 @@ impl Expression {
             Self::If(cond, true_expr, false_expr) => {
                 writeln!(f, "{}If", prefix)?;
                 cond.fmt_indent(f, indent + 1)?;
-                write!(f, "\n{}Then", idt(indent + 1))?;
-                true_expr.fmt_indent(f, indent + 1)?;
-                write!(f, "\n{}Else", idt(indent + 1))?;
-                false_expr.fmt_indent(f, indent + 1)
+                writeln!(f, "\n{}Then", idt(indent + 1))?;
+                true_expr.fmt_indent(f, indent + 2)?;
+                writeln!(f, "\n{}Else", idt(indent + 1))?;
+                false_expr.fmt_indent(f, indent + 2)
             }
             Self::While(cond, body) => {
                 writeln!(f, "{}While", prefix)?;
                 cond.fmt_indent(f, indent + 1)?;
-                write!(f, "\n{}Body", idt(indent + 1))?;
-                body.fmt_indent(f, indent + 1)
+                writeln!(f, "\n{}Body", idt(indent + 1))?;
+                body.fmt_indent(f, indent + 2)
             }
             Self::Loop(body) => {
                 writeln!(f, "{}Loop", prefix)?;
@@ -745,12 +745,12 @@ impl Expression {
                 }
                 list.fmt_indent(f, indent + 1)?;
                 write!(f, "\n{}Body", idt(indent + 1))?;
-                body.fmt_indent(f, indent + 1)
+                body.fmt_indent(f, indent + 2)
             }
             Self::Match(value, branches) => {
                 writeln!(f, "{}Match", prefix)?;
                 value.fmt_indent(f, indent + 1)?;
-                write!(f, "\n{}Branches", idt(indent + 1))?;
+                writeln!(f, "\n{}Branches", idt(indent + 1))?;
                 for (pat, expr) in branches.iter() {
                     writeln!(
                         f,
@@ -882,7 +882,7 @@ impl Expression {
                 writeln!(f)?;
                 r.fmt_indent(f, indent + 1)?;
                 if let Some(step_expr) = step {
-                    write!(f, "\n{}Step", idt(indent + 1))?;
+                    writeln!(f, "\n{}Step", idt(indent + 1))?;
                     step_expr.fmt_indent(f, indent + 2)?;
                 }
                 Ok(())
@@ -898,7 +898,7 @@ impl Expression {
             Self::Apply(func, args) => {
                 writeln!(f, "{}Apply", prefix)?;
                 func.fmt_indent(f, indent + 1)?;
-                write!(f, "\n{}Args", idt(indent + 1))?;
+                writeln!(f, "\n{}Args", idt(indent + 1))?;
                 for arg in args.iter() {
                     arg.fmt_indent(f, indent + 2)?;
                     writeln!(f)?;
@@ -908,7 +908,7 @@ impl Expression {
             Self::Command(cmd, args) => {
                 writeln!(f, "{}Command", prefix)?;
                 cmd.fmt_indent(f, indent + 1)?;
-                write!(f, "\n{}Args", idt(indent + 1))?;
+                writeln!(f, "\n{}Args", idt(indent + 1))?;
                 for arg in args.iter() {
                     arg.fmt_indent(f, indent + 2)?;
                     writeln!(f)?;
@@ -925,9 +925,10 @@ impl Expression {
                 write!(f, "\n{}]", idt(indent + 1))
             }
             Self::Property(obj, prop) => {
-                writeln!(f, "{}Property", prefix)?;
+                writeln!(f, "{}Property〈", prefix)?;
                 obj.fmt_indent(f, indent + 1)?;
-                write!(f, ".{}", prop)
+                writeln!(f, "\n{}.{prop}", idt(indent + 1))?;
+                writeln!(f, "{}〉", prefix)
             }
 
             // 链式调用
@@ -938,11 +939,11 @@ impl Expression {
                     write!(f, "\n{}.{}(", idt(indent + 1), call.method)?;
                     for (i, arg) in call.args.iter().enumerate() {
                         if i > 0 {
-                            write!(f, ", ")?;
+                            writeln!(f, ", ")?;
                         }
-                        write!(f, "{arg:?}")?;
+                        write!(f, "{}{arg:?}", idt(indent + 2))?;
                     }
-                    write!(f, ")")?;
+                    writeln!(f, "\n{})", idt(indent + 1))?;
                 }
                 Ok(())
             }
