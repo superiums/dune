@@ -749,7 +749,7 @@ impl Editor {
             } else if line[..byte_pos].contains(['/', '\\'])
                 || new_completions
                     .get(current_sel)
-                    .is_some_and(|c| c.replacement.starts_with("."))
+                    .is_some_and(|c| c.replacement.starts_with("./"))
             {
                 Self::find_path_start(&line, byte_pos)
             } else {
