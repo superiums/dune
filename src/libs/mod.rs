@@ -75,6 +75,7 @@ thread_local! {
     static FROM_LIB: LazyModule = bin::from_lib::regist_lazy();
     static ABOUT_LIB: LazyModule = bin::about_lib::regist_lazy();
     static CONSOLE_LIB: LazyModule = bin::console_lib::regist_lazy();
+    static BYTES_LIB: LazyModule = bin::bytes_lib::regist_lazy();
     // static COLOR_LIB: LazyModule = bin::colors::regist_color_lazy();
 }
 
@@ -104,6 +105,7 @@ fn regist_all_info() -> BTreeMap<&'static str, BTreeMap<&'static str, BuiltinInf
     libs_info.insert("console", bin::console_lib::regist_info());
     libs_info.insert("log", bin::log_lib::regist_info());
     libs_info.insert("about", bin::about_lib::regist_info());
+    libs_info.insert("bytes", bin::bytes_lib::regist_info());
     // libs_info.insert("color", bin::colors::regist_color_info());
     // CONSTS
     libs_info.insert("MATH", bin::math_lib::regist_const_math());
@@ -209,6 +211,10 @@ pub fn get_builtin_optimized(
             .with(|m| m.get_function(fn_name))
             .ok_or(no_lib_err("console", fn_name, ctx))
             .map(Some),
+        "bytes" => BYTES_LIB
+            .with(|m| m.get_function(fn_name))
+            .ok_or(no_lib_err("console", fn_name, ctx))
+            .map(Some),
         // "color" => COLOR_LIB.with(|m| m.get_function(fn_name)),
         _ => Ok(None),
     }
@@ -283,14 +289,13 @@ fn get_belong_lib_name(exp: &Expression) -> Option<Cow<'static, str>> {
         Expression::Map(_) => Some("map".into()),
         Expression::HMap(_) => Some("hmap".into()),
         Expression::Table(_) => Some("table".into()),
-        Expression::String(_) | Expression::StringTemplate(_) | Expression::Bytes(_) => {
-            Some("string".into())
-        }
+        Expression::String(_) | Expression::StringTemplate(_) => Some("string".into()),
         Expression::Integer(_) | Expression::Float(_) => Some("math".into()),
         Expression::DateTime(_) => Some("time".into()),
         Expression::Boolean(_) => Some("boolean".into()),
         Expression::Regex(_) => Some("regex".into()),
         Expression::FileSize(_) => Some("filesize".into()),
+        Expression::Bytes(_) => Some("bytes".into()),
         _ => None,
     }
 }
