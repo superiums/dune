@@ -363,7 +363,7 @@ fn split_first(
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("pop_first", &args, 1, ctx)?;
+    check_exact_args_len("split_first", &args, 1, ctx)?;
     let set = get_bset_ref(&args[0], ctx)?;
     let mut new_set = set.as_ref().clone();
     let popped = new_set.pop_first().unwrap_or(Expression::None);
@@ -379,7 +379,7 @@ fn split_last(
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("pop_last", &args, 1, ctx)?;
+    check_exact_args_len("split_last", &args, 1, ctx)?;
     let set = get_bset_ref(&args[0], ctx)?;
     let mut new_set = set.as_ref().clone();
     let popped = new_set.pop_last().unwrap_or(Expression::None);

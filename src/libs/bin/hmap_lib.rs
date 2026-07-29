@@ -19,20 +19,20 @@ pub fn regist_lazy() -> LazyModule {
         // from top
         len, insert, flatten, get,
         // 检查操作
-        has,
+        contains_key, contains_value, is_empty,
         // 数据获取
-        at, items, keys, values,
+        at, keys, values,
         // 查找
         find, filter,
         // 结构修改
         set,
         remove,
         // 创建操作
-        from_items,
+        from_list,
         // 集合运算
-        union, intersect, difference, merge,
+        union, intersection, difference, merge,
         // 转换操作
-        map, to_bmap
+        map, to_bmap, to_list
     })
 }
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
@@ -43,12 +43,13 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         len => "get length of map", "<map>"
         insert => "insert item into map", "<map> <key> <value>"
         flatten => "flatten nested structure", "<map>"
-        has => "check if a map has a key", "<map> <key>"
+        contains_key => "check if a map has a key", "<map> <key>"
+        contains_value => "check if a map has a value", "<map> <value>"
+        is_empty => "check if map is empty", "<map>"
 
         // 数据获取
         get => "get value from nested map/list/range using dot notation path", "<map|list|range> <path>"
         at => "get value from map", "<map> <key>"
-        items => "get the items of a map or list", "<map>"
         keys => "get the keys of a map", "<map>"
         values => "get the values of a map", "<map>"
         // 查找
@@ -58,16 +59,17 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         remove => "remove a key-value pair from a map", "<map> <key>"
         set => "set value for existing key in map", "<map> <key> <value>"
         // 创建操作
-        from_items => "create a map from a list of key-value pairs", "<items>"
+        from_list => "create a map from a list of key-value pairs", "<items>"
 
         // 集合运算
         union => "combine two maps", "<map1> <map2>"
-        intersect => "get the intersection of two maps", "<map1> <map2>"
+        intersection => "get the intersection of two maps", "<map1> <map2>"
         difference => "get the difference of two maps", "<map1> <map2>"
         merge => "recursively merge two or more maps", "<map1> <map2> [<map3> ...]"
 
         // 转换操作
         map => "transform map keys and values with provided functions", "<map> <key_fn> <val_fn>"
+        to_list => "get the items of a map", "<map>"
         to_bmap => "convert hashMap to btreeMap", "<map>"
     })
 }
@@ -114,6 +116,17 @@ fn flatten(
 }
 
 // 检查操作函数
+fn is_empty(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("is_empty", &args, 1, ctx)?;
+    let map = get_hmap_ref(&args[0], ctx)?;
+
+    Ok(Expression::Boolean(map.is_empty()))
+}
+
 fn at(
     args: Vec<Expression>,
     _env: &mut Environment,
@@ -132,25 +145,35 @@ fn at(
     })
 }
 
-fn has(
+fn contains_key(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("has", &args, 2, ctx)?;
+    check_exact_args_len("contains_key", &args, 2, ctx)?;
     let key = get_string_ref(&args[1], ctx)?.as_str();
     let map = get_hmap_ref(&args[0], ctx)?;
 
     Ok(Expression::Boolean(map.contains_key(key)))
 }
 
-// 数据获取函数
-fn items(
+fn contains_value(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("items", &args, 1, ctx)?;
+    check_exact_args_len("contains_value", &args, 2, ctx)?;
+    let map = get_hmap_ref(&args[0], ctx)?;
+
+    Ok(Expression::Boolean(map.values().any(|x| x == &args[1])))
+}
+// 数据获取函数
+fn to_list(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("to_list", &args, 1, ctx)?;
     let map = get_hmap_ref(&args[0], ctx)?;
 
     let r = map
@@ -290,12 +313,12 @@ fn set(
 }
 
 // 创建操作函数
-fn from_items(
+fn from_list(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("from_items", &args, 1, ctx)?;
+    check_exact_args_len("from_list", &args, 1, ctx)?;
     let expr = &args[0];
 
     if let Expression::List(list) = expr {
@@ -336,12 +359,12 @@ fn union(
     Ok(Expression::HMap(Rc::new(new_map)))
 }
 
-fn intersect(
+fn intersection(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("intersect", &args, 2, ctx)?;
+    check_exact_args_len("intersection", &args, 2, ctx)?;
     let map1 = get_hmap_ref(&args[0], ctx)?;
     let map2 = get_hmap_ref(&args[1], ctx)?;
 
