@@ -28,7 +28,8 @@ pub fn regist_lazy() -> LazyModule {
         table,
         // 数据格式序列化
         toml, json, csv, pretty,
-        highlighted, striped,
+        highlight, strip,
+        safe
     })
 }
 
@@ -46,8 +47,10 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         json => "serialize lumesh expression to JSON", "<expr>"
         csv => "serialize lumesh expression to CSV", "<expr>"
         pretty => "serialize lumesh expression to Pretty String", "<expr>"
-        highlighted => "highlight script str with ANSI", "<script_string>"
-        striped => "remove all ANSI escape codes from string", "<string>"
+        highlight => "highlight script str with ANSI", "<script_string>"
+        strip => "remove all ANSI escape codes from string", "<string>"
+        safe => "make a string safe and never eval","<str>"
+
     })
 }
 
@@ -787,12 +790,12 @@ pub fn pretty(
     Ok(Expression::String(pretty_formatter(&args[0])))
 }
 
-fn highlighted(
+fn highlight(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("highlighted", &args, 1, ctx)?;
+    check_exact_args_len("highlight", &args, 1, ctx)?;
     let script = get_string_ref(&args[0], ctx)?;
     if script.is_empty() {
         return Ok(Expression::None);
@@ -801,12 +804,24 @@ fn highlighted(
     Ok(Expression::String(hi))
 }
 
-pub fn striped(
+pub fn strip(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("striped", &args, 1, ctx)?;
+    check_exact_args_len("strip", &args, 1, ctx)?;
     let p = get_string_ref(&args[0], ctx)?;
     Ok(strip_ansi_escapes(p).into())
+}
+
+fn safe(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    _ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    let str = args
+        .into_iter()
+        .next()
+        .map_or("".to_string(), |exp| exp.to_string());
+    Ok(Expression::StringSafe(str))
 }

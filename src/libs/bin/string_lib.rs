@@ -16,7 +16,7 @@ use crate::{
 use std::{collections::BTreeMap, sync::OnceLock};
 
 use crate::libs::bin::into_lib::{
-    filesize as to_filesize, float as to_float, int as to_int, striped as strip, table as to_table,
+    filesize as to_filesize, float as to_float, int as to_int, strip, table as to_table,
     time as to_time,
 };
 static QUOTED_RE: OnceLock<Regex> = OnceLock::new();
@@ -26,6 +26,7 @@ pub fn regist_lazy() -> LazyModule {
         // pprint,
         // 转换
         to_int, to_float, to_filesize, to_time, to_table,
+        to_safe,
         // 基础检查
         is_empty, is_whitespace, is_alpha, is_alphanumeric, is_numeric, is_lower, is_upper, is_title, len,
         // 子串检查
@@ -33,7 +34,7 @@ pub fn regist_lazy() -> LazyModule {
         // 分割操作
         split, split_at, chars, words, words_quoted, lines, paragraphs, concat,
         // 修改操作
-        insert, repeat, replace, substring, remove_prefix, remove_suffix, trim, trim_start, trim_end, to_lower, to_upper, to_title,
+        insert, repeat, replace, substring, remove_prefix, remove_suffix, trim, trim_start, trim_end, lower, upper, title,
         // 高级操作
         max_len, grep,
         caesar,
@@ -58,6 +59,7 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
        to_filesize => "parse a string representing a file size into bytes", "<size_str>"
        to_time => "convert a string to a datetime", "<datetime_str> [datetime_template]"
        to_table => "convert third-party command output to a table", "<command_output>"
+       to_safe => "make a string safe and never eval","<str>"
 
        // 基础检查
        is_empty => "is this string empty?", "<string>"
@@ -95,9 +97,9 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
        trim => "trim whitespace from a string", "<string>"
        trim_start => "trim whitespace from the start", "<string>"
        trim_end => "trim whitespace from the end", "<string>"
-       to_lower => "convert a string to lowercase", "<string>"
-       to_upper => "convert a string to uppercase", "<string>"
-       to_title => "convert a string to title case", "<string>"
+       lower => "convert a string to lowercase", "<string>"
+       upper => "convert a string to uppercase", "<string>"
+       title => "convert a string to title case", "<string>"
 
        // 高级操作
        caesar => "encrypt a string using a caesar cipher", "<string> <shift>"
@@ -579,22 +581,22 @@ fn trim_end(
     Ok(Expression::String(text.trim_end().to_string()))
 }
 
-fn to_lower(
+fn lower(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("to_lower", &args, 1, ctx)?;
+    check_exact_args_len("lower", &args, 1, ctx)?;
     let text = get_string_ref(&args[0], ctx)?;
     Ok(Expression::String(text.to_lowercase()))
 }
 
-fn to_upper(
+fn upper(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("to_upper", &args, 1, ctx)?;
+    check_exact_args_len("upper", &args, 1, ctx)?;
     let text = get_string_ref(&args[0], ctx)?;
     Ok(Expression::String(text.to_uppercase()))
 }
@@ -617,12 +619,12 @@ fn to_title_inner(text: &str) -> String {
     title
 }
 
-fn to_title(
+fn title(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("to_title", &args, 1, ctx)?;
+    check_exact_args_len("title", &args, 1, ctx)?;
     let text = get_string_ref(&args[0], ctx)?;
     let title = to_title_inner(text);
     Ok(Expression::String(title))
@@ -1061,12 +1063,14 @@ fn grep(
     Ok(Expression::from(lines))
 }
 
-// fn table_pprint(
-//     args: Vec<Expression>,
-//     env: &mut Environment,
-//     ctx: &Expression,
-// ) -> Result<Expression, RuntimeError> {
-//     check_args_len("pprint", &args, 1.., ctx)?;
-//     let table = from_module::parse_command_output(args, env, ctx)?;
-//     pprint::pretty_printer(&table)
-// }
+fn to_safe(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    _ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    let str = args
+        .into_iter()
+        .next()
+        .map_or("".to_string(), |exp| exp.to_string());
+    Ok(Expression::StringSafe(str))
+}

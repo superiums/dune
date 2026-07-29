@@ -187,11 +187,11 @@ boolean <value>
 csv <expr>
 filesize <size_str>
 float <value>
-highlighted <script_string>
+highlight <script_string>
 int <value>
 json <expr>
 str <value>
-striped <string>
+strip <string>
 table <command_output> [regex|headers...]
 time <datetime_str> [datetime_template]
 toml <expr>
@@ -429,11 +429,13 @@ substring <string> <start> <end>
 to_filesize <size_str>
 to_float <value>
 to_int <value>
-to_lower <string>
+lower <string>
+to_safe <string>
+  convert to StringSafe and never eval
 to_table <command_output>
 to_time <datetime_str> [datetime_template]
-to_title <string>
-to_upper <string>
+title <string>
+upper <string>
 trim <string>
 trim_end <string>
 trim_start <string>
@@ -462,8 +464,6 @@ max_syntax [int]
 max_usemode [int]
 modes
 print_tty <arg>
-safe <str>
-  make a string safe and never eval
 set_cfm <boolean>
 set_pdm <boolean>
 set_strict <boolean>
