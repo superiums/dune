@@ -11,17 +11,18 @@ use std::rc::Rc;
 pub fn regist_lazy() -> LazyModule {
     reg_lazy!({
         // 检查操作
-        contains, is_empty,
+        contains, is_empty, any, all,
         // 数据获取
-        first,last,items, len,
+        first,last,len,
         // 查找
         find, filter,
         // 结构修改
-        add, remove,
+        insert, remove, split_first, split_last,
         // 创建操作
-        from_items,
+        from_list,
         // 集合运算
-        union, intersect, difference, is_subset, is_superset,
+        union, intersection, difference, symmetric_difference,
+        is_subset, is_superset, is_disjoint,
         // 转换操作
         map, to_list,
     })
@@ -32,11 +33,12 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         // 检查操作
         contains => "check if set contains item", "<set> <item>"
         is_empty => "check if set is empty", "<set>"
+        any => "test if any element passes condition", "<set> <fn>"
+        all => "test if all elements pass condition", "<set> <fn>"
 
         // 数据获取
         first => "get first item of set", "<set>"
         last => "get last item of set", "<set>"
-        items => "get all items from set", "<set>"
         len => "get size of set", "<set>"
 
         // 查找
@@ -44,18 +46,22 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         filter => "filter set by condition", "<set> <predicate_fn>"
 
         // 结构修改
-        add => "add item to set", "<set> <item>"
+        insert => "add item to set", "<set> <item>"
         remove => "remove item from set", "<set> <item>"
+        split_first => "split at head", "<set>"
+        split_last => "split at tail", "<set>"
 
         // 创建操作
-        from_items => "create set from list", "<items>"
+        from_list => "create set from list", "<items>"
 
         // 集合运算
         union => "union of two sets", "<set1> <set2>"
-        intersect => "intersection of two sets", "<set1> <set2>"
+        intersection => "intersection of two sets", "<set1> <set2>"
         difference => "difference of two sets", "<set1> <set2>"
+        symmetric_difference => "symmetric_difference of two sets", "<set1> <set2>"
         is_subset => "check if set1 is subset of set2", "<set1> <set2>"
         is_superset => "check if set1 is superset of set2", "<set1> <set2>"
+        is_disjoint => "check if two sets never intersect", "<set1> <set2>"
 
         // 转换操作
         map => "apply function to each item", "<set> <fn>"
@@ -114,18 +120,6 @@ fn last(
         .last()
         .cloned()
         .ok_or_else(|| RuntimeError::common("cannot get last of empty set".into(), ctx.clone(), 0))
-}
-
-fn items(
-    args: Vec<Expression>,
-    _env: &mut Environment,
-    ctx: &Expression,
-) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("items", &args, 1, ctx)?;
-    let set = get_bset_ref(&args[0], ctx)?;
-
-    let items = set.iter().cloned().collect::<Vec<_>>();
-    Ok(Expression::from(items))
 }
 
 fn len(
@@ -190,7 +184,7 @@ fn filter(
 }
 
 // 结构修改函数
-fn add(
+fn insert(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
@@ -221,7 +215,7 @@ fn remove(
 }
 
 // 创建操作函数
-fn from_items(
+fn from_list(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
@@ -263,7 +257,7 @@ fn union(
     Ok(Expression::BSet(Rc::new(new_set)))
 }
 
-fn intersect(
+fn intersection(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
@@ -333,6 +327,109 @@ fn map(
     }
 
     Ok(Expression::from(new_set))
+}
+
+// 关系判断：与 is_subset/is_superset 组成完整三件套
+fn is_disjoint(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("is_disjoint", &args, 2, ctx)?;
+    let set1 = get_bset_ref(&args[0], ctx)?;
+    let set2 = get_bset_ref(&args[1], ctx)?;
+    Ok(Expression::Boolean(set1.is_disjoint(set2)))
+}
+
+// 集合运算第四件套：对称差集
+fn symmetric_difference(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("symmetric_difference", &args, 2, ctx)?;
+    let set1 = get_bset_ref(&args[0], ctx)?;
+    let set2 = get_bset_ref(&args[1], ctx)?;
+    let new_set = set1
+        .symmetric_difference(set2)
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    Ok(Expression::from(new_set))
+}
+
+// 弹出最小元素，返回 [popped, new_set]
+fn split_first(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("pop_first", &args, 1, ctx)?;
+    let set = get_bset_ref(&args[0], ctx)?;
+    let mut new_set = set.as_ref().clone();
+    let popped = new_set.pop_first().unwrap_or(Expression::None);
+    Ok(Expression::List(Rc::new(vec![
+        popped,
+        Expression::BSet(Rc::new(new_set)),
+    ])))
+}
+
+// 弹出最大元素，返回 [popped, new_set]
+fn split_last(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("pop_last", &args, 1, ctx)?;
+    let set = get_bset_ref(&args[0], ctx)?;
+    let mut new_set = set.as_ref().clone();
+    let popped = new_set.pop_last().unwrap_or(Expression::None);
+    Ok(Expression::List(Rc::new(vec![
+        popped,
+        Expression::BSet(Rc::new(new_set)),
+    ])))
+}
+
+// 补齐 any/all，与 list_lib 保持一致的谓词遍历能力
+fn any(
+    args: Vec<Expression>,
+    env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("any", &args, 2, ctx)?;
+    let predicate = &args[1];
+    check_fn_arg(predicate, 1, ctx)?;
+    let set = get_bset_ref(&args[0], ctx)?;
+    let mut state = State::new();
+    for item in set.iter() {
+        if predicate
+            .eval_apply(predicate, &vec![item.clone()], &mut state, env, 0)?
+            .is_truthy()
+        {
+            return Ok(Expression::Boolean(true));
+        }
+    }
+    Ok(Expression::Boolean(false))
+}
+
+fn all(
+    args: Vec<Expression>,
+    env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("all", &args, 2, ctx)?;
+    let predicate = &args[1];
+    check_fn_arg(predicate, 1, ctx)?;
+    let set = get_bset_ref(&args[0], ctx)?;
+    let mut state = State::new();
+    for item in set.iter() {
+        if !predicate
+            .eval_apply(predicate, &vec![item.clone()], &mut state, env, 0)?
+            .is_truthy()
+        {
+            return Ok(Expression::Boolean(false));
+        }
+    }
+    Ok(Expression::Boolean(true))
 }
 
 fn to_list(

@@ -15,37 +15,37 @@ use crate::{
     reg_lazy,
 };
 
+use rand::prelude::IndexedRandom;
+use rand::seq::SliceRandom;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 pub fn regist_lazy() -> LazyModule {
     reg_lazy!({
-        //打印
-        // pprint,
         //数学统计
         max,min,sum,average,
         //读取操作
-        get,len,insert,rev,flatten,
-        first,last,at,take,drop,is_empty,
+        get,len,is_empty,first,last,at,take,skip,slice,
         //查找操作
-        contains,find,find_last,
+        contains,find,rfind,position,rposition,
         //修改操作
-        append,prepend,unique,split_at,sort,group,remove_at,remove,set,
+        insert,rev,flatten,push,unique,split_at,split_first,sort,group,
+        remove_at,remove,set,swap,rotate,splice,
         //创建操作
-        concat,from,
+        concat,from,fill,
         //遍历操作
         map,items,filter,filter_map,any,all,
         //转换操作
         join,to_map,to_hmap,to_set,
         //结构操作
-        transpose,chunk,foldl,foldr,zip,unzip,
+        transpose,chunks,fold,rfold,zip,unzip,windows,
+        //随机操作
+        shuffle,sample,
     })
 }
+
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
     reg_info!({
-        // 打印
-        // pprint => "pretty print", "<list>"
-
         // 数学统计
         max => "get max value in an array or multi args", "<num1> <num2> ... | <array>"
         min => "get min value in an array or multi args", "<num1> <num2> ... | <array>"
@@ -55,35 +55,42 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         // 读取操作
         get => "get value from nested map/list/range using dot notation path", "<map|list|range> <path>"
         len => "get length of list", "<list>"
-        insert => "insert item into list", "<list> <index> <value>"
-        rev => "reverse sequence", "<list>"
-        flatten => "flatten nested structure", "<collection>"
         is_empty => "is this list empty?", "<list>"
-
         first => "get the first element of a list", "<list> [n]"
         last => "get the last element of a list", "<list> [n]"
         at => "get the nth element of a list", "<list> <index>"
         take => "take the first n elements of a list", "<list> <count>"
-        drop => "drop the first n elements of a list", "<list> <count>"
+        skip => "skip the first n elements of a list", "<list> <count>"
+        slice => "get a sub-list from start(inclusive) to end(exclusive), support negative index", "<list> <start> <end>"
+
         // 查找操作
         contains => "check if list contains an item", "<list> <item>"
-        find => "find first index of matching element", "<list> <item|fn> [skip_n]"
-        find_last => "find last index of item", "<list> <item|fn> [skip_n]"
+        find => "find first matched item", "<list> <item|fn> [skip_n]"
+        rfind => "find last matched item", "<list> <item|fn> [skip_n]"
+        position => "find first matched index", "<list> <item|fn> [skip_n]"
+        rposition => "find last matched index", "<list> <item|fn> [skip_n]"
 
         // 修改操作
-        append => "append an element to a list", "<list> <element>"
-        prepend => "prepend an element to a list", "<list> <element>"
+        insert => "insert item into list", "<list> <index> <value>"
+        rev => "reverse sequence", "<list>"
+        flatten => "flatten nested structure", "<collection>"
+        push => "append an element to a list", "<list> <element>"
         unique => "remove duplicates from a list while preserving order", "<list>"
         split_at => "split a list at a given index", "<list> <index>"
-        // splice => "change contents by removing/adding elements", "<start> <deleteCount> [items...] <list>"
+        split_first => "split a list at head", "<list>"
         sort => "sort a string/list, optionally with a key function or key_list", "<string|list> [key_fn|key_list|keys...]"
         group => "group list elements by key function", "<list> <key_fn|key>"
         remove_at => "remove n elements starting from index", "<list> <index> [count]"
         remove => "remove first matching element", "<list> <item> [all?]"
         set => "set element at existing index", "<list> <index> <value>"
+        swap => "swap two elements by index", "<list> <i> <j>"
+        rotate => "rotate list, positive n rotates right, negative rotates left", "<list> <n>"
+        splice => "remove elements starting at index and optionally insert new items, returns new list", "<list> <start> <delete_count> [items...]"
+
         // 创建操作
         concat => "concatenate multiple lists into one", "<list1|item1> <list2|item2> ..."
         from => "create a list from a range", "<range|item...>"
+        fill => "create a list by repeating a value n times", "<value> <n>"
 
         // 遍历操作
         map => "apply function for each element", "<list> <fn>"
@@ -101,11 +108,16 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
 
         // 结构操作
         transpose => "transpose matrix (list of lists)", "<matrix>"
-        chunk => "split list into chunks of size n", "<list> <size>"
-        foldl => "fold list from left with function", "<list> <fn> <init>"
-        foldr => "fold list from right with function", "<list> <fn> <init>"
+        chunks => "split list into chunks of size n", "<list> <size>"
+        fold => "fold list from left with function", "<list> <fn> <init>"
+        rfold => "fold list from right with function", "<list> <fn> <init>"
         zip => "zip two lists into list of pairs", "<list1> <list2>"
         unzip => "unzip list of pairs into two lists", "<list_of_pairs>"
+        windows => "get overlapping sliding windows of given size", "<list> <size>"
+
+        // 随机操作
+        shuffle => "randomly shuffle list order", "<list>"
+        sample => "randomly pick n distinct elements from list", "<list> <n>"
     })
 }
 
@@ -329,12 +341,12 @@ fn take(
     )))
 }
 
-fn drop(
+fn skip(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("drop", &args, 2, ctx)?;
+    check_exact_args_len("skip", &args, 2, ctx)?;
     let list = get_list_ref(&args[0], ctx)?;
     let n = get_integer_ref(&args[1], ctx)?;
 
@@ -355,7 +367,6 @@ fn contains(
 
     Ok(Expression::Boolean(list.as_ref().contains(&args[1])))
 }
-
 fn find(
     args: Vec<Expression>,
     env: &mut Environment,
@@ -376,8 +387,47 @@ fn find(
     match &target {
         Expression::Function(..) | Expression::Lambda(..) => {
             let state = &mut State::new();
+            for item in list.as_ref().iter().skip(start) {
+                let r = target.eval_apply(&target, std::slice::from_ref(item), state, env, 0)?;
+                if let Expression::Boolean(true) = r {
+                    return Ok(item.clone());
+                }
+            }
+            Ok(Expression::None)
+        }
+        _ => Ok(list
+            .as_ref()
+            .iter()
+            .skip(start)
+            .find(|x| *x == &target)
+            .cloned()
+            .unwrap_or(Expression::None)),
+    }
+}
+
+// 返回第一个满足条件的元素索引（对齐 Rust Iterator::position）
+fn position(
+    args: Vec<Expression>,
+    env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_args_len("position", &args, 2..=3, ctx)?;
+
+    let mut it = args.into_iter();
+    let list_exp = it.next().unwrap();
+    let target = it.next().unwrap();
+    let list = get_list_ref(&list_exp, ctx)?;
+    let start = if let Some(start_expr) = it.next() {
+        get_integer_ref(&start_expr, ctx)? as usize
+    } else {
+        0
+    };
+
+    match &target {
+        Expression::Function(..) | Expression::Lambda(..) => {
+            let state = &mut State::new();
             for (i, item) in list.as_ref().iter().enumerate().skip(start) {
-                let r = &target.eval_apply(&target, std::slice::from_ref(item), state, env, 0)?;
+                let r = target.eval_apply(&target, std::slice::from_ref(item), state, env, 0)?;
                 if let Expression::Boolean(true) = r {
                     return Ok(Expression::Integer(i as Int));
                 }
@@ -392,13 +442,13 @@ fn find(
         ),
     }
 }
-fn find_last(
+// 从尾部查找，返回元素（对齐 Rust Iterator::rfind）
+fn rfind(
     args: Vec<Expression>,
     env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_args_len("find_last", &args, 2..=3, ctx)?;
-    // Move out of args to avoid later clones
+    check_args_len("rfind", &args, 2..=3, ctx)?;
     let mut it = args.into_iter();
     let list_exp = it.next().unwrap();
     let target = it.next().unwrap();
@@ -412,15 +462,57 @@ fn find_last(
     match target {
         Expression::Function(..) | Expression::Lambda(..) => {
             let state = &mut State::new();
+            let target_rc = target;
+            for item in list.as_ref().iter().rev().skip(start) {
+                let r =
+                    target_rc.eval_apply(&target_rc, std::slice::from_ref(item), state, env, 0)?;
+                if let Expression::Boolean(true) = r {
+                    return Ok(item.clone());
+                }
+            }
+            Ok(Expression::None)
+        }
+        _ => Ok(list
+            .as_ref()
+            .iter()
+            .rev()
+            .skip(start)
+            .find(|x| *x == &target)
+            .cloned()
+            .unwrap_or(Expression::None)),
+    }
+}
+
+// 从尾部查找，返回索引（对齐 Rust Iterator::rposition）
+fn rposition(
+    args: Vec<Expression>,
+    env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_args_len("rposition", &args, 2..=3, ctx)?;
+    let mut it = args.into_iter();
+    let list_exp = it.next().unwrap();
+    let target = it.next().unwrap();
+    let list = get_list_ref(&list_exp, ctx)?;
+    let start = if let Some(start_expr) = it.next() {
+        get_integer_ref(&start_expr, ctx)? as usize
+    } else {
+        0
+    };
+
+    match target {
+        Expression::Function(..) | Expression::Lambda(..) => {
+            let state = &mut State::new();
+            let target_rc = target;
             for (i, item) in list.as_ref().iter().enumerate().rev().skip(start) {
-                let r = &target.eval_apply(&target, std::slice::from_ref(item), state, env, 0)?;
+                let r =
+                    target_rc.eval_apply(&target_rc, std::slice::from_ref(item), state, env, 0)?;
                 if let Expression::Boolean(true) = r {
                     return Ok(Expression::Integer(i as Int));
                 }
             }
             Ok(Expression::None)
         }
-        // Non-function case: direct equality using moved target
         _ => Ok(
             match list
                 .as_ref()
@@ -436,12 +528,12 @@ fn find_last(
     }
 }
 // 修改操作函数
-fn append(
+fn push(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("append", &args, 2, ctx)?;
+    check_exact_args_len("push", &args, 2, ctx)?;
     let mut it = args.into_iter();
     let list_exp = it.next().unwrap();
     let item = it.next().unwrap();
@@ -449,23 +541,6 @@ fn append(
 
     let mut new_list = list.as_ref().to_vec();
     new_list.push(item);
-    Ok(Expression::List(Rc::new(new_list)))
-}
-
-fn prepend(
-    args: Vec<Expression>,
-    _env: &mut Environment,
-    ctx: &Expression,
-) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("prepend", &args, 2, ctx)?;
-    let mut it = args.into_iter();
-    let list_exp = it.next().unwrap();
-    let item = it.next().unwrap();
-    let list = get_list_ref(&list_exp, ctx)?;
-
-    let mut new_list = Vec::with_capacity(list.as_ref().len() + 1);
-    new_list.push(item);
-    new_list.extend(list.as_ref().iter().cloned());
     Ok(Expression::List(Rc::new(new_list)))
 }
 
@@ -508,6 +583,23 @@ fn split_at(
         Expression::List(Rc::new(first.to_vec())),
         Expression::List(Rc::new(second.to_vec())),
     ])))
+}
+
+fn split_first(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("shift", &args, 1, ctx)?;
+    let list = get_list_ref(&args[0], ctx)?;
+
+    match list.as_ref().split_first() {
+        Some((first, rest)) => Ok(Expression::List(Rc::new(vec![
+            first.clone(),
+            Expression::List(Rc::new(rest.to_vec())),
+        ]))),
+        None => Ok(Expression::None),
+    }
 }
 
 fn sort(
@@ -824,6 +916,28 @@ fn set(
             0,
         ))
     }
+}
+// 切片
+fn slice(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("slice", &args, 3, ctx)?;
+    let list = get_list_ref(&args[0], ctx)?;
+    let start_n = get_integer_ref(&args[1], ctx)?;
+    let end_n = get_integer_ref(&args[2], ctx)?;
+
+    let len = list.as_ref().len();
+    let start = clamp(start_n, len);
+    let end = clamp(end_n, len);
+
+    if start >= end {
+        return Ok(Expression::List(Rc::new(vec![])));
+    }
+    Ok(Expression::List(Rc::new(
+        list.as_ref()[start..end].to_vec(),
+    )))
 }
 // 创建操作函数
 fn concat(
@@ -1270,12 +1384,12 @@ fn transpose(
     Ok(Expression::List(Rc::new(transposed)))
 }
 
-fn chunk(
+fn chunks(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("chunk", &args, 2, ctx)?;
+    check_exact_args_len("chunks", &args, 2, ctx)?;
     let list = get_list_ref(&args[0], ctx)?;
     let n = get_integer_ref(&args[1], ctx)?;
 
@@ -1294,12 +1408,12 @@ fn chunk(
     Ok(Expression::List(Rc::new(result)))
 }
 
-fn foldl(
+fn fold(
     args: Vec<Expression>,
     env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_args_len("foldl", &args, 2..=3, ctx)?;
+    check_args_len("fold", &args, 2..=3, ctx)?;
     let mut it = args.into_iter();
     let list_exp = it.next().unwrap();
     let func = it.next().unwrap();
@@ -1338,12 +1452,12 @@ fn foldl(
     // }
     Ok(acc)
 }
-fn foldr(
+fn rfold(
     args: Vec<Expression>,
     env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_args_len("foldr", &args, 2..=3, ctx)?;
+    check_args_len("rfold", &args, 2..=3, ctx)?;
     let mut it = args.into_iter();
     let list_exp = it.next().unwrap();
     let func = Rc::new(it.next().unwrap());
@@ -1418,6 +1532,152 @@ fn unzip(
     ])))
 }
 
+// 交换两个索引位置的元素
+fn swap(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("swap", &args, 3, ctx)?;
+    let list = get_list_ref(&args[0], ctx)?;
+    let i = get_integer_ref(&args[1], ctx)?;
+    let j = get_integer_ref(&args[2], ctx)?;
+    let len = list.as_ref().len();
+    let idx_i = clamp(i, len);
+    let idx_j = clamp(j, len);
+
+    if idx_i >= len || idx_j >= len {
+        return Err(RuntimeError::common(
+            format!("swap index out of bounds for list of length {}", len).into(),
+            ctx.clone(),
+            0,
+        ));
+    }
+
+    let mut new_list = list.as_ref().clone();
+    new_list.swap(idx_i, idx_j);
+    Ok(Expression::List(Rc::new(new_list)))
+}
+
+// 整体循环移位，n>0 向右移，n<0 向左移
+fn rotate(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("rotate", &args, 2, ctx)?;
+    let list = get_list_ref(&args[0], ctx)?;
+    let n = get_integer_ref(&args[1], ctx)?;
+    let len = list.as_ref().len();
+
+    if len == 0 {
+        return Ok(Expression::List(Rc::new(vec![])));
+    }
+
+    let shift = ((n % len as Int + len as Int) % len as Int) as usize;
+    let mut new_list = list.as_ref().clone();
+    new_list.rotate_right(shift);
+    Ok(Expression::List(Rc::new(new_list)))
+}
+
+// 随机打乱顺序
+fn shuffle(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("shuffle", &args, 1, ctx)?;
+    let list = get_list_ref(&args[0], ctx)?;
+    let mut new_list = list.as_ref().clone();
+    let mut rng = rand::rng();
+    new_list.shuffle(&mut rng);
+    Ok(Expression::List(Rc::new(new_list)))
+}
+
+// 随机取n个不重复元素
+fn sample(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("sample", &args, 2, ctx)?;
+    let list = get_list_ref(&args[0], ctx)?;
+    let n = get_integer_ref(&args[1], ctx)?.max(0) as usize;
+
+    let mut rng = rand::rng();
+    let sampled: Vec<Expression> = list.as_ref().sample(&mut rng, n).cloned().collect();
+    Ok(Expression::List(Rc::new(sampled)))
+}
+
+// 滑动窗口
+fn windows(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("windows", &args, 2, ctx)?;
+    let list = get_list_ref(&args[0], ctx)?;
+    let size = get_integer_ref(&args[1], ctx)?;
+
+    if size <= 0 {
+        return Err(RuntimeError::common(
+            "windows size must be positive".into(),
+            ctx.clone(),
+            0,
+        ));
+    }
+    let size = size as usize;
+    if size > list.as_ref().len() {
+        return Ok(Expression::List(Rc::new(vec![])));
+    }
+
+    let result = list
+        .as_ref()
+        .windows(size)
+        .map(|w| Expression::List(Rc::new(w.to_vec())))
+        .collect::<Vec<_>>();
+    Ok(Expression::List(Rc::new(result)))
+}
+
+// 用给定值重复n次构造列表
+fn fill(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("fill", &args, 2, ctx)?;
+    let value = args[0].clone();
+    let n = get_integer_ref(&args[1], ctx)?.max(0) as usize;
+    Ok(Expression::List(Rc::new(vec![value; n])))
+}
+
+// 类JS Array.splice：从start位置删除delete_count个元素，并插入items，返回新列表
+fn splice(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_args_len("splice", &args, 3.., ctx)?;
+    let mut it = args.into_iter();
+    let list_exp = it.next().unwrap();
+    let start_expr = it.next().unwrap();
+    let delete_expr = it.next().unwrap();
+    let items: Vec<Expression> = it.collect();
+
+    let list = get_list_ref(&list_exp, ctx)?;
+    let len = list.as_ref().len();
+    let start = clamp(get_integer_ref(&start_expr, ctx)?, len);
+    let delete_count = get_integer_ref(&delete_expr, ctx)?.max(0) as usize;
+    let end = (start + delete_count).min(len);
+
+    let mut new_list = Vec::with_capacity(len - (end - start) + items.len());
+    new_list.extend(list.as_ref()[..start].iter().cloned());
+    new_list.extend(items);
+    new_list.extend(list.as_ref()[end..].iter().cloned());
+
+    Ok(Expression::List(Rc::new(new_list)))
+}
+
 // fn get_list_arg(expr: Expression, ctx: &Expression) -> Result<Rc<Vec<Expression>>, RuntimeError> {
 //     match expr {
 //         Expression::List(s) => Ok(s),
@@ -1441,6 +1701,7 @@ pub fn get_list_ref<'a>(
 ) -> Result<&'a Rc<Vec<Expression>>, RuntimeError> {
     match expr {
         Expression::List(s) => Ok(s),
+        // Expression::BSet(s) => Ok(s),
         // Expression::Range(r, step) => Ok(Rc::new(
         //     r.step_by(*step)
         //         .map(Expression::Integer)
