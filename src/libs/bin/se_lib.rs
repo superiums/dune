@@ -1,5 +1,6 @@
 use std::{
     collections::{BTreeMap, HashMap},
+    rc::Rc,
     sync::OnceLock,
 };
 
@@ -31,6 +32,10 @@ pub fn regist_se() -> HashMap<&'static str, SelfExpandFunc> {
     module.insert("typeof", r#typeof);
     module.insert("set_root", set_root);
     module.insert("unset_root", unset_root);
+    module.insert("get_local", get_local);
+    module.insert("get_env", get_env);
+    module.insert("get_var", get_var);
+    module.insert("quote", quote);
     module
 }
 
@@ -42,6 +47,7 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
       debug => "print debug representation", "<args>..."
       ddebug => "print pretty debug", "<args>..."
       typeof => "get type of data value", "<value>"
+      quote => "quote an expr to eval later", "<expr>"
 
       // Data manipulation
       format => "print formatted string with named/position vars, aligned", "'tmpl {a:*>20}' <args>..."
@@ -53,7 +59,9 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
       // env
       set_root => "define a variable in root environment", "<var> <val>"
       unset_root => "undefine a variable in root environment", "<var>"
-      // getvar => "get a variable value", "<var>"
+      get_local => "get a local variable value", "<var>"
+      get_env => "get a variable from env", "<var>"
+      get_var => "get a variable from local and env", "<var>"
 
     })
 }
@@ -385,4 +393,58 @@ pub fn unset_root(
     let name = args[0].to_string();
     env.undefine_in_root(&name);
     Ok(Expression::None)
+}
+
+pub fn get_local(
+    args: &[Expression],
+    _env: &mut Environment,
+    state: &mut State,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("get_local", args, 1, ctx)?;
+    let name = args[0].to_string();
+    let r = state
+        .get_local_var(&name)
+        .cloned()
+        .unwrap_or(Expression::None);
+    Ok(r)
+}
+
+pub fn get_env(
+    args: &[Expression],
+    env: &mut Environment,
+    _state: &mut State,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("get_env", args, 1, ctx)?;
+    let name = args[0].to_string();
+    let r = env.get(&name).unwrap_or(Expression::None);
+    Ok(r)
+}
+
+pub fn get_var(
+    args: &[Expression],
+    env: &mut Environment,
+    state: &mut State,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("get_var", args, 1, ctx)?;
+    let name = args[0].to_string();
+
+    if let Some(local_val) = state.get_local_var(&name) {
+        return Ok(local_val.clone());
+    }
+
+    let r = env.get(&name).unwrap_or(Expression::None);
+    Ok(r)
+}
+
+fn quote(
+    args: &[Expression],
+    _env: &mut Environment,
+    _state: &mut State,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("quote", &args, 1, ctx)?;
+    Ok(Expression::Quote(Rc::new(args[0].clone())))
 }
