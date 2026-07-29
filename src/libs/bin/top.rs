@@ -24,7 +24,7 @@ pub fn regist_all() -> HashMap<&'static str, Rc<BuiltinFunc>> {
     reg_all!({
         exit, cd, cwd, symof,
         tap, print, pprint, println, eprint, eprintln, read,
-        get, len, rev, flatten,  select, sort_by,
+        dig, len, rev, flatten,  select, sort_by,
         not,
         eval, exec, eval_str, exec_str, include, import,
         help,
@@ -58,7 +58,7 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         throw => "return a runtime error", "<msg>"
 
         // Data manipulation
-        get => "get value from nested map/list/range using dot notation path", "<map|list|range> <path>"
+        dig => "get value from nested map/list/range using dot notation path", "<map|list|range> <path>"
         // typeof => "get data type", "<value>"
         len => "get length of expression", "<collection>"
         rev => "reverse sequence", "<string|list|bytes>"
@@ -792,12 +792,12 @@ pub fn flatten(
     Ok(Expression::from(flat(&args[0])))
 }
 
-pub fn get(
+pub fn dig(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("get", &args, 2, ctx)?;
+    check_exact_args_len("dig", &args, 2, ctx)?;
     let mut it = args.into_iter();
     let mut current = it.next().unwrap();
     let index = it.next().unwrap();

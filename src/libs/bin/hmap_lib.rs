@@ -17,11 +17,11 @@ pub fn regist_lazy() -> LazyModule {
     reg_lazy!({
         // pprint,
         // from top
-        len, insert, flatten, get,
+        len, insert, flatten, dig,
         // 检查操作
         contains_key, contains_value, is_empty,
         // 数据获取
-        at, keys, values,
+        get, keys, values,
         // 查找
         find, filter,
         // 结构修改
@@ -48,8 +48,8 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         is_empty => "check if map is empty", "<map>"
 
         // 数据获取
-        get => "get value from nested map/list/range using dot notation path", "<map|list|range> <path>"
-        at => "get value from map", "<map> <key>"
+        dig => "get value from nested map/list/range using dot notation path", "<map|list|range> <path>"
+        get => "get value from map", "<map> <key>"
         keys => "get the keys of a map", "<map>"
         values => "get the values of a map", "<map>"
         // 查找
@@ -100,12 +100,12 @@ fn len(
 ) -> Result<Expression, RuntimeError> {
     top::len(args, env, ctx)
 }
-fn get(
+fn dig(
     args: Vec<Expression>,
     env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    top::get(args, env, ctx)
+    top::dig(args, env, ctx)
 }
 fn flatten(
     args: Vec<Expression>,
@@ -127,7 +127,7 @@ fn is_empty(
     Ok(Expression::Boolean(map.is_empty()))
 }
 
-fn at(
+fn get(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,

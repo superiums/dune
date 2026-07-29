@@ -25,7 +25,7 @@ pub fn regist_lazy() -> LazyModule {
         //数学统计
         max,min,sum,average,
         //读取操作
-        get,len,is_empty,first,last,at,take,skip,slice,
+        dig,len,is_empty,first,last,get,take,skip,slice,
         //查找操作
         contains,find,rfind,position,rposition,
         //修改操作
@@ -53,12 +53,12 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         average => "get the average of a list of numbers", "<num1> <num2> ... | <array>"
 
         // 读取操作
-        get => "get value from nested map/list/range using dot notation path", "<map|list|range> <path>"
+        dig => "get value from nested map/list/range using dot notation path", "<map|list|range> <path>"
         len => "get length of list", "<list>"
         is_empty => "is this list empty?", "<list>"
         first => "get the first element of a list", "<list> [n]"
         last => "get the last element of a list", "<list> [n]"
-        at => "get the nth element of a list", "<list> <index>"
+        get => "get the nth element of a list", "<list> <index>"
         take => "take the first n elements of a list", "<list> <count>"
         skip => "skip the first n elements of a list", "<list> <count>"
         slice => "get a sub-list from start(inclusive) to end(exclusive), support negative index", "<list> <start> <end>"
@@ -215,12 +215,12 @@ fn len(
 ) -> Result<Expression, RuntimeError> {
     top::len(args, env, ctx)
 }
-fn get(
+fn dig(
     args: Vec<Expression>,
     env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    top::get(args, env, ctx)
+    top::dig(args, env, ctx)
 }
 fn rev(
     args: Vec<Expression>,
@@ -304,7 +304,7 @@ fn clamp(n: Int, len: usize) -> usize {
         (n as usize).min(len)
     }
 }
-fn at(
+fn get(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
