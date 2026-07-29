@@ -69,6 +69,10 @@ throw <msg>
 typeof <value>
   get type of data value
 unset_root <var>
+get_var <var>
+get_local <var>
+get_env <var>
+quote <expr>
 when <condition> <execute>
 where <table> <condition>
   filter rows by condition
