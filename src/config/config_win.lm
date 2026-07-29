@@ -169,7 +169,7 @@ if IS_INTERACTIVE {
 
     # ## alias
     alias int = into.int()
-    alias str = into.str()
+    alias str = into.string()
     alias each = list.map()
     alias sort = list.sort()
     alias group = list.group()

@@ -4,8 +4,10 @@ use crate::{
     Environment, Expression, Int, RuntimeError, RuntimeErrorKind,
     libs::{
         BuiltinInfo,
-        bin::colors::{COLOR_MAP, true_color_by_hex},
-        bin::top,
+        bin::{
+            colors::{COLOR_MAP, true_color_by_hex},
+            top,
+        },
         helper::{
             check_args_len, check_exact_args_len, get_integer_arg, get_integer_ref, get_string_arg,
             get_string_ref,
@@ -13,6 +15,7 @@ use crate::{
         lazy_module::LazyModule,
     },
     reg_info, reg_lazy,
+    utils::unescape_str,
 };
 use std::{collections::BTreeMap, sync::OnceLock};
 
@@ -41,6 +44,7 @@ pub fn regist_lazy() -> LazyModule {
         // 高级操作
         max_len, grep,
         strip_ansi,
+        escape, unescape,
         // 格式化
         pad_start, pad_end, center, wrap,
         // 样式
@@ -115,6 +119,8 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
        max_len => "get max length of lines", "<string>"
        grep => "find lines which contains the substring", "<string> <substring>"
        strip_ansi => "remove all ANSI escape codes from string", "<string>"
+       unescape => "unescape a string containing escape sequences (\\n \\t \\xNN \\uXXXX etc.)", "<string>"
+       escape => "escape control/special characters into printable escape sequences", "<string>"
 
        // 格式化
        pad_start => "pad string to specified length at start", "<string> <length> [pad_char]"
@@ -1198,4 +1204,42 @@ fn to_safe(
         .next()
         .map_or("".to_string(), |exp| exp.to_string());
     Ok(Expression::StringSafe(str))
+}
+
+fn unescape(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("unescape", &args, 1, ctx)?;
+    let text = get_string_ref(&args[0], ctx)?;
+    Ok(Expression::String(unescape_str(text)))
+}
+
+// 转义：将真实的控制字符/特殊字符转成可打印的 \n \t \\ 等序列
+fn escape(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("escape", &args, 1, ctx)?;
+    let text = get_string_ref(&args[0], ctx)?;
+    let mut out = String::with_capacity(text.len());
+    for c in text.chars() {
+        match c {
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '\x07' => out.push_str("\\a"),
+            '\x08' => out.push_str("\\b"),
+            '\x0c' => out.push_str("\\f"),
+            '\x0b' => out.push_str("\\v"),
+            '\x1b' => out.push_str("\\e"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\x{:02x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    Ok(Expression::String(out))
 }

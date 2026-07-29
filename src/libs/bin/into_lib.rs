@@ -356,27 +356,7 @@ fn split_file_size(size_str: &str) -> Option<(f64, &'static str)> {
 }
 
 // ===========serializers==============
-
-// [NEW] 提取 TOML 字符串转义为独立函数
-fn escape_toml_string(s: &str) -> String {
-    let mut escaped = String::with_capacity(s.len());
-    for ch in s.chars() {
-        match ch {
-            '"' => escaped.push_str("\\\""),
-            '\\' => escaped.push_str("\\\\"),
-            '\n' => escaped.push_str("\\n"),
-            '\r' => escaped.push_str("\\r"),
-            '\t' => escaped.push_str("\\t"),
-            '\u{0008}' => escaped.push_str("\\b"),
-            '\u{000C}' => escaped.push_str("\\f"),
-            _ => escaped.push(ch),
-        }
-    }
-    escaped
-}
-
-// [NEW] 提取 JSON 字符串转义为独立函数（供键和值共用）
-fn escape_json_string(s: &str) -> String {
+fn escape_string_common(s: &str) -> String {
     let mut escaped = String::with_capacity(s.len());
     for ch in s.chars() {
         match ch {
@@ -392,6 +372,15 @@ fn escape_json_string(s: &str) -> String {
         }
     }
     escaped
+}
+// [NEW] 提取 TOML 字符串转义为独立函数
+fn escape_toml_string(s: &str) -> String {
+    escape_string_common(s)
+}
+
+// [NEW] 提取 JSON 字符串转义为独立函数（供键和值共用）
+fn escape_json_string(s: &str) -> String {
+    escape_string_common(s)
 }
 
 pub fn toml(

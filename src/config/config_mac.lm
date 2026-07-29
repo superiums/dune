@@ -174,7 +174,7 @@ if IS_INTERACTIVE {
 
     # ## alias
     alias int = into.int()
-    alias str = into.str()
+    alias str = into.string()
     alias each = list.map()
     alias table = into.table()
     alias join = list.join()

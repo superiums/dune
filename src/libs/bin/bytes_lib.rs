@@ -1,6 +1,7 @@
 use crate::libs::BuiltinInfo;
 use crate::libs::helper::*;
 use crate::libs::lazy_module::LazyModule;
+use crate::utils::unescape_bytes;
 use crate::{Environment, Expression, Int, RuntimeError, RuntimeErrorKind};
 use crate::{reg_info, reg_lazy};
 use std::collections::BTreeMap;
@@ -8,7 +9,7 @@ use std::collections::BTreeMap;
 pub fn regist_lazy() -> LazyModule {
     reg_lazy!({
         // 构造/转换
-        from, from_hex, from_base64, from_list,
+        from, from_hex, from_base64, from_list, from_escaped,
         to_string, to_hex, to_base64, to_list,
         // 基本信息
         len, is_empty,
@@ -30,6 +31,8 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         from_hex => "create bytes from a hex string", "<hex_string>"
         from_base64 => "create bytes from a base64 string", "<base64_string>"
         from_list => "create bytes from a list of integers(0-255)", "<list>"
+        from_escaped => "create bytes from escaped text", "<string>"
+
         to_string => "convert bytes to a utf8 string (lossy)", "<bytes>"
         to_hex => "convert bytes to a hex string", "<bytes>"
         to_base64 => "convert bytes to a base64 string", "<bytes>"
@@ -429,6 +432,16 @@ fn split(
         .map(|p| Expression::Bytes(p.to_vec()))
         .collect::<Vec<_>>();
     Ok(Expression::from(parts))
+}
+
+fn from_escaped(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("from_escaped", &args, 1, ctx)?;
+    let text = get_string_ref(&args[0], ctx)?;
+    Ok(Expression::Bytes(unescape_bytes(text)))
 }
 
 // ---------------- 辅助函数 ----------------
