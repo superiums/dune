@@ -1,4 +1,5 @@
 use crate::expression::table::TableData;
+use crate::libs::bin::into_lib::csv as to_csv;
 use crate::libs::helper::{
     check_args_len, check_exact_args_len, get_integer_arg, get_integer_ref, get_table_arg,
 };
@@ -12,34 +13,46 @@ use std::collections::BTreeMap;
 pub fn regist_lazy() -> LazyModule {
     reg_lazy!({
         len, header_len,
-        getcol, select, headers,
-        at, rows, first, last, grep, find, find_last, filter,
-        rows_list, first_list, last_list, at_list,
+        get_column, select, headers,
+        get_map, rows_map, first_map, last_map,
+        rows, first, last, get,
+        grep, position, rposition, filter,
         sort_by,
-        append
+        push,
+
+        is_empty,get_cell,slice,from_maps,
+        to_csv
     })
 }
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
     reg_info!({
         len => "count rows", "<table>"
         header_len => "count headers", "<table>"
-        getcol => "get column by header/index", "<table> <header|index>"
+        get_column => "get column by header/index", "<table> <header|index>"
         select => "select columns", "<table> <cols...>"
         headers => "list headers", "<table>"
-        rows => "list rows as maps", "<table>"
-        first => "get first n row as maps", "<table> [n]"
-        last => "get last n row as maps", "<table> [n]"
-        at => "get nth row as map", "<table> <index>"
-        rows_list => "list rows as lists", "<table>"
-        first_list => "get first n row as lists", "<table> [n]"
-        last_list => "get last n row as lists", "<table> [n]"
-        at_list => "get nth row as list", "<table> <index>"
+        rows_map => "list rows as maps", "<table>"
+        first_map => "get first n row as maps", "<table> [n]"
+        last_map => "get last n row as maps", "<table> [n]"
+        get_map => "get nth row as map", "<table> <index>"
+        rows => "list rows as lists", "<table>"
+        first => "get first n row as lists", "<table> [n]"
+        last => "get last n row as lists", "<table> [n]"
+        get => "get nth row as list", "<table> <index>"
         grep => "grep rows which contains the string", "<table> <string>"
-        find => "find first row index of matching cell", "<table> <cell|fn> [start_index]"
-        find_last => "find last row index of matching cell", "<table> <cell|fn> [start_index]"
+        position => "find first row_index of matching cell", "<table> <cell|fn> [start_index]"
+        rposition => "find last row_index of matching cell", "<table> <cell|fn> [start_index]"
         filter => "filter rows by condition/cell match", "<table> <cell|fn>"
-        sortby => "sort a table by column", "<table> <col>"
-        append => "append a row", "<table> <list|set>"
+        sort_by => "sort a table by column", "<table> <col>"
+        push => "append a row", "<table> <list|set>"
+
+        is_empty => "check if table has no rows", "<table>"
+        get_cell => "get single cell value by row index and column header/index", "<table> <row_index> <header|index>"
+        slice => "get a row range as maps, support negative index", "<table> <start> <end>"
+        from_maps => "build a table from a list of maps, using union of all keys as headers", "<list_of_maps>"
+
+        to_csv => "serialize to CSV", "<table>"
+
     })
 }
 
@@ -65,12 +78,12 @@ fn header_len(
     let table = get_table_arg(data, ctx)?;
     Ok(Expression::Integer(table.column_count() as i64))
 }
-fn getcol(
+fn get_column(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("get", &args, 2, ctx)?;
+    check_exact_args_len("get_column", &args, 2, ctx)?;
     let mut it = args.into_iter();
     let data = it.next().unwrap();
     let table = get_table_arg(data, ctx)?;
@@ -120,7 +133,7 @@ pub fn select(
     let data_expr = args.into_iter().next().unwrap();
     let data = get_table_arg(data_expr, ctx)?;
 
-    match data.get_columns(&data.get_header_indexes(&headers)) {
+    match data.columns(&data.column_indexes(&headers)) {
         Some(rows) => Ok(Expression::Table(TableData::new(headers, rows))),
         None => Ok(Expression::None),
     }
@@ -138,6 +151,18 @@ fn headers(
 }
 
 ///every row as a map
+fn rows_map(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("rows_map", &args, 1, ctx)?;
+    let mut it = args.into_iter();
+    let data = it.next().unwrap();
+    let table = get_table_arg(data, ctx)?;
+
+    Ok(table.to_map())
+}
 fn rows(
     args: Vec<Expression>,
     _env: &mut Environment,
@@ -148,28 +173,16 @@ fn rows(
     let data = it.next().unwrap();
     let table = get_table_arg(data, ctx)?;
 
-    Ok(table.to_list_map())
-}
-fn rows_list(
-    args: Vec<Expression>,
-    _env: &mut Environment,
-    ctx: &Expression,
-) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("rows_list", &args, 1, ctx)?;
-    let mut it = args.into_iter();
-    let data = it.next().unwrap();
-    let table = get_table_arg(data, ctx)?;
-
     Ok(Expression::from(table.rows().to_vec()))
 }
 
 ///first row as map
-fn first(
+fn first_map(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_args_len("first", &args, 1..=2, ctx)?;
+    check_args_len("first_map", &args, 1..=2, ctx)?;
     let mut it = args.into_iter();
     let data = it.next().unwrap();
     let table = get_table_arg(data, ctx)?;
@@ -220,12 +233,12 @@ fn first(
     }
 }
 ///first row as list
-fn first_list(
+fn first(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_args_len("first_list", &args, 1..=2, ctx)?;
+    check_args_len("first", &args, 1..=2, ctx)?;
     let mut it = args.into_iter();
     let data = it.next().unwrap();
     let table = get_table_arg(data, ctx)?;
@@ -251,12 +264,12 @@ fn first_list(
 }
 
 ///last row as map
-fn last(
+fn last_map(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_args_len("last", &args, 1..=2, ctx)?;
+    check_args_len("last_map", &args, 1..=2, ctx)?;
     let mut it = args.into_iter();
     let data = it.next().unwrap();
     let table = get_table_arg(data, ctx)?;
@@ -309,12 +322,12 @@ fn last(
     }
 }
 ///first row as list
-fn last_list(
+fn last(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_args_len("last_list", &args, 1..=2, ctx)?;
+    check_args_len("last", &args, 1..=2, ctx)?;
     let mut it = args.into_iter();
     let data = it.next().unwrap();
     let table = get_table_arg(data, ctx)?;
@@ -341,12 +354,12 @@ fn last_list(
     }
 }
 
-fn at(
+fn get_map(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("at", &args, 1, ctx)?;
+    check_exact_args_len("get_map", &args, 1, ctx)?;
     let mut it = args.into_iter();
     let data = it.next().unwrap();
     let table = get_table_arg(data, ctx)?;
@@ -376,12 +389,12 @@ fn at(
     }
 }
 
-fn at_list(
+fn get(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("at_list", &args, 1, ctx)?;
+    check_exact_args_len("get", &args, 1, ctx)?;
     let mut it = args.into_iter();
     let data = it.next().unwrap();
     let table = get_table_arg(data, ctx)?;
@@ -447,12 +460,12 @@ fn grep(
     Ok(Expression::from(r))
 }
 
-fn find(
+fn position(
     args: Vec<Expression>,
     env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_args_len("find", &args, 2..=3, ctx)?;
+    check_args_len("position", &args, 2..=3, ctx)?;
 
     let mut it = args.into_iter();
     let data = it.next().unwrap();
@@ -467,7 +480,7 @@ fn find(
     match &target {
         Expression::Function(..) | Expression::Lambda(..) => {
             let state = &mut State::new();
-            for (i, row) in table.to_maps().into_iter().enumerate().skip(start) {
+            for (i, row) in table.to_map_vec().into_iter().enumerate().skip(start) {
                 let r = &target.eval_apply(&target, &[row], state, env, 0)?;
                 if let Expression::Boolean(true) = r {
                     return Ok(Expression::Integer(i as i64));
@@ -489,12 +502,12 @@ fn find(
     }
 }
 
-fn find_last(
+fn rposition(
     args: Vec<Expression>,
     env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_args_len("find_last", &args, 2..=3, ctx)?;
+    check_args_len("rposition", &args, 2..=3, ctx)?;
 
     let mut it = args.into_iter();
     let data = it.next().unwrap();
@@ -509,7 +522,7 @@ fn find_last(
     match &target {
         Expression::Function(..) | Expression::Lambda(..) => {
             let state = &mut State::new();
-            for (i, row) in table.to_maps().into_iter().enumerate().rev().skip(start) {
+            for (i, row) in table.to_map_vec().into_iter().enumerate().rev().skip(start) {
                 let r = &target.eval_apply(&target, &[row], state, env, 0)?;
                 if let Expression::Boolean(true) = r {
                     return Ok(Expression::Integer(i as i64));
@@ -548,7 +561,7 @@ fn filter(
         Expression::Function(..) | Expression::Lambda(..) => {
             let state = &mut State::new();
             let r = table
-                .to_maps()
+                .to_map_vec()
                 .into_iter()
                 .filter(|row| {
                     target
@@ -570,12 +583,12 @@ fn filter(
     Ok(Expression::from(result))
 }
 
-fn append(
+fn push(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("append", &args, 2, ctx)?;
+    check_exact_args_len("push", &args, 2, ctx)?;
     let mut it = args.into_iter();
     let data = it.next().unwrap();
     let mut t = get_table_arg(data, ctx)?;
@@ -601,27 +614,168 @@ fn append(
     };
     t.push_row(v);
     Ok(Expression::from(t))
+}
 
-    // if v.len() != t.column_count() {
-    //     return Err(RuntimeError::new(
-    //         RuntimeErrorKind::CustomError(
-    //             format!("length not match while insert:\n`{}`", &val).into(),
-    //         ),
-    //         ctx.clone(),
-    //         0,
-    //     ));
-    // }
-    // let mut rows = t.rows().clone();
-    // rows.insert(i as usize, v);
-    // let tn = TableData::new(t.headers().to_vec(), rows);
+// ---- is_empty ----
+fn is_empty(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("is_empty", &args, 1, ctx)?;
+    let t = get_table_arg(args.into_iter().next().unwrap(), ctx)?;
+    Ok(Expression::Boolean(t.rows().is_empty()))
+}
 
-    // } else {
-    //     Err(RuntimeError::new(
-    //         RuntimeErrorKind::CustomError(
-    //             format!("index {} out of bounds for insertion", i).into(),
-    //         ),
-    //         ctx.clone(),
-    //         0,
-    //     ))
-    // }
+// ---- get_cell：单元格精确访问 ----
+fn get_cell(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("get_cell", &args, 3, ctx)?;
+    let mut it = args.into_iter();
+    let data = it.next().unwrap();
+    let t = get_table_arg(data, ctx)?;
+    let a1 = it.next().unwrap();
+    let a2 = it.next().unwrap();
+
+    let row_idx = get_integer_ref(&a1, ctx)?;
+    let row_len = t.rows().len();
+    let row_i = if row_idx < 0 {
+        (row_len as i64 + row_idx).max(0) as usize
+    } else {
+        row_idx as usize
+    };
+
+    let col_i = match &a2 {
+        Expression::Integer(i) => *i as usize,
+        Expression::String(s) | Expression::Symbol(s) => {
+            t.headers().iter().position(|h| h == s).ok_or_else(|| {
+                RuntimeError::common(format!("no such column: {s}").into(), ctx.clone(), 0)
+            })?
+        }
+        e => {
+            return Err(RuntimeError::new(
+                RuntimeErrorKind::TypeError {
+                    expected: "String/Integer".into(),
+                    sym: e.to_string(),
+                    found: e.type_name(),
+                },
+                ctx.clone(),
+                0,
+            ));
+        }
+    };
+
+    t.rows()
+        .get(row_i)
+        .and_then(|row| row.get(col_i))
+        .cloned()
+        .ok_or_else(|| {
+            RuntimeError::common("row/column index out of bounds".into(), ctx.clone(), 0)
+        })
+}
+
+// ---- slice：行区间截取，返回 Map 形式（与 rows/first/last 保持一致） ----
+fn slice(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("slice", &args, 3, ctx)?;
+
+    let mut it = args.into_iter();
+    let data = it.next().unwrap();
+    let t = get_table_arg(data, ctx)?;
+    let a1 = it.next().unwrap();
+    let a2 = it.next().unwrap();
+
+    let len = t.rows().len();
+    let clamp = |n: i64| -> usize {
+        if n < 0 {
+            (len as i64 + n).max(0) as usize
+        } else {
+            (n as usize).min(len)
+        }
+    };
+    let start = clamp(get_integer_ref(&a1, ctx)?);
+    let end = clamp(get_integer_ref(&a2, ctx)?);
+
+    if start >= end {
+        return Ok(Expression::from(Vec::<Expression>::new()));
+    }
+
+    let headers = t.headers();
+    let result = t.rows()[start..end]
+        .iter()
+        .map(|row| {
+            let mut m = BTreeMap::new();
+            for (h, v) in headers.iter().zip(row.iter()) {
+                m.insert(h.clone(), v.clone());
+            }
+            Expression::from(m)
+        })
+        .collect::<Vec<_>>();
+    Ok(Expression::from(result))
+}
+
+// ---- from_maps：反向构造入口，与 to_maps/rows 对称 ----
+fn from_maps(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("from_maps", &args, 1, ctx)?;
+    let list = match &args[0] {
+        Expression::List(l) => l.as_ref().clone(),
+        e => {
+            return Err(RuntimeError::new(
+                RuntimeErrorKind::TypeError {
+                    expected: "List of Map".into(),
+                    sym: e.to_string(),
+                    found: e.type_name(),
+                },
+                ctx.clone(),
+                0,
+            ));
+        }
+    };
+
+    // 收集所有 key 的并集作为表头，保持首次出现顺序
+    let mut headers: Vec<String> = Vec::new();
+    let mut maps: Vec<BTreeMap<String, Expression>> = Vec::with_capacity(list.len());
+    for item in &list {
+        let m = match item {
+            Expression::Map(m) => m.as_ref().clone(),
+            Expression::HMap(m) => m.as_ref().clone().into_iter().collect(),
+            e => {
+                return Err(RuntimeError::new(
+                    RuntimeErrorKind::TypeError {
+                        expected: "Map/HMap".into(),
+                        sym: e.to_string(),
+                        found: e.type_name(),
+                    },
+                    ctx.clone(),
+                    0,
+                ));
+            }
+        };
+        for k in m.keys() {
+            if !headers.contains(k) {
+                headers.push(k.clone());
+            }
+        }
+        maps.push(m);
+    }
+
+    let mut t = TableData::with_header(headers.clone());
+    for m in maps {
+        let row = headers
+            .iter()
+            .map(|h| m.get(h).cloned().unwrap_or(Expression::None))
+            .collect::<Vec<_>>();
+        t.push_row(row);
+    }
+    Ok(Expression::from(t))
 }

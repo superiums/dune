@@ -45,13 +45,13 @@ impl TableData {
                 .collect(),
         )
     }
-    pub fn get_header_indexes(&self, col_names: &[String]) -> Vec<usize> {
+    pub fn column_indexes(&self, col_names: &[String]) -> Vec<usize> {
         col_names
             .iter()
             .filter_map(|x| self.headers.iter().position(|h| h == x))
             .collect()
     }
-    pub fn get_columns(&self, indexes: &[usize]) -> Option<Vec<Vec<Expression>>> {
+    pub fn columns(&self, indexes: &[usize]) -> Option<Vec<Vec<Expression>>> {
         if indexes.is_empty() {
             return None;
         }
@@ -131,10 +131,10 @@ impl TableData {
     }
 
     /// 转换为 List<Map> 格式（向后兼容）
-    pub fn to_list_map(&self) -> Expression {
-        Expression::from(self.to_maps())
+    pub fn to_map(&self) -> Expression {
+        Expression::from(self.to_map_vec())
     }
-    pub fn to_maps(&self) -> Vec<Expression> {
+    pub fn to_map_vec(&self) -> Vec<Expression> {
         use std::collections::BTreeMap;
 
         self.rows

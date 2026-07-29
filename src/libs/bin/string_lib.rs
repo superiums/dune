@@ -5,6 +5,7 @@ use crate::{
     libs::{
         BuiltinInfo,
         bin::colors::{COLOR_MAP, true_color_by_hex},
+        bin::top,
         helper::{
             check_args_len, check_exact_args_len, get_integer_arg, get_integer_ref, get_string_arg,
             get_string_ref,
@@ -16,8 +17,8 @@ use crate::{
 use std::{collections::BTreeMap, sync::OnceLock};
 
 use crate::libs::bin::into_lib::{
-    filesize as to_filesize, float as to_float, int as to_int, strip, table as to_table,
-    time as to_time,
+    filesize as to_filesize, float as to_float, int as to_int, strip as strip_ansi,
+    table as to_table, time as to_time,
 };
 static QUOTED_RE: OnceLock<Regex> = OnceLock::new();
 
@@ -28,17 +29,18 @@ pub fn regist_lazy() -> LazyModule {
         to_int, to_float, to_filesize, to_time, to_table,
         to_safe,
         // 基础检查
+        is_ascii, is_ascii_control, is_ascii_punctuation, is_ascii_digit, is_ascii_hexdigit,
         is_empty, is_whitespace, is_alpha, is_alphanumeric, is_numeric, is_lower, is_upper, is_title, len,
         // 子串检查
-        starts_with, ends_with, contains,
+        starts_with, ends_with, contains, position, get,
         // 分割操作
         split, split_at, chars, words, words_quoted, lines, paragraphs, concat,
         // 修改操作
-        insert, repeat, replace, substring, remove_prefix, remove_suffix, trim, trim_start, trim_end, lower, upper, title,
+        insert, repeat, replace, slice, strip_prefix, strip_suffix, trim, trim_start, trim_end, lower, upper, title,
+        rev,
         // 高级操作
         max_len, grep,
-        caesar,
-        strip,
+        strip_ansi,
         // 格式化
         pad_start, pad_end, center, wrap,
         // 样式
@@ -62,20 +64,27 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
        to_safe => "make a string safe and never eval","<str>"
 
        // 基础检查
-       is_empty => "is this string empty?", "<string>"
-       is_whitespace => "is this string whitespace?", "<string>"
-       is_alpha => "is this string alphabetic?", "<string>"
-       is_alphanumeric => "is this string alphanumeric?", "<string>"
-       is_numeric => "is this string numeric?", "<string>"
-       is_lower => "is this string lowercase?", "<string>"
-       is_upper => "is this string uppercase?", "<string>"
-       is_title => "is this string title case?", "<string>"
+       is_empty => "is empty?", "<string>"
+       is_whitespace => "is whitespace?", "<string>"
+       is_ascii => "is ascii?", "<string>"
+       is_ascii_control => "is ascii_control?", "<string>"
+       is_ascii_punctuation => "is ascii_punctuation?", "<string>"
+       is_ascii_digit => "is ascii_hexdigit?", "<string>"
+       is_ascii_hexdigit => "is ascii_hexdigit?", "<string>"
+       is_alpha => "is alphabetic?", "<string>"
+       is_alphanumeric => "is alphanumeric?", "<string>"
+       is_numeric => "is numeric?", "<string>"
+       is_lower => "is lowercase?", "<string>"
+       is_upper => "is uppercase?", "<string>"
+       is_title => "is title case?", "<string>"
        len => "get length of string", "<string>"
 
        // 子串检查
        starts_with => "check if a string starts with a given substring", "<string> <substring>"
        ends_with => "check if a string ends with a given substring", "<string> <substring>"
        contains => "check if a string contains a given substring", "<string> <substring>"
+       position => "find char-index of first occurrence of substring (or None)", "<string> <substring> [start]"
+       get => "get character at index, support negative index", "<string> <index>"
 
        // 分割操作
        split => "split a string on a given character", "<string> [delimiter]"
@@ -91,9 +100,10 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
        insert => "insert chars to a string", "<string> <index> <string>"
        repeat => "repeat string specified number of times", "<string> <count>"
        replace => "replace all instances of a substring", "<string> <old> <new>"
-       substring => "get substring from start to end indices", "<string> <start> <end>"
-       remove_prefix => "remove prefix if present", "<string> <prefix>"
-       remove_suffix => "remove suffix if present", "<string> <suffix>"
+       slice => "get substring from start to end indices", "<string> <start> <end>"
+       rev => "reverse a string", "<string>"
+       strip_prefix => "remove prefix", "<string> <prefix>"
+       strip_suffix => "remove suffix", "<string> <suffix>"
        trim => "trim whitespace from a string", "<string>"
        trim_start => "trim whitespace from the start", "<string>"
        trim_end => "trim whitespace from the end", "<string>"
@@ -102,10 +112,9 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
        title => "convert a string to title case", "<string>"
 
        // 高级操作
-       caesar => "encrypt a string using a caesar cipher", "<string> <shift>"
        max_len => "get max length of lines", "<string>"
        grep => "find lines which contains the substring", "<string> <substring>"
-       strip => "remove all ANSI escape codes from string", "<string>"
+       strip_ansi => "remove all ANSI escape codes from string", "<string>"
 
        // 格式化
        pad_start => "pad string to specified length at start", "<string> <length> [pad_char]"
@@ -161,6 +170,64 @@ fn is_whitespace(
     check_exact_args_len("is_whitespace", &args, 1, ctx)?;
     let text = get_string_ref(&args[0], ctx)?;
     Ok(Expression::Boolean(text.chars().all(|c| c.is_whitespace())))
+}
+
+fn is_ascii(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("is_ascii", &args, 1, ctx)?;
+    let text = get_string_ref(&args[0], ctx)?;
+    Ok(Expression::Boolean(text.chars().all(|c| c.is_ascii())))
+}
+
+fn is_ascii_control(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("is_ascii_control", &args, 1, ctx)?;
+    let text = get_string_ref(&args[0], ctx)?;
+    Ok(Expression::Boolean(
+        text.chars().all(|c| c.is_ascii_control()),
+    ))
+}
+
+fn is_ascii_punctuation(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("is_ascii_control", &args, 1, ctx)?;
+    let text = get_string_ref(&args[0], ctx)?;
+    Ok(Expression::Boolean(
+        text.chars().all(|c| c.is_ascii_punctuation()),
+    ))
+}
+
+fn is_ascii_digit(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("is_ascii_digit", &args, 1, ctx)?;
+    let text = get_string_ref(&args[0], ctx)?;
+    Ok(Expression::Boolean(
+        text.chars().all(|c| c.is_ascii_digit()),
+    ))
+}
+
+fn is_ascii_hexdigit(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("is_ascii_digit", &args, 1, ctx)?;
+    let text = get_string_ref(&args[0], ctx)?;
+    Ok(Expression::Boolean(
+        text.chars().all(|c| c.is_ascii_hexdigit()),
+    ))
 }
 
 fn is_alpha(
@@ -270,6 +337,76 @@ fn contains(
     let substring = get_string_ref(&args[1], ctx)?;
 
     Ok(Expression::Boolean(text.contains(substring)))
+}
+
+// 查找子串首次出现的位置（按字符计数，与 len/substring 保持一致），未找到返回 None
+fn position(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_args_len("position", &args, 2..=3, ctx)?;
+    let text = get_string_ref(&args[0], ctx)?;
+    let pattern = get_string_ref(&args[1], ctx)?;
+    let start = if args.len() == 3 {
+        get_integer_ref(&args[2], ctx)?.max(0) as usize
+    } else {
+        0
+    };
+
+    if pattern.is_empty() {
+        return Ok(Expression::Integer(start.min(text.chars().count()) as Int));
+    }
+
+    let chars: Vec<char> = text.chars().collect();
+    let pat_chars: Vec<char> = pattern.chars().collect();
+    let plen = pat_chars.len();
+
+    if start > chars.len() || plen > chars.len() {
+        return Ok(Expression::None);
+    }
+
+    for i in start..=(chars.len() - plen) {
+        if chars[i..i + plen] == pat_chars[..] {
+            return Ok(Expression::Integer(i as Int));
+        }
+    }
+    Ok(Expression::None)
+}
+// 按字符索引取值，支持负数索引（从末尾计算）
+fn get(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("get", &args, 2, ctx)?;
+    let text = get_string_ref(&args[0], ctx)?;
+    let n = get_integer_ref(&args[1], ctx)?;
+
+    let chars: Vec<char> = text.chars().collect();
+    let len = chars.len();
+    let index = if n < 0 {
+        let ni = len as i64 + n;
+        if ni < 0 {
+            return Err(RuntimeError::new(
+                RuntimeErrorKind::IndexOutOfBounds { index: n, len },
+                ctx.clone(),
+                0,
+            ));
+        }
+        ni as usize
+    } else {
+        n as usize
+    };
+
+    chars
+        .get(index)
+        .map(|c| Expression::String(c.to_string()))
+        .ok_or(RuntimeError::new(
+            RuntimeErrorKind::IndexOutOfBounds { index: n, len },
+            ctx.clone(),
+            0,
+        ))
 }
 // Splitting Operations
 fn split(
@@ -430,6 +567,13 @@ fn concat(
 
     Ok(Expression::from(others))
 }
+fn rev(
+    args: Vec<Expression>,
+    env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    top::rev(args, env, ctx)
+}
 
 fn repeat(
     args: Vec<Expression>,
@@ -438,11 +582,21 @@ fn repeat(
 ) -> Result<Expression, RuntimeError> {
     check_exact_args_len("repeat", &args, 2, ctx)?;
     let text = get_string_ref(&args[0], ctx)?;
-    let count = get_integer_ref(&args[1], ctx)?;
+    let count = get_integer_ref(&args[1], ctx)?.max(0) as usize;
 
-    Ok(Expression::String(
-        text.repeat(count.clamp(0, 1000) as usize),
-    ))
+    const MAX_RESULT_BYTES: usize = 1024 * 1024; // 1MB limit
+    match text.len().checked_mul(count) {
+        Some(total) if total <= MAX_RESULT_BYTES => Ok(Expression::String(text.repeat(count))),
+        _ => Err(RuntimeError::common(
+            format!(
+                "string.repeat would produce a result larger than {}MB, refused",
+                1
+            )
+            .into(),
+            ctx.clone(),
+            0,
+        )),
+    }
 }
 
 fn replace(
@@ -458,7 +612,7 @@ fn replace(
     Ok(Expression::String(text.replace(from, to)))
 }
 
-fn substring(
+fn slice(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
@@ -523,7 +677,7 @@ fn insert(
     }
 }
 
-fn remove_prefix(
+fn strip_prefix(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
@@ -537,7 +691,7 @@ fn remove_prefix(
     ))
 }
 
-fn remove_suffix(
+fn strip_suffix(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
@@ -736,7 +890,7 @@ fn italic(
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("italics", &args, 1, ctx)?;
+    check_exact_args_len("italic", &args, 1, ctx)?;
     let text = get_string_ref(&args[0], ctx)?;
     Ok(format!("\x1b[3m{}\x1b[m\x1b[0m", text).into())
 }
@@ -1002,35 +1156,6 @@ fn true_color(
 
     let prefix = if is_bg { "48" } else { "38" };
     Ok(format!("\x1b[{};2;{}m{}\x1b[m\x1b[0m", prefix, color_code, text).into())
-}
-
-// Additional Functions
-fn caesar(
-    args: Vec<Expression>,
-    env: &mut Environment,
-    ctx: &Expression,
-) -> Result<Expression, RuntimeError> {
-    check_args_len("caesar", &args, 1..=2, ctx)?;
-
-    let text = get_string_ref(&args[0], ctx)?;
-    let shift = if args.len() > 1 {
-        get_integer_arg(args[1].eval(env)?, ctx)?
-    } else {
-        13
-    };
-
-    let mut result = String::with_capacity(text.len());
-    for c in text.chars() {
-        if c.is_ascii_alphabetic() {
-            let base = if c.is_ascii_lowercase() { b'a' } else { b'A' };
-            let offset = (c as u8 - base) as i64;
-            let shifted = ((offset + shift).rem_euclid(26) as u8 + base) as char;
-            result.push(shifted);
-        } else {
-            result.push(c);
-        }
-    }
-    Ok(Expression::String(result))
 }
 
 fn max_len(

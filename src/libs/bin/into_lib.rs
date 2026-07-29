@@ -8,7 +8,10 @@ use crate::{
     libs::{
         BuiltinInfo,
         bin::time_lib,
-        helper::{check_args_len, check_exact_args_len, convert_list_map_to_table, get_string_ref},
+        helper::{
+            check_args_len, check_exact_args_len, convert_list_map_to_table, get_integer_arg,
+            get_string_ref,
+        },
         lazy_module::LazyModule,
         pprint::{pretty_formatter, strip_ansi_escapes},
     },
@@ -23,13 +26,13 @@ use crate::{
 pub fn regist_lazy() -> LazyModule {
     reg_lazy!({
         // 类型转换函数（into库）
-        str, int, float, boolean, filesize,
+        string, int, float, boolean, filesize,
         time,
         table,
         // 数据格式序列化
         toml, json, csv, pretty,
         highlight, strip,
-        safe
+        safe, caesar
     })
 }
 
@@ -50,6 +53,8 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         highlight => "highlight script str with ANSI", "<script_string>"
         strip => "remove all ANSI escape codes from string", "<string>"
         safe => "make a string safe and never eval","<str>"
+        caesar => "encrypt a string using a caesar cipher", "<string> <shift>"
+
 
     })
 }
@@ -220,12 +225,12 @@ fn boolean(
     Ok(Expression::Boolean(args[0].is_truthy()))
 }
 
-pub fn str(
+pub fn string(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("str", &args, 1, ctx)?;
+    check_exact_args_len("string", &args, 1, ctx)?;
     Ok(Expression::String(args[0].to_string()))
 }
 
@@ -824,4 +829,32 @@ fn safe(
         .next()
         .map_or("".to_string(), |exp| exp.to_string());
     Ok(Expression::StringSafe(str))
+}
+
+fn caesar(
+    args: Vec<Expression>,
+    env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_args_len("caesar", &args, 1..=2, ctx)?;
+
+    let text = get_string_ref(&args[0], ctx)?;
+    let shift = if args.len() > 1 {
+        get_integer_arg(args[1].eval(env)?, ctx)?
+    } else {
+        13
+    };
+
+    let mut result = String::with_capacity(text.len());
+    for c in text.chars() {
+        if c.is_ascii_alphabetic() {
+            let base = if c.is_ascii_lowercase() { b'a' } else { b'A' };
+            let offset = (c as u8 - base) as i64;
+            let shifted = ((offset + shift).rem_euclid(26) as u8 + base) as char;
+            result.push(shifted);
+        } else {
+            result.push(c);
+        }
+    }
+    Ok(Expression::String(result))
 }

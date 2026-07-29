@@ -24,9 +24,9 @@ pub fn regist_lazy() -> LazyModule {
         // Console information
         width, height,
         // Output control
-        write, title, clear, flush,
+        write, title, clear, flush, bell,
         // Mode control
-        mode_raw, mode_normal, screen_alternate, screen_normal,
+        raw_mode, alt_screen, line_wrap,
         // Cursor control
         cursor_to, cursor_up, cursor_down, cursor_left, cursor_right, cursor_save, cursor_restore, cursor_hide, cursor_show,
         // Input control
@@ -47,12 +47,12 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         title => "set the title of the console", "<string>"
         clear => "clear the console", ""
         flush => "flush the console", ""
+        bell => "ring the terminal bell", ""
 
         // Mode control
-        mode_raw => "enable raw mode", ""
-        mode_normal => "disable raw mode", ""
-        screen_alternate => "enable alternate screen", ""
-        screen_normal => "disable alternate screen", ""
+        raw_mode => "get/set raw_mode", "[bool]"
+        alt_screen => "enable/disable alternate screen", "<bool>"
+        line_wrap => "enable/disable line wrap", "<bool>"
 
         // Cursor control
         cursor_to => "move the cursor to a specific position", "<x> <y>"
@@ -178,47 +178,72 @@ fn flush(
     Ok(Expression::None)
 }
 // Console Mode Functions
-fn mode_raw(
-    _args: Vec<Expression>,
+fn raw_mode(
+    args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    enable_raw_mode()
-        .map(|_| Expression::None)
-        .map_err(|_| RuntimeError::common("Failed to enable raw mode".into(), ctx.clone(), 0))
+    if args.is_empty() {
+        let r = crossterm::terminal::is_raw_mode_enabled().map_err(|_| {
+            RuntimeError::common(
+                "Failed to detect whether raw mode is enabled".into(),
+                ctx.clone(),
+                0,
+            )
+        })?;
+        return Ok(Expression::Boolean(r));
+    } else {
+        if args[0].is_truthy() {
+            enable_raw_mode().map_err(|_| {
+                RuntimeError::common("Failed to enable raw mode".into(), ctx.clone(), 0)
+            })?;
+        } else {
+            disable_raw_mode().map_err(|_| {
+                RuntimeError::common("Failed to disable raw mode".into(), ctx.clone(), 0)
+            })?;
+        }
+        return Ok(Expression::None);
+    }
 }
 
-fn mode_normal(
-    _args: Vec<Expression>,
+fn alt_screen(
+    args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    disable_raw_mode()
-        .map(|_| Expression::None)
-        .map_err(|_| RuntimeError::common("Failed to disable raw mode".into(), ctx.clone(), 0))
+    check_exact_args_len("alt_screen", &args, 1, ctx)?;
+
+    if args[0].is_truthy() {
+        execute!(stdout(), EnterAlternateScreen).map_err(|_| {
+            RuntimeError::common("Failed to enter alternate screen".into(), ctx.clone(), 0)
+        })?;
+    } else {
+        execute!(stdout(), LeaveAlternateScreen).map_err(|_| {
+            RuntimeError::common("Failed to leave alternate screen".into(), ctx.clone(), 0)
+        })?;
+    }
+    return Ok(Expression::None);
 }
 
-fn screen_alternate(
-    _args: Vec<Expression>,
+fn line_wrap(
+    args: Vec<Expression>,
     _env: &mut Environment,
-    _ctx: &Expression,
+    ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    execute!(stdout(), EnterAlternateScreen).map_err(|_| {
-        RuntimeError::common("Failed to enter alternate screen".into(), _ctx.clone(), 0)
-    })?;
-    Ok(Expression::None)
+    check_exact_args_len("line_wrap", &args, 1, ctx)?;
+
+    if args[0].is_truthy() {
+        execute!(stdout(), crossterm::terminal::EnableLineWrap).map_err(|_| {
+            RuntimeError::common("Failed to enable line wrap".into(), ctx.clone(), 0)
+        })?;
+    } else {
+        execute!(stdout(), crossterm::terminal::DisableLineWrap).map_err(|_| {
+            RuntimeError::common("Failed to disable line wrap".into(), ctx.clone(), 0)
+        })?;
+    }
+    return Ok(Expression::None);
 }
 
-fn screen_normal(
-    _args: Vec<Expression>,
-    _env: &mut Environment,
-    _ctx: &Expression,
-) -> Result<Expression, RuntimeError> {
-    execute!(stdout(), LeaveAlternateScreen).map_err(|_| {
-        RuntimeError::common("Failed to leave alternate screen".into(), _ctx.clone(), 0)
-    })?;
-    Ok(Expression::None)
-}
 // Cursor Control Functions
 fn cursor_to(
     args: Vec<Expression>,
@@ -518,6 +543,15 @@ fn print_tty(
     tty.write_all(v.as_bytes())
         .map_err(|e| RuntimeError::from_io_error(e, "write tty".into(), Expression::None, 0))?;
 
+    Ok(Expression::None)
+}
+
+fn bell(
+    _args: Vec<Expression>,
+    _env: &mut Environment,
+    _ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    print!("\x07");
     Ok(Expression::None)
 }
 

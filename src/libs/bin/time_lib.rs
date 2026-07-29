@@ -53,7 +53,7 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         add => "add duration to datetime", "<datetime> <duration>"
         diff => "calculate difference between two datetimes", "<datetime1> <datetime2> <unit>"
         timezone => "convert datetime to different timezone", "<datetime> <offset_hours>"
-        is_leap_year => "check if a year is a leap year", "[year]"
+        is_leap => "check if a year is a leap year", "[year]"
         from_map => "create DateTime from components", "<map>"
         to_string => "convert DateTime to string", "<datetime> [format_string]"
     })

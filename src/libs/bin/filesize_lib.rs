@@ -79,7 +79,7 @@ fn b(
     env: &mut Environment,
     _ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("btyes", &args, 1, _ctx)?;
+    check_exact_args_len("b", &args, 1, _ctx)?;
     let s = get_fsize_arg(args.into_iter().next().unwrap(), env, _ctx)?;
     Ok(Expression::Integer(s.to_bytes() as Int))
 }

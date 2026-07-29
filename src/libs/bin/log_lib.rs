@@ -11,7 +11,7 @@ use std::sync::{LazyLock, RwLock};
 pub fn regist_lazy() -> LazyModule {
     reg_lazy!({
         // 日志级别控制
-        set_level , get_level , disable , enabled ,
+        enable, level , disable , is_enabled ,
         // 日志记录函数
         info , warn , debug , error , trace ,
         // 原始输出
@@ -23,10 +23,10 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         // level =>
 
         // 日志级别控制
-        set_level => "set the log level", "<level>"
-        get_level => "get the current log level", ""
+        level => "get/set the log level", "[int]"
+        enable => "enable log level/all", "[int]"
         disable => "disable all logging output", ""
-        enabled => "check if a log level is enabled", "<level>"
+        is_enabled => "check if a log level is enabled", "<level>"
 
         // 日志记录函数
         info => "log info message", "<message>"
@@ -56,13 +56,28 @@ fn is_log_level_enabled(level: Int) -> bool {
     *LOG_LEVEL.read().unwrap() >= level
 }
 // 日志级别管理函数
-fn set_level(
+fn enable(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    _ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    if let Some(Expression::Integer(i)) = args.get(0) {
+        *LOG_LEVEL.write().unwrap() = *i;
+    } else {
+        *LOG_LEVEL.write().unwrap() = TRACE;
+    }
+    Ok(Expression::None)
+}
+fn level(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("set_level", &args, 1, ctx)?;
-
+    // 查询
+    if args.is_empty() {
+        return Ok(Expression::Integer(*LOG_LEVEL.read().unwrap()));
+    }
+    // 设置
     if let Expression::Integer(level) = &args[0] {
         *LOG_LEVEL.write().unwrap() = *level;
         Ok(Expression::None)
@@ -79,14 +94,6 @@ fn set_level(
     }
 }
 
-fn get_level(
-    _args: Vec<Expression>,
-    _env: &mut Environment,
-    _ctx: &Expression,
-) -> Result<Expression, RuntimeError> {
-    Ok(Expression::Integer(*LOG_LEVEL.read().unwrap()))
-}
-
 fn disable(
     _args: Vec<Expression>,
     _env: &mut Environment,
@@ -96,12 +103,12 @@ fn disable(
     Ok(Expression::None)
 }
 
-fn enabled(
+fn is_enabled(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("enabled", &args, 1, ctx)?;
+    check_exact_args_len("is_enabled", &args, 1, ctx)?;
 
     if let Expression::Integer(level) = &args[0] {
         Ok(Expression::Boolean(is_log_level_enabled(*level)))

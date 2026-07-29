@@ -21,7 +21,7 @@ use inquire::{
 use inquire::{list_option::ListOption, validator::Validation};
 pub fn regist_lazy() -> LazyModule {
     reg_lazy!({
-        int, float, text, passwd, confirm, pick, multi_pick, date_pick, editor,
+        int, float, text, password, confirm, pick, multi_pick, date_pick, editor,
         widget, joinx, joiny, join_flow,
     })
 }
@@ -31,7 +31,7 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         int => "read an int from input", "<msg>"
         float => "read a float from input", "<msg> [decimal_places]"
         text => "read a text input ", "<msg> [initValue]"
-        passwd => "read a passwd input", "<msg> [confirm?]"
+        password => "read a password input", "<msg> [confirm?]"
         confirm => "ask user to confirm", "<msg>"
         pick => "select one from list/string", "<list|items...> [msg|cfg_map]"
         multi_pick => "select multi from list/string", "<list|items...> [msg|cfg_map]"
@@ -177,7 +177,7 @@ fn text(
     }
 }
 
-fn passwd(
+fn password(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,

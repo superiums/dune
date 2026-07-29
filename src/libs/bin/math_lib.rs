@@ -1,5 +1,5 @@
 use crate::libs::BuiltinInfo;
-use crate::libs::bin::into_lib::str as to_str;
+use crate::libs::bin::into_lib::string as to_string;
 use crate::libs::helper::{check_args_len, check_exact_args_len, get_integer_ref};
 use crate::libs::lazy_module::LazyModule;
 use crate::{Environment, Expression, Int, RuntimeError, RuntimeErrorKind, reg_info, reg_lazy};
@@ -42,15 +42,17 @@ pub fn regist_lazy() -> LazyModule {
          // 双曲函数
          sinh, cosh, tanh, asinh, acosh, atanh,
          // π倍三角函数
-         sinpi, cospi, tanpi,
+         sin_pi, cos_pi, tan_pi,
          // 指数与对数
          pow, exp, exp2, sqrt, cbrt, log, log2, log10, ln,
          // 舍入函数
          floor, ceil, round, trunc,
          // 其他函数
-         is_odd,
+         is_odd, is_even, signum,
+         hypot, gcd, lcm, rem,
+         to_degrees, to_radians,
          // from into lib:
-         to_str,
+         to_string,
     })
 }
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
@@ -97,9 +99,9 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
          atanh => "get the inverse hyperbolic tangent of a number", "<value>"
 
          // π倍三角函数
-         sinpi => "get the sine of a number times π", "<value>"
-         cospi => "get the cosine of a number times π", "<value>"
-         tanpi => "get the tangent of a number times π", "<value>"
+         sin_pi => "get the sine of a number times π", "<value>"
+         cos_pi => "get the cosine of a number times π", "<value>"
+         tan_pi => "get the tangent of a number times π", "<value>"
 
          // 指数与对数
          pow => "raise a number to a power", "<exponent> <base>"
@@ -119,9 +121,16 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
          trunc => "truncate a number", "<number>"
 
          // 其他函数
+         to_string => "trans to String", "<number>"
          is_odd => "is a number odd?", "<integer>"
-         to_str => "trans to String", "<number>"
-
+         is_even => "is a number even?", "<integer>"
+         signum => "get the sign of a number (-1, 0, or 1)", "<number>"
+         hypot => "get the hypotenuse: sqrt(x^2+y^2)", "<x> <y>"
+         gcd => "get the greatest common divisor of two integers", "<int1> <int2>"
+         lcm => "get the least common multiple of two integers", "<int1> <int2>"
+         rem => "get the euclidean remainder (always non-negative for positive divisor)", "<a> <b>"
+         to_degrees => "convert radians to degrees", "<radians>"
+         to_radians => "convert degrees to radians", "<degrees>"
 
     })
 }
@@ -675,7 +684,7 @@ fn is_odd(
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("isodd", &args, 1, ctx)?;
+    check_exact_args_len("is_odd", &args, 1, ctx)?;
     Ok(match &args[0] {
         Expression::Integer(i) => (i % 2 != 0).into(),
         Expression::Float(f) => ((*f as Int) % 2 != 0).into(),
@@ -688,6 +697,133 @@ fn is_odd(
         }
     })
 }
+fn is_even(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("is_even", &args, 1, ctx)?;
+    Ok(match &args[0] {
+        Expression::Integer(i) => (i % 2 == 0).into(),
+        Expression::Float(f) => ((*f as Int) % 2 == 0).into(),
+        e => {
+            return Err(RuntimeError::common(
+                format!("invalid is_even argument {e}").into(),
+                ctx.clone(),
+                0,
+            ));
+        }
+    })
+}
+
+fn signum(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("signum", &args, 1, ctx)?;
+    match &args[0] {
+        Expression::Integer(i) => Ok(Expression::Integer(i.signum())),
+        Expression::Float(f) => Ok(Expression::Float(f.signum())),
+        e => Err(RuntimeError::common(
+            format!("invalid signum argument {e:?}").into(),
+            ctx.clone(),
+            0,
+        )),
+    }
+}
+
+fn hypot(
+    args: Vec<Expression>,
+    env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("hypot", &args, 2, ctx)?;
+    let nums = eval_to_f64(args, env, "hypot", ctx)?;
+    Ok(nums[0].hypot(nums[1]).into())
+}
+
+fn gcd_impl(a: Int, b: Int) -> Int {
+    let (mut a, mut b) = (a.abs(), b.abs());
+    while b != 0 {
+        let t = b;
+        b = a % b;
+        a = t;
+    }
+    a
+}
+
+fn gcd(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("gcd", &args, 2, ctx)?;
+    let a = get_integer_ref(&args[0], ctx)?;
+    let b = get_integer_ref(&args[1], ctx)?;
+    Ok(Expression::Integer(gcd_impl(a, b)))
+}
+
+fn lcm(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("lcm", &args, 2, ctx)?;
+    let a = get_integer_ref(&args[0], ctx)?;
+    let b = get_integer_ref(&args[1], ctx)?;
+    if a == 0 || b == 0 {
+        return Ok(Expression::Integer(0));
+    }
+    let g = gcd_impl(a, b);
+    Ok(Expression::Integer((a / g * b).abs()))
+}
+
+fn rem(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("rem", &args, 2, ctx)?;
+    match (&args[0], &args[1]) {
+        (Expression::Integer(a), Expression::Integer(b)) => {
+            if *b == 0 {
+                return Err(RuntimeError::common(
+                    "rem division by zero".into(),
+                    ctx.clone(),
+                    0,
+                ));
+            }
+            Ok(Expression::Integer(a.rem_euclid(*b)))
+        }
+        _ => {
+            let a = get_float_arg(&args[0], ctx)?;
+            let b = get_float_arg(&args[1], ctx)?;
+            Ok(Expression::Float(a.rem_euclid(b)))
+        }
+    }
+}
+
+fn to_degrees(
+    args: Vec<Expression>,
+    env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("to_degrees", &args, 1, ctx)?;
+    let x = eval_to_f64(args, env, "to_degrees", ctx)?[0];
+    Ok(x.to_degrees().into())
+}
+
+fn to_radians(
+    args: Vec<Expression>,
+    env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("to_radians", &args, 1, ctx)?;
+    let x = eval_to_f64(args, env, "to_radians", ctx)?[0];
+    Ok(x.to_radians().into())
+}
+
 // Mathematical Functions
 fn sqrt(
     args: Vec<Expression>,
@@ -899,7 +1035,7 @@ fn atanh(
     Ok(x.atanh().into())
 }
 // Pi Multiple Functions
-fn sinpi(
+fn sin_pi(
     args: Vec<Expression>,
     env: &mut Environment,
     ctx: &Expression,
@@ -909,7 +1045,7 @@ fn sinpi(
     Ok((x * std::f64::consts::PI).sin().into())
 }
 
-fn cospi(
+fn cos_pi(
     args: Vec<Expression>,
     env: &mut Environment,
     ctx: &Expression,
@@ -919,7 +1055,7 @@ fn cospi(
     Ok((x * std::f64::consts::PI).cos().into())
 }
 
-fn tanpi(
+fn tan_pi(
     args: Vec<Expression>,
     env: &mut Environment,
     ctx: &Expression,

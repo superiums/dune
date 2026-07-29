@@ -10,11 +10,11 @@ pub fn regist_lazy() -> LazyModule {
         // 匹配定位
         find, find_all,
         // 匹配验证
-        r#match => "match",
+        is_match,
         // 捕获组操作
-        capture, captures, capture_name,
+        capture, captures, named_captures,
         // 文本处理
-        split, replace,
+        split, replace, replace_all,
     })
 }
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
@@ -23,14 +23,15 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         find => "find first regex match with [start, end, text]", "<pattern> <text>"
         find_all => "find all matches as [[start, end, text], ...]", "<pattern> <text>"
         // 匹配验证
-        match => "check if entire text matches pattern", "<pattern> <text>"
+        is_match => "check if entire text matches pattern", "<pattern> <text>"
         // 捕获组操作
         capture => "get first capture groups as [full, group1, group2, ...]", "<pattern> <text>"
         captures => "get all captures as [[full, group1, ...], ...]", "<pattern> <text>"
-        capture_name => "get regex capture groups with names", "<pattern> <text>"
+        named_captures => "get regex capture groups with names", "<pattern> <text>"
         // 文本处理
         split => "split text by regex pattern", "<pattern> <text>"
-        replace => "replace all regex matches in text", "<text> <pattern> <replacement>"
+        replace => "replace first regex matches in text", "<text> <pattern> <replacement>"
+        replace_all => "replace all regex matches in text", "<text> <pattern> <replacement>"
 
     })
 }
@@ -66,7 +67,7 @@ fn get_r_args<'a>(
     }
 }
 // 匹配验证函数
-fn r#match(
+fn is_match(
     args: Vec<Expression>,
     env: &mut Environment,
     ctx: &Expression,
@@ -159,12 +160,12 @@ fn captures(
     Ok(Expression::from(all_caps))
 }
 
-fn capture_name(
+fn named_captures(
     args: Vec<Expression>,
     env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("capture_name", &args, 2, ctx)?;
+    check_exact_args_len("named_captures", &args, 2, ctx)?;
     let (re, text) = get_r_args(&args, env, ctx)?;
 
     if let Some(caps) = re.captures(text) {
@@ -200,10 +201,34 @@ fn replace(
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
     check_exact_args_len("replace", &args, 3, ctx)?;
+    let (regex, text, replacement) = get_replace_args(args, ctx)?;
 
-    let first = &args[0];
-    let second = &args[1];
-    let last = &args[2];
+    Ok(Expression::String(
+        regex.replace(&text, replacement.as_str()).to_string(),
+    ))
+}
+
+fn replace_all(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("replace_all", &args, 3, ctx)?;
+    let (regex, text, replacement) = get_replace_args(args, ctx)?;
+
+    Ok(Expression::String(
+        regex.replace_all(&text, replacement.as_str()).to_string(),
+    ))
+}
+
+fn get_replace_args(
+    args: Vec<Expression>,
+    ctx: &Expression,
+) -> Result<(Regex, String, String), RuntimeError> {
+    let mut it = args.into_iter();
+    let first = it.next().unwrap();
+    let second = it.next().unwrap();
+    let last = it.next().unwrap();
     let (replacement, text, regex) = match first {
         Expression::Regex(regex) => match (second, last) {
             (
@@ -243,7 +268,5 @@ fn replace(
         }
     };
 
-    Ok(Expression::String(
-        regex.replace_all(text, replacement.as_str()).to_string(),
-    ))
+    Ok((regex, text, replacement))
 }

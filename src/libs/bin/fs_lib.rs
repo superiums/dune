@@ -2,7 +2,9 @@ use crate::{
     Environment, Expression, Int, RuntimeError,
     libs::{
         BuiltinInfo,
-        helper::{check_args_len, check_exact_args_len, get_string_arg, get_string_ref},
+        helper::{
+            check_args_len, check_exact_args_len, get_integer_ref, get_string_arg, get_string_ref,
+        },
         lazy_module::LazyModule,
     },
     reg_info, reg_lazy,
@@ -21,13 +23,16 @@ pub fn regist_lazy() -> LazyModule {
     reg_lazy!({
         ls, glob, tree, abs, canon,
         // modify
-        mkdir, rmdir, mv, cp, rm,
+        mkdir, rmdir, mv, cp, rm, touch,
+        // permission & link
+        chmod, chown, symlink, read_link,
         // check
         exists, is_dir, is_file,
         // read and write,
         head, tail, read, write, append,
         // assist
-        base_name, dir_name, parent, join,
+        base_name, stem, extension, dir_name, parent, join,
+
     })
 }
 
@@ -45,6 +50,13 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         mv => "move path", "<source> <destination>"
         cp => "copy path", "<source> <destination>"
         rm => "remove path", "<path>"
+        touch => "create empty file, or update modified time if file exists", "<path>"
+
+        // permission & link
+        chmod => "change file permission mode (unix only)", "<path> <mode:octal_int>"
+        chown => "change file owner uid/gid, -1 to keep unchanged (unix only)", "<path> <uid> <gid>"
+        symlink => "create a symbolic link pointing to source", "<source> <link_path>"
+        read_link => "read the target path of a symbolic link", "<link_path>"
 
         // check
         exists => "check if path exists", "<path>"
@@ -58,7 +70,9 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         write => "create/write to file", "[content] <file>"
         append => "append to file", "<content> <file>"
         // assist
-        base_name => "extract base_name from path", "<path> [split_ext?]"
+        base_name => "extract full file name from path", "<path>"
+        stem => "extract file name without extension from path", "<path>"
+        extension => "extract file extension from path", "<path>"
         dir_name => "extract dir_name from path", "<path>"
         parent => "extract parent_name from path", "<path>"
         join => "join paths", "<path>..."
@@ -539,40 +553,49 @@ fn glob(
     Ok(Expression::from(results))
 }
 // Path Extraction
+// 完整文件名（含扩展名）
 fn base_name(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_args_len("base_name", &args, 1..=2, ctx)?;
+    check_exact_args_len("base_name", &args, 1, ctx)?;
     let p = get_string_ref(&args[0], ctx)?;
-    let split_extension = args.len() > 1
-        && match args[1] {
-            Expression::Boolean(b) => b,
-            _ => false,
-        };
+    let name = Path::new(p.as_str())
+        .file_name()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    Ok(Expression::String(name))
+}
 
-    let path = Path::new(&p);
+// 不含扩展名的主干名
+fn stem(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("stem", &args, 1, ctx)?;
+    let p = get_string_ref(&args[0], ctx)?;
+    let name = Path::new(p.as_str())
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    Ok(Expression::String(name))
+}
 
-    // 获取文件名
-    let file_name = match path.file_name() {
-        Some(name) => name.to_string_lossy().into_owned(),
-        None => String::from(""),
-    };
-
-    // 如果需要分割扩展名
-    if split_extension {
-        let parts = file_name.split_once('.');
-        Ok(Expression::from(match parts {
-            Some(ps) => vec![
-                Expression::String(ps.0.to_string()),
-                Expression::String(ps.1.to_string()),
-            ],
-            _ => vec![Expression::None, Expression::None],
-        }))
-    } else {
-        Ok(Expression::String(file_name))
-    }
+// 单独获取扩展名
+fn extension(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("extension", &args, 1, ctx)?;
+    let p = get_string_ref(&args[0], ctx)?;
+    let ext = Path::new(p.as_str())
+        .extension()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    Ok(Expression::String(ext))
 }
 
 fn dir_name(
@@ -627,4 +650,137 @@ fn join(
 fn is_a_dir(path: &str, env: &mut Environment) -> bool {
     let path = utils::abs(path, env);
     path.is_dir()
+}
+
+// touch: 文件不存在则创建空文件，存在则更新修改时间
+fn touch(
+    args: Vec<Expression>,
+    env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("touch", &args, 1, ctx)?;
+    let p = get_string_ref(&args[0], ctx)?;
+    let path = utils::abs(&p, env);
+
+    if path.exists() {
+        let file = std::fs::File::open(&path)
+            .map_err(|e| RuntimeError::from_io_error(e, "touch".into(), args[0].clone(), 0))?;
+        file.set_modified(std::time::SystemTime::now())
+            .map_err(|e| RuntimeError::from_io_error(e, "touch".into(), args[0].clone(), 0))?;
+    } else {
+        std::fs::File::create(&path)
+            .map_err(|e| RuntimeError::from_io_error(e, "touch".into(), args[0].clone(), 0))?;
+    }
+    Ok(Expression::None)
+}
+
+// chmod: 仅 unix 支持，mode 为八进制整数（如 0o755）
+#[cfg(unix)]
+fn chmod(
+    args: Vec<Expression>,
+    env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    use std::os::unix::fs::PermissionsExt;
+
+    check_exact_args_len("chmod", &args, 2, ctx)?;
+    let p = get_string_ref(&args[0], ctx)?;
+    let path = utils::abs(&p, env);
+    let mode = get_integer_ref(&args[1], ctx)? as u32;
+
+    let perms = std::fs::Permissions::from_mode(mode);
+    std::fs::set_permissions(&path, perms)
+        .map_err(|e| RuntimeError::from_io_error(e, "chmod".into(), args[0].clone(), 0))?;
+    Ok(Expression::None)
+}
+
+#[cfg(not(unix))]
+fn chmod(
+    _args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    Err(RuntimeError::common(
+        "chmod is only supported on unix systems".into(),
+        ctx.clone(),
+        0,
+    ))
+}
+
+// chown: 仅 unix 支持，uid/gid 传 -1 表示保持不变
+#[cfg(unix)]
+fn chown(
+    args: Vec<Expression>,
+    env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("chown", &args, 3, ctx)?;
+    let p = get_string_ref(&args[0], ctx)?;
+    let path = utils::abs(&p, env);
+    let uid = get_integer_ref(&args[1], ctx)?;
+    let gid = get_integer_ref(&args[2], ctx)?;
+
+    let uid_opt = if uid < 0 { None } else { Some(uid as u32) };
+    let gid_opt = if gid < 0 { None } else { Some(gid as u32) };
+
+    std::os::unix::fs::chown(&path, uid_opt, gid_opt)
+        .map_err(|e| RuntimeError::from_io_error(e, "chown".into(), args[0].clone(), 0))?;
+    Ok(Expression::None)
+}
+
+#[cfg(not(unix))]
+fn chown(
+    _args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    Err(RuntimeError::common(
+        "chown is only supported on unix systems".into(),
+        ctx.clone(),
+        0,
+    ))
+}
+
+// symlink: 创建符号链接，source -> link_path
+fn symlink(
+    args: Vec<Expression>,
+    env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("symlink", &args, 2, ctx)?;
+    let src_s = get_string_ref(&args[0], ctx)?;
+    let src = utils::abs(&src_s, env);
+    let dst_s = get_string_ref(&args[1], ctx)?;
+    let dst = join_current_path(&dst_s, env);
+
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(&src, &dst)
+            .map_err(|e| RuntimeError::from_io_error(e, "symlink".into(), args[1].clone(), 0))?;
+    }
+    #[cfg(windows)]
+    {
+        let result = if src.is_dir() {
+            std::os::windows::fs::symlink_dir(&src, &dst)
+        } else {
+            std::os::windows::fs::symlink_file(&src, &dst)
+        };
+        result.map_err(|e| RuntimeError::from_io_error(e, "symlink".into(), args[1].clone(), 0))?;
+    }
+    Ok(Expression::None)
+}
+
+// read_link: 读取符号链接指向的路径
+fn read_link(
+    args: Vec<Expression>,
+    env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("read_link", &args, 1, ctx)?;
+    let p = get_string_ref(&args[0], ctx)?;
+    let path = utils::abs(&p, env);
+
+    let target = std::fs::read_link(&path)
+        .map_err(|e| RuntimeError::from_io_error(e, "read_link".into(), args[0].clone(), 0))?;
+    Ok(Expression::String(target.to_string_lossy().into()))
 }
