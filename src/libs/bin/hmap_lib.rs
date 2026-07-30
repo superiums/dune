@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use crate::eval::State;
-use crate::libs::bin::top;
+use crate::libs::bin::top::{dig, flatten, len};
 use crate::libs::helper::{
     check_args_len, check_exact_args_len, check_fn_arg, get_hmap_ref, get_string_arg,
     get_string_ref, into_hmap,
@@ -15,9 +15,8 @@ use std::collections::{BTreeMap, HashMap};
 
 pub fn regist_lazy() -> LazyModule {
     reg_lazy!({
-        // pprint,
         // from top
-        len, insert, flatten, dig,
+        len, flatten, dig,
         // 检查操作
         contains_key, contains_value, is_empty,
         // 数据获取
@@ -25,8 +24,7 @@ pub fn regist_lazy() -> LazyModule {
         // 查找
         find, filter,
         // 结构修改
-        set,
-        remove,
+        insert, set, remove,
         // 创建操作
         from_list,
         // 集合运算
@@ -35,46 +33,47 @@ pub fn regist_lazy() -> LazyModule {
         map, to_bmap, to_list
     })
 }
+
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
     reg_info!({
-        // pprint => "pretty print", "<map>"
-
         // 检查操作
-        len => "get length of map", "<map>"
-        insert => "insert item into map", "<map> <key> <value>"
+        len => "map size", "<map>"
+        contains_key => "has key?", "<map> <key>"
+        contains_value => "has value?", "<map> <value>"
+        is_empty => "is empty?", "<map>"
         flatten => "flatten nested structure", "<map>"
-        contains_key => "check if a map has a key", "<map> <key>"
-        contains_value => "check if a map has a value", "<map> <value>"
-        is_empty => "check if map is empty", "<map>"
 
         // 数据获取
-        dig => "get value from nested map/list/range using dot notation path", "<map|list|range> <path>"
-        get => "get value from map", "<map> <key>"
-        keys => "get the keys of a map", "<map>"
-        values => "get the values of a map", "<map>"
+        dig => "get nested value by dot path. e.g. dig m 'a.b.0'", "<map|list|range> <path>"
+        get => "value by key", "<map> <key>"
+        keys => "list of keys", "<map>"
+        values => "list of values", "<map>"
+
         // 查找
-        find => "find first key-value pair matching condition", "<map> <predicate_fn>"
-        filter => "filter map by condition", "<map> <predicate_fn>"
+        find => "first pair matching fn(k,v)->bool, returns [k,v]", "<map> <fn>"
+        filter => "keep pairs where fn(k,v)->bool", "<map> <fn>"
+
         // 结构修改
-        remove => "remove a key-value pair from a map", "<map> <key>"
-        set => "set value for existing key in map", "<map> <key> <value>"
+        insert => "insert key-value, returns new map", "<map> <key> <value>"
+        set => "set existing key's value, returns new map", "<map> <key> <value>"
+        remove => "remove key, returns new map", "<map> <key>"
+
         // 创建操作
-        from_list => "create a map from a list of key-value pairs", "<items>"
+        from_list => "create map from list of [k,v] pairs", "<list>"
 
         // 集合运算
-        union => "combine two maps", "<map1> <map2>"
-        intersection => "get the intersection of two maps", "<map1> <map2>"
-        difference => "get the difference of two maps", "<map1> <map2>"
-        merge => "recursively merge two or more maps", "<map1> <map2> [<map3> ...]"
+        union => "combine maps, map2 wins on conflict", "<map1> <map2>"
+        intersection => "keys in both, values from map1", "<map1> <map2>"
+        difference => "keys in map1 not in map2", "<map1> <map2>"
+        merge => "deep merge maps, recurse on nested maps", "<map1> <map2> [<map3>...]"
 
         // 转换操作
-        map => "transform map keys and values with provided functions", "<map> <key_fn> <val_fn>"
-        to_list => "get the items of a map", "<map>"
-        to_bmap => "convert hashMap to btreeMap", "<map>"
+        map => "transform keys/values, fn_k(k)->k', fn_v(v)->v'", "<map> <key_fn> <val_fn>"
+        to_list => "to list of [k,v] pairs", "<map>"
+        to_bmap => "to BtreeMap (ordered)", "<map>"
     })
 }
 
-// ---from top---
 fn insert(
     args: Vec<Expression>,
     _env: &mut Environment,
@@ -91,28 +90,6 @@ fn insert(
     let mut result = map.as_ref().clone();
     result.insert(key, val);
     Ok(Expression::from(result))
-}
-
-fn len(
-    args: Vec<Expression>,
-    env: &mut Environment,
-    ctx: &Expression,
-) -> Result<Expression, RuntimeError> {
-    top::len(args, env, ctx)
-}
-fn dig(
-    args: Vec<Expression>,
-    env: &mut Environment,
-    ctx: &Expression,
-) -> Result<Expression, RuntimeError> {
-    top::dig(args, env, ctx)
-}
-fn flatten(
-    args: Vec<Expression>,
-    env: &mut Environment,
-    ctx: &Expression,
-) -> Result<Expression, RuntimeError> {
-    top::flatten(args, env, ctx)
 }
 
 // 检查操作函数

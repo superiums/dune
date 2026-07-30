@@ -34,56 +34,41 @@ pub fn regist_all() -> HashMap<&'static str, Rc<BuiltinFunc>> {
 
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
     reg_info!({
-        // console control
         // Shell control
-        exit => "exit the shell", "[status]"
-        cd => "change current directory", "[path]"
-        cwd => "print current working directory", ""
-        // env control
-        // set => "define a variable in root environment", "<var> <val>"
-        // unset => "undefine a variable in root environment", "<var>"
+        exit => "exit shell", "[status=0]"
+        cd => "change dir. '-' for previous", "[path=~]"
+        cwd => "current dir", ""
 
         // I/O operations
-        symof => "get type of data symbol", "<value>"
-        tap => "print and return result", "<args>..."
-        print => "print arguments without newline", "<args>..."
-        pprint => "pretty print", "<list>|<map>"
-        println => "print arguments with newline", "<args>..."
-        // printf => "print formatted string with vars", "<template> <args>..."
-        eprint => "print to stderr without newline", "<args>..."
-        eprintln => "print to stderr with newline", "<args>..."
-        // debug => "print debug representation", "<args>..."
-        // ddebug => "pretty debug", "<args>..."
-        read => "get user input", "[-p prompt] [-n count] [-s] [-t secs]"
-        throw => "return a runtime error", "<msg>"
+        symof => "type name of value", "<value>"
+        tap => "print then return value(s)", "<args>..."
+        print => "print, space-sep, no newline", "<args>..."
+        pprint => "pretty print table/list/map", "<value>..."
+        println => "print, space-sep, with newline", "<args>..."
+        eprint => "print to stderr, red, no newline", "<args>..."
+        eprintln => "print to stderr, red, with newline", "<args>..."
+        read => "read input", "[-p prompt] [-n max_chars] [-s silent] [-t timeout_secs]"
+        throw => "raise a runtime error", "<msg>"
 
         // Data manipulation
-        dig => "get value from nested map/list/range using dot notation path", "<map|list|range> <path>"
-        // typeof => "get data type", "<value>"
-        len => "get length of expression", "<collection>"
-        rev => "reverse sequence", "<string|list|bytes>"
-        flatten => "flatten nested structure", "<collection>"
-        // where => "filter rows by condition", "<list[map]> <condition> "
-        select => "select columns from list of maps", "<table> <columns...>"
-        sortby => "sort a table by column", "<table> <col>"
-        not => "logic not", "<boolean1>..."
+        dig => "get nested value by dot path. e.g. dig m 'a.b.0'", "<map|list|set|range|table> <path>"
+        len => "size of collection", "<list|set|map|table|range|string|bytes>"
+        rev => "reverse", "<string|list|table|bytes>"
+        flatten => "flatten nested list/map to flat list", "<collection>"
+        select => "select columns from table", "<table> <columns...>"
+        sort_by => "sort table by column", "<table> <col>"
+        not => "logic not", "<boolean>..."
 
         // Execution control
-        // repeat => "evaluate without env change", "<expr>"
-        eval => "evaluate expression in current env", "<expr>"
-        exec => "execute expression in new env", "<expr>"
-        eval_str => "evaluate string in current env", "<expr>"
-        exec_str => "execute string in new env", "<string>"
-        include => "evaluate file in current env", "<path>"
-        import => "evaluate file in new env", "<path>"
-
-        // env
-        // set_root => "define a variable in root environment", "<var> <val>"
-        // unset_root => "undefine a variable in root environment", "<var>"
-        // getvar => "get a variable value", "<var>"
+        eval => "eval expr in current env", "<expr>"
+        exec => "eval expr in forked env", "<expr>"
+        eval_str => "parse & eval string in current env", "<string>"
+        exec_str => "parse & eval string in forked env", "<string>"
+        include => "eval file in current env", "<path>"
+        import => "eval file in forked env", "<path>"
 
         // Help system
-        help => "display help", "[module]"
+        help => "show help. e.g. help string.split", "[libs|tops|doc|<lib>|<lib>.<func>|<top_func>]"
     })
 }
 

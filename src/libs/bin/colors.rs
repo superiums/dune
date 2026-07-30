@@ -345,10 +345,10 @@ pub fn regist_const_color() -> BTreeMap<&'static str, BuiltinInfo> {
         BG_yellow => "",""
         BG_yellowgreen => "",""
 
-        FGX_ffffff => "true color for front ground in hex format","<000000..ffffff>"
-        BGX_ffffff => "true color for back ground in hex format","<000000..ffffff>"
-        FG_256 => "256 color for front ground","<1..=256>"
-        BG_256 => "256 color for back ground","<1..=256>"
+        FGX_ => "true color for front ground in hex format","<000000..ffffff>"
+        BGX_ => "true color for back ground in hex format","<000000..ffffff>"
+        FG_ => "256 color for front ground","<1..=256>"
+        BG_ => "256 color for back ground","<1..=256>"
     })
 }
 

@@ -17,22 +17,25 @@ pub fn regist_lazy() -> LazyModule {
         split, replace, replace_all,
     })
 }
+
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
     reg_info!({
         // 匹配定位
-        find => "find first regex match with [start, end, text]", "<pattern> <text>"
-        find_all => "find all matches as [[start, end, text], ...]", "<pattern> <text>"
-        // 匹配验证
-        is_match => "check if entire text matches pattern", "<pattern> <text>"
-        // 捕获组操作
-        capture => "get first capture groups as [full, group1, group2, ...]", "<pattern> <text>"
-        captures => "get all captures as [[full, group1, ...], ...]", "<pattern> <text>"
-        named_captures => "get regex capture groups with names", "<pattern> <text>"
-        // 文本处理
-        split => "split text by regex pattern", "<pattern> <text>"
-        replace => "replace first regex matches in text", "<text> <pattern> <replacement>"
-        replace_all => "replace all regex matches in text", "<text> <pattern> <replacement>"
+        find => "first match, returns {start,end,found}", "<pattern> <text>"
+        find_all => "all matches, list of {start,end,found}", "<pattern> <text>"
 
+        // 匹配验证
+        is_match => "contains a match?", "<pattern> <text>"
+
+        // 捕获组操作
+        capture => "first match's groups [full,g1,g2,...]", "<pattern> <text>"
+        captures => "all matches' groups [[full,g1,...],...]", "<pattern> <text>"
+        named_captures => "named groups as map. e.g. r'(?<y>\\d+)'", "<pattern> <text>"
+
+        // 文本处理
+        split => "split by pattern", "<pattern> <text>"
+        replace => "replace first match", "<text> <pattern> <replacement>"
+        replace_all => "replace all matches", "<text> <pattern> <replacement>"
     })
 }
 

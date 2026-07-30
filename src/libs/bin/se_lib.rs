@@ -42,27 +42,26 @@ pub fn regist_se() -> HashMap<&'static str, SelfExpandFunc> {
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
     reg_info!({
       // debug
-      when => "conditional execute", "<condition> <execute>"
-      assert => "assert condition is true, throw error if false", "<condition> [message]"
-      debug => "print debug representation", "<args>..."
-      ddebug => "print pretty debug", "<args>..."
-      typeof => "get type of data value", "<value>"
-      quote => "quote an expr to eval later", "<expr>"
+      when => "if cond then execute", "<condition> <execute>"
+      assert => "throw if condition false", "<condition> [message]"
+      debug => "eval & show expr,type,value(debug fmt)", "<args>..."
+      ddebug => "eval & show expr,type,value(pretty fmt)", "<args>..."
+      typeof => "type name", "<value>"
+      quote => "quote expr, eval later", "<expr>"
 
       // Data manipulation
-      format => "print formatted string with named/position vars, aligned", "'tmpl {a:*>20}' <args>..."
-      where => "filter rows by condition", "<table> <condition> "
+      format => "fmt string. {name}/{} for named/positional, :spec for align.\ne.g. format '{:0>5}' 3 -> 00003", "<template> <args>..."
+      where => "filter table rows. NR/<col_name> injected. e.g. where t (NR>1 and col>0)", "<table> <condition>"
 
       // Execution control
-      repeat => "evaluate expr n times", "<expr> <n>"
+      repeat => "eval expr n times, collect non-None results", "<expr> <n>"
 
       // env
-      set_root => "define a variable in root environment", "<var> <val>"
-      unset_root => "undefine a variable in root environment", "<var>"
-      get_local => "get a local variable value", "<var>"
-      get_env => "get a variable from env", "<var>"
-      get_var => "get a variable from local and env", "<var>"
-
+      set_root => "define var in root env", "<var> <val>"
+      unset_root => "undefine var in root env", "<var>"
+      get_local => "get local var value", "<var>"
+      get_env => "get var from env", "<var>"
+      get_var => "get var, local first then env", "<var>"
     })
 }
 
@@ -93,7 +92,7 @@ fn r#where(
                 .get(nf)
                 .map_or("unkown".to_string(), |x| x.to_string());
             state.set_local_var(name, cell.clone());
-            state.set_local_var("NF".to_string(), Expression::Integer(nf as i64));
+            // state.set_local_var("NF".to_string(), Expression::Integer(nf as i64));
         }
         match args[1].eval_mut(state, env, 0) {
             Ok(x) => x.is_truthy(),

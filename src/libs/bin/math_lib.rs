@@ -4,6 +4,7 @@ use crate::libs::helper::{check_args_len, check_exact_args_len, get_integer_ref}
 use crate::libs::lazy_module::LazyModule;
 use crate::{Environment, Expression, Int, RuntimeError, RuntimeErrorKind, reg_info, reg_lazy};
 use std::collections::BTreeMap;
+use std::ops::Rem;
 
 pub fn handle_math(arg: &str, ctx: &Expression) -> Result<Expression, RuntimeError> {
     match arg {
@@ -55,83 +56,82 @@ pub fn regist_lazy() -> LazyModule {
          to_string,
     })
 }
+
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
     reg_info!({
+        // 基础数学函数
+        max => "max value", "<num1> <num2>... | <array>"
+        min => "min value", "<num1> <num2>... | <array>"
+        sum => "sum of numbers", "<num1> <num2>... | <array>"
+        average => "average of numbers", "<num1> <num2>... | <array>"
+        abs => "absolute value", "<number>"
+        clamp => "clamp value into [min,max]", "<value> <min> <max>"
 
-         // 基础数学函数
-         max => "get max value in an array or multi args", "<num1> <num2> ... | <array>"
-         min => "get min value in an array or multi args", "<num1> <num2> ... | <array>"
-         sum => "sum a list of numbers", "<num1> <num2> ... | <array>"
-         average => "get the average of a list of numbers", "<num1> <num2> ... | <array>"
-         abs => "get the absolute value of a number", "<number>"
-         clamp => "clamp a value between min and max", "<value> <min> <max>"
+        // 位运算
+        bit_and => "bitwise AND", "<int1> <int2>"
+        bit_or => "bitwise OR", "<int1> <int2>"
+        bit_xor => "bitwise XOR", "<int1> <int2>"
+        bit_not => "bitwise NOT", "<integer>"
+        bit_shl => "shift left, bits 0-63", "<integer> <bits>"
+        bit_shr => "shift right, bits 0-63", "<integer> <bits>"
 
-         // 位运算
-         bit_and => "bitwise AND operation", "<int1> <int2>"
-         bit_or => "bitwise OR operation", "<int1> <int2>"
-         bit_xor => "bitwise XOR operation", "<int1> <int2>"
-         bit_not => "bitwise NOT operation", "<integer>"
-         bit_shl => "bitwise shift left", "<integer> <shift_bits>"
-         bit_shr => "bitwise shift right", "<integer> <shift_bits>"
+        // 逻辑运算
+        gt => "a > b?", "<a> <b>"
+        ge => "a >= b?", "<a> <b>"
+        lt => "a < b?", "<a> <b>"
+        le => "a <= b?", "<a> <b>"
+        eq => "a == b?", "<a> <b>"
+        ne => "a != b?", "<a> <b>"
 
-         //逻辑运算
-         gt => "check if greater than", " <number_base> <number>"
-         ge => "check if greater than or equal", " <number_base> <number>"
-         lt => "check if lower than", " <number_base> <number>"
-         le => "check if lower than or equal", " <number_base> <number>"
-         eq => "check if equal", " <number_base> <number>"
-         ne => "check if NOT equal", " <number_base> <number>"
+        // 三角函数（单位：弧度）
+        sin => "sine", "<radians>"
+        cos => "cosine", "<radians>"
+        tan => "tangent", "<radians>"
+        asin => "inverse sine", "<value>"
+        acos => "inverse cosine", "<value>"
+        atan => "inverse tangent", "<value>"
 
-         // 三角函数（单位：弧度）
-         sin => "get the sine of a number", "<radians>"
-         cos => "get the cosine of a number", "<radians>"
-         tan => "get the tangent of a number", "<radians>"
-         asin => "get the inverse sine of a number", "<value>"
-         acos => "get the inverse cosine of a number", "<value>"
-         atan => "get the inverse tangent of a number", "<value>"
+        // 双曲函数
+        sinh => "hyperbolic sine", "<value>"
+        cosh => "hyperbolic cosine", "<value>"
+        tanh => "hyperbolic tangent", "<value>"
+        asinh => "inverse hyperbolic sine", "<value>"
+        acosh => "inverse hyperbolic cosine", "<value>"
+        atanh => "inverse hyperbolic tangent", "<value>"
 
-         // 双曲函数
-         sinh => "get the hyperbolic sine of a number", "<value>"
-         cosh => "get the hyperbolic cosine of a number", "<value>"
-         tanh => "get the hyperbolic tangent of a number", "<value>"
-         asinh => "get the inverse hyperbolic sine of a number", "<value>"
-         acosh => "get the inverse hyperbolic cosine of a number", "<value>"
-         atanh => "get the inverse hyperbolic tangent of a number", "<value>"
+        // π倍三角函数
+        sin_pi => "sin(x*π)", "<x>"
+        cos_pi => "cos(x*π)", "<x>"
+        tan_pi => "tan(x*π)", "<x>"
 
-         // π倍三角函数
-         sin_pi => "get the sine of a number times π", "<value>"
-         cos_pi => "get the cosine of a number times π", "<value>"
-         tan_pi => "get the tangent of a number times π", "<value>"
+        // 指数与对数
+        pow => "base^exponent", "<base> <exponent>"
+        exp => "e^x", "<x>"
+        exp2 => "2^x", "<x>"
+        sqrt => "square root", "<number>"
+        cbrt => "cube root", "<number>"
+        log => "log base b of x", "<base> <x>"
+        log2 => "log base 2", "<number>"
+        log10 => "log base 10", "<number>"
+        ln => "natural log", "<number>"
 
-         // 指数与对数
-         pow => "raise a number to a power", "<exponent> <base>"
-         exp => "get e raised to the power of a number", "<exponent>"
-         exp2 => "get 2 raised to the power of a number", "<exponent>"
-         sqrt => "get the square root of a number", "<number>"
-         cbrt => "get the cube root of a number", "<number>"
-         log => "get the log of a number using a given base", "<base> <number>"
-         log2 => "get the log base 2 of a number", "<number>"
-         log10 => "get the log base 10 of a number", "<number>"
-         ln => "natural logarithm", "<number>"
+        // 舍入函数
+        floor => "round down", "<number>"
+        ceil => "round up", "<number>"
+        round => "round to nearest", "<number>"
+        trunc => "truncate decimal", "<number>"
 
-         // 舍入函数
-         floor => "get the floor of a number", "<number>"
-         ceil => "get the ceiling of a number", "<number>"
-         round => "round a number to the nearest integer", "<number>"
-         trunc => "truncate a number", "<number>"
-
-         // 其他函数
-         to_string => "trans to String", "<number>"
-         is_odd => "is a number odd?", "<integer>"
-         is_even => "is a number even?", "<integer>"
-         signum => "get the sign of a number (-1, 0, or 1)", "<number>"
-         hypot => "get the hypotenuse: sqrt(x^2+y^2)", "<x> <y>"
-         gcd => "get the greatest common divisor of two integers", "<int1> <int2>"
-         lcm => "get the least common multiple of two integers", "<int1> <int2>"
-         rem => "get the euclidean remainder (always non-negative for positive divisor)", "<a> <b>"
-         to_degrees => "convert radians to degrees", "<radians>"
-         to_radians => "convert degrees to radians", "<degrees>"
-
+        // 其他函数
+        to_string => "to string", "<number>"
+        is_odd => "is odd?", "<integer>"
+        is_even => "is even?", "<integer>"
+        signum => "sign: -1, 0, or 1", "<number>"
+        hypot => "sqrt(x^2+y^2)", "<x> <y>"
+        gcd => "greatest common divisor", "<int1> <int2>"
+        lcm => "least common multiple", "<int1> <int2>"
+        rem => "euclidean remainder", "<a> <b>"
+        to_degrees => "radians to degrees", "<radians>"
+        to_radians => "degrees to radians", "<degrees>"
     })
 }
 
@@ -794,12 +794,12 @@ fn rem(
                     0,
                 ));
             }
-            Ok(Expression::Integer(a.rem_euclid(*b)))
+            Ok(a.checked_rem(*b).map_or(Expression::None, Expression::from))
         }
         _ => {
             let a = get_float_arg(&args[0], ctx)?;
             let b = get_float_arg(&args[1], ctx)?;
-            Ok(Expression::Float(a.rem_euclid(b)))
+            Ok(Expression::Float(a.rem(b)))
         }
     }
 }

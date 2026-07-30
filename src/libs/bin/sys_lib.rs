@@ -27,28 +27,27 @@ pub fn regist_lazy() -> LazyModule {
         set_strict
     })
 }
+
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
     reg_info!({
-        dirs => "get system directories", ""
-        env => "get root environment map/var value", "[var]"
-        vars => "get defined variables in current enviroment", ""
-        has => "check if a variable is defined in current environment", "<var>"
-        defined => "check if a variable is defined in current environment tree", "<var>"
+        dirs => "system directories map", ""
+        env => "root env map, or var value", "[var]"
+        vars => "vars defined in current scope", ""
+        has => "defined in current scope?", "<var>"
+        defined => "defined in scope chain?", "<var>"
 
-        ecodes_rt => "display runtime error codes", ""
-        ecodes_lm => "display Lmerror codes", ""
-        // throw => "return a runtime error", "<msg>"
+        ecodes_rt => "list runtime error codes", ""
+        ecodes_lm => "list Lmerror codes", ""
 
-        info => "get os info", ""
-        modes => "get lume modes", ""
+        info => "os info", ""
+        modes => "current mode flags {cfm,strict,pdm}", ""
 
-        max_syntax => "get/set max syntax recursion","[int]"
-        max_runtime=> "get/set max runtime recursion","[int]"
-        max_usemode=> "get/set max use mode recursion","[int]"
-        set_cfm=> "enable/disable CFM","<boolean>"
-        set_pdm=> "enable/disable print direct mode","<boolean>"
-        set_strict=> "enable/disable strict mode","<boolean>"
-
+        max_syntax => "get/set max syntax recursion depth", "[depth]"
+        max_runtime => "get/set max runtime recursion depth", "[depth]"
+        max_usemode => "get/set max use-mode recursion depth", "[depth]"
+        set_cfm => "enable/disable Cmd First Mode", "<boolean>"
+        set_pdm => "enable/disable print direct mode", "<boolean>"
+        set_strict => "enable/disable strict mode", "<boolean>"
     })
 }
 

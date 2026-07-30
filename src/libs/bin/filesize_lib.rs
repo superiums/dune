@@ -12,16 +12,16 @@ pub fn regist_lazy() -> LazyModule {
         kb, mb, gb, tb,
     })
 }
+
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
     reg_info!({
-            from => "create a Filesize", "<size_str|byte_int>"
-            to_string => "Filesize to human readable string", "<filesize>"
-            b =>  "get btyes of a Filesize", "<filesize>"
-            kb => "get kb of a Filesize", "<filesize>"
-            mb => "get mb of a Filesize", "<filesize>"
-            gb => "get gb of a Filesize", "<filesize>"
-            tb => "get tb of a Filesize", "<filesize>"
-
+        from => "to Filesize", "<size_str|byte_int>"
+        to_string => "to human readable string", "<filesize>"
+        b => "bytes", "<filesize>"
+        kb => "kilobytes (integer, truncated)", "<filesize>"
+        mb => "megabytes", "<filesize>"
+        gb => "gigabytes", "<filesize>"
+        tb => "terabytes", "<filesize>"
     })
 }
 

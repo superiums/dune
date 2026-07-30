@@ -35,49 +35,50 @@ pub fn regist_lazy() -> LazyModule {
 
     })
 }
-
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
     reg_info!({
-        ls => "list directory contents", "[-l|a|h|t| L|c|u|m|p] [path]"
-        glob => "match files with pattern", "<pattern>"
-        tree => "get directory tree as nested map", "[path]"
+        ls => "list dir contents", "[-l|a|h|t|L|c|u|m|p]|[--help] [path]"
+        glob => "match files by pattern", "<pattern>"
+        tree => "dir tree as nested map", "[depth=3] [path]"
         abs => "absolute path", "<path>"
-        canon => "canonicalize path", "<path>"
+        canon => "canonical path, resolves symlinks", "<path>"
 
         // modify
-        mkdir => "create directory", "<path>"
-        rmdir => "remove empty directory", "<path>"
+        mkdir => "create dir, incl parents", "<path>"
+        rmdir => "remove empty dir", "<path>"
         mv => "move path", "<source> <destination>"
-        cp => "copy path", "<source> <destination>"
-        rm => "remove path", "<path>"
-        touch => "create empty file, or update modified time if file exists", "<path>"
+        cp => "copy path, recursive for dirs", "<source> <destination>"
+        rm => "remove path, recursive for dirs", "<path>"
+        touch => "create empty file, or update mtime if exists", "<path>"
 
         // permission & link
-        chmod => "change file permission mode (unix only)", "<path> <mode:octal_int>"
-        chown => "change file owner uid/gid, -1 to keep unchanged (unix only)", "<path> <uid> <gid>"
-        symlink => "create a symbolic link pointing to source", "<source> <link_path>"
-        read_link => "read the target path of a symbolic link", "<link_path>"
+        chmod => "set unix permission mode", "<path> <mode:octal>"
+        chown => "set unix owner, -1 to keep", "<path> <uid> <gid>"
+        symlink => "create symlink", "<source> <link_path>"
+        read_link => "read symlink target", "<link_path>"
 
         // check
-        exists => "check if path exists", "<path>"
-        is_dir => "check if path is directory", "<path>"
-        is_file => "check if path is file", "<path>"
+        exists => "path exists?", "<path>"
+        is_dir => "is dir?", "<path>"
+        is_file => "is file?", "<path>"
 
         // read/write
-        head => "read first N lines of file", "<file> [n]"
-        tail => "read last N lines of file", "<file> [n]"
-        read => "read file contents", "<file>"
-        write => "create/write to file", "[content] <file>"
-        append => "append to file", "<content> <file>"
+        head => "first n lines", "<file> [n=10]"
+        tail => "last n lines", "<file> [n=10]"
+        read => "read file, text or bytes", "<file>"
+        write => "create/overwrite file", "[content] <file>"
+        append => "append to file, creates if missing", "<content> <file>"
+
         // assist
-        base_name => "extract full file name from path", "<path>"
-        stem => "extract file name without extension from path", "<path>"
-        extension => "extract file extension from path", "<path>"
-        dir_name => "extract dir_name from path", "<path>"
-        parent => "extract parent_name from path", "<path>"
-        join => "join paths", "<path>..."
+        base_name => "file name with extension", "<path>"
+        stem => "file name without extension", "<path>"
+        extension => "file extension", "<path>"
+        dir_name => "dir part before last '/'", "<path>"
+        parent => "parent dir path", "<path>"
+        join => "join path segments", "<segment>..."
     })
 }
+
 // Helper Functions
 fn build_directory_tree(path: &Path, max_depth: Option<Int>) -> BTreeMap<String, Expression> {
     let mut tree = BTreeMap::new();
@@ -460,7 +461,7 @@ fn read(
         .map_err(|e| RuntimeError::from_io_error(e, "read file".into(), args[0].clone(), 0))?;
     Ok(Expression::Bytes(bytes))
 }
-
+// write content (String/Bytes/other) to a File, or truncate-create if `content` is None.
 fn write(
     args: Vec<Expression>,
     env: &mut Environment,
@@ -468,58 +469,79 @@ fn write(
 ) -> Result<Expression, RuntimeError> {
     check_args_len("write", &args, 1..=2, ctx)?;
     let mut it = args.into_iter();
-    let p_expr = it.next().unwrap();
+    let a0 = it.next().unwrap();
 
-    let p = get_string_ref(&p_expr, ctx)?;
+    // 一个参数 => a0 是 path，没有内容（相当于 touch）
+    // 两个参数 => a0 是内容（管道传入），a1 是 path
+    let (content, path_expr) = match it.next() {
+        Some(path_expr) => (Some(a0), path_expr),
+        None => (None, a0),
+    };
+
+    let p = get_string_ref(&path_expr, ctx)?;
     let path = utils::abs(p, env);
 
-    // 只有一个参数时，创建空白文件（如果不存在）
-    if !path.exists() {
-        std::fs::File::create(&path)
-            .map_err(|e| RuntimeError::from_io_error(e, "create file".into(), p_expr.clone(), 0))?;
-    }
-
-    // 两个参数时，正常写入内容
-    if let Some(contents) = it.next() {
-        match contents {
-            Expression::Bytes(bytes) => std::fs::write(&path, bytes),
-            Expression::String(ct) => std::fs::write(&path, ct),
-            _ => std::fs::write(&path, contents.to_string()),
+    match content {
+        // 只有 path：如果文件不存在则创建空白文件；已存在则保持不变
+        None => {
+            if !path.exists() {
+                std::fs::File::create(&path).map_err(|e| {
+                    RuntimeError::from_io_error(e, "create file".into(), path_expr.clone(), 0)
+                })?;
+            }
         }
-        .map_err(|e| RuntimeError::from_io_error(e, "write file".into(), p_expr, 0))?;
+        // 有内容：写入（覆盖）
+        Some(contents) => {
+            match contents {
+                Expression::Bytes(bytes) => std::fs::write(&path, bytes),
+                Expression::String(ct) => std::fs::write(&path, ct),
+                other => std::fs::write(&path, other.to_string()),
+            }
+            .map_err(|e| RuntimeError::from_io_error(e, "write file".into(), path_expr, 0))?;
+        }
     }
 
     Ok(Expression::None)
 }
 
+// append content to a file, creating it if needed.
 fn append(
     args: Vec<Expression>,
     env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("append", &args, 2, ctx)?;
-
+    check_args_len("append", &args, 1..=2, ctx)?;
     let mut it = args.into_iter();
-    let p_expr = it.next().unwrap();
-    let p = get_string_ref(&p_expr, ctx)?;
+    let a0 = it.next().unwrap();
+
+    // 一个参数 => a0 是 path，没有内容（相当于 touch，确保文件存在）
+    // 两个参数 => a0 是内容（管道传入），a1 是 path
+    let (content, path_expr) = match it.next() {
+        Some(path_expr) => (Some(a0), path_expr),
+        None => (None, a0),
+    };
+
+    let p = get_string_ref(&path_expr, ctx)?;
     let path = utils::abs(p, env);
-    let contents = it.next().unwrap();
 
     let mut file = std::fs::OpenOptions::new()
         .append(true)
         .create(true)
         .open(&path)
-        .map_err(|e| RuntimeError::from_io_error(e, "open file".into(), p_expr.clone(), 0))?;
+        .map_err(|e| RuntimeError::from_io_error(e, "open file".into(), path_expr.clone(), 0))?;
 
-    match contents {
-        Expression::Bytes(bytes) => file.write_all(&bytes),
-        Expression::String(ct) => file.write_all(ct.as_bytes()),
-        _ => file.write_all(contents.to_string().as_bytes()),
+    if let Some(contents) = content {
+        match contents {
+            Expression::Bytes(bytes) => file.write_all(&bytes),
+            Expression::String(ct) => file.write_all(ct.as_bytes()),
+            other => file.write_all(other.to_string().as_bytes()),
+        }
+        .map_err(|e| RuntimeError::from_io_error(e, "write file".into(), path_expr, 0))?;
     }
-    .map_err(|e| RuntimeError::from_io_error(e, "write file".into(), p_expr, 0))?;
 
     Ok(Expression::None)
 }
+
 // Pattern Matching
 fn glob(
     args: Vec<Expression>,

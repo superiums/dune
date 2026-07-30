@@ -1,6 +1,5 @@
-use std::collections::BTreeMap;
-
 use regex_lite::Regex;
+use std::collections::BTreeMap;
 
 use crate::{
     Environment, Expression, Int, RuntimeError, RuntimeErrorKind,
@@ -38,23 +37,21 @@ pub fn regist_lazy() -> LazyModule {
 
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
     reg_info!({
-        str => "format an expression to a string", "<value>"
-        int => "convert a float or string to an int", "<value>"
-        float => "convert an int or string to a float", "<value>"
-        boolean => "convert a value to a boolean", "<value>"
-        filesize => "parse a string representing a file size into bytes", "<size_str>"
-        time => "convert a string to a datetime", "<datetime_str> [datetime_template]"
-        table => "convert third-party command output to a table", "<command_output> [regex|headers...]"
-        // [FIX] "parse" → "serialize"
-        toml => "serialize lumesh expression to TOML", "<expr>"
-        json => "serialize lumesh expression to JSON", "<expr>"
-        csv => "serialize lumesh expression to CSV", "<expr>"
-        pretty => "serialize lumesh expression to Pretty String", "<expr>"
-        highlight => "highlight script str with ANSI", "<script_string>"
-        strip => "remove all ANSI escape codes from string", "<string>"
-        safe => "make a string safe and never eval","<str>"
-        caesar => "encrypt a string using a caesar cipher", "<string> <shift>"
-
+        string => "to string", "<value>"
+        int => "to int. radix ok(0x/0o/0b), _ as sep. e.g. 0xff_80", "<str|num|bool>"
+        float => "to float. % as /100, _ as sep. e.g. 12.5% -> 0.125", "<str|num|bool>"
+        boolean => "to bool", "<value>"
+        filesize => "to filesize. e.g. 1.5GB, 500K", "<size_str|int>"
+        time => "to datetime", "<str> [fmt]"
+        table => "parse cmd output to table", "<output> [split_regex] [headers...]"
+        toml => "to TOML", "<expr>"
+        json => "to JSON", "<expr>"
+        csv => "to CSV", "<expr>"
+        pretty => "to pretty string", "<expr>"
+        highlight => "ANSI highlight script", "<script>"
+        strip => "remove ANSI codes", "<string>"
+        safe => "wrap str, never eval", "<str>"
+        caesar => "caesar cipher", "<string> [shift=13]"
 
     })
 }
@@ -246,15 +243,29 @@ pub fn int(
         // [FIX] 新增 Boolean 处理
         Expression::Boolean(b) => Ok(Expression::Integer(if *b { 1 } else { 0 })),
         Expression::String(x) => {
-            if let Ok(n) = x.parse::<Int>() {
-                Ok(Expression::Integer(n))
+            let x = x.replace('_', "");
+            let int = if x.starts_with("0x") {
+                Int::from_str_radix(&x, 16).map_err(|_| {
+                    RuntimeError::common(format!("invalid Hex number").into(), ctx.clone(), 0)
+                })
+            } else if x.starts_with("0o") {
+                Int::from_str_radix(&x, 8).map_err(|_| {
+                    RuntimeError::common(format!("invalid Oct number").into(), ctx.clone(), 0)
+                })
+            } else if x.starts_with("0b") {
+                Int::from_str_radix(&x, 2).map_err(|_| {
+                    RuntimeError::common(format!("invalid Bin number").into(), ctx.clone(), 0)
+                })
             } else {
-                Err(RuntimeError::common(
-                    format!("could not convert {x:?} to an integer").into(),
-                    ctx.clone(),
-                    0,
-                ))
-            }
+                x.parse::<Int>().map_err(|_| {
+                    RuntimeError::common(
+                        format!("could not convert {x:?} to an integer").into(),
+                        ctx.clone(),
+                        0,
+                    )
+                })
+            };
+            Ok(Expression::Integer(int?))
         }
         otherwise => Err(RuntimeError::common(
             format!("could not convert {otherwise:?} to an integer").into(),
@@ -276,6 +287,7 @@ pub fn float(
         // [FIX] 新增 Boolean 处理
         Expression::Boolean(b) => Ok(Expression::Float(if *b { 1.0 } else { 0.0 })),
         Expression::String(x) => {
+            let x = x.replace('_', "");
             let xt = x.trim();
             let r = match xt.ends_with("%") {
                 true => xt.trim_end_matches('%').parse::<f64>().map(|f| f * 0.01),

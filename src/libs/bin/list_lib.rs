@@ -4,7 +4,10 @@ use std::rc::Rc;
 use crate::eval::State;
 use crate::expression::BoxedIterator;
 use crate::expression::eval2::execute_iteration;
-use crate::libs::bin::{math_lib, top};
+use crate::libs::bin::{
+    math_lib,
+    top::{dig, flatten, len, rev},
+};
 use crate::libs::helper::{
     check_args_len, check_exact_args_len, check_fn_arg, get_integer_arg, get_integer_ref,
     get_string_arg, get_string_ref,
@@ -47,77 +50,77 @@ pub fn regist_lazy() -> LazyModule {
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
     reg_info!({
         // 数学统计
-        max => "get max value in an array or multi args", "<num1> <num2> ... | <array>"
-        min => "get min value in an array or multi args", "<num1> <num2> ... | <array>"
-        sum => "sum a list of numbers", "<num1> <num2> ... | <array>"
-        average => "get the average of a list of numbers", "<num1> <num2> ... | <array>"
+        max => "max value", "<num1> <num2>... | <array>"
+        min => "min value", "<num1> <num2>... | <array>"
+        sum => "sum of numbers", "<num1> <num2>... | <array>"
+        average => "average of numbers", "<num1> <num2>... | <array>"
 
         // 读取操作
-        dig => "get value from nested map/list/range using dot notation path", "<map|list|range> <path>"
-        len => "get length of list", "<list>"
-        is_empty => "is this list empty?", "<list>"
-        first => "get the first element of a list", "<list> [n]"
-        last => "get the last element of a list", "<list> [n]"
-        get => "get the nth element of a list", "<list> <index>"
-        take => "take the first n elements of a list", "<list> <count>"
-        skip => "skip the first n elements of a list", "<list> <count>"
-        slice => "get a sub-list from start(inclusive) to end(exclusive), support negative index", "<list> <start> <end>"
+        dig => "get nested value by dot path. e.g. dig m 'a.b.0'", "<map|list|range> <path>"
+        len => "list length", "<list>"
+        is_empty => "is empty?", "<list>"
+        first => "first n elements", "<list> [n=1]"
+        last => "last n elements", "<list> [n=1]"
+        get => "nth element, negative index from end", "<list> <index>"
+        take => "first n elements", "<list> <count>"
+        skip => "skip first n elements", "<list> <count>"
+        slice => "sub-list [start,end), negative index ok", "<list> <start> <end>"
 
         // 查找操作
-        contains => "check if list contains an item", "<list> <item>"
-        find => "find first matched item", "<list> <item|fn> [skip_n]"
-        rfind => "find last matched item", "<list> <item|fn> [skip_n]"
-        position => "find first matched index", "<list> <item|fn> [skip_n]"
-        rposition => "find last matched index", "<list> <item|fn> [skip_n]"
+        contains => "contains item?", "<list> <item>"
+        find => "first matched item", "<list> <item|fn> [skip_n=0]"
+        rfind => "last matched item", "<list> <item|fn> [skip_n=0]"
+        position => "first matched index", "<list> <item|fn> [skip_n=0]"
+        rposition => "last matched index", "<list> <item|fn> [skip_n=0]"
 
         // 修改操作
-        insert => "insert item into list", "<list> <index> <value>"
-        rev => "reverse sequence", "<list>"
+        insert => "insert value at index", "<list> <index> <value>"
+        rev => "reverse", "<list>"
         flatten => "flatten nested structure", "<collection>"
-        push => "append an element to a list", "<list> <element>"
-        unique => "remove duplicates from a list while preserving order", "<list>"
-        split_at => "split a list at a given index", "<list> <index>"
-        split_first => "split a list at head", "<list>"
-        sort => "sort a string/list, optionally with a key function or key_list", "<string|list> [key_fn|key_list|keys...]"
-        group => "group list elements by key function", "<list> <key_fn|key>"
-        remove_at => "remove n elements starting from index", "<list> <index> [count]"
-        remove => "remove first matching element", "<list> <item> [all?]"
-        set => "set element at existing index", "<list> <index> <value>"
+        push => "append element", "<list> <element>"
+        unique => "dedupe, preserve order", "<list>"
+        split_at => "split at index, returns [left,right]", "<list> <index>"
+        split_first => "split head/tail, returns [head,rest]", "<list>"
+        sort => "sort, optional fn(a,b)->[-1/0/1]. e.g. sort list 'name'", "<string|list> [key_fn|key...]"
+        group => "group by key fn or map field, e.g.  fn(item)->string", "<list> <key_fn|key>"
+        remove_at => "remove n items from index", "<list> <index> [count=1]"
+        remove => "remove item, default first-only", "<list> <item> [all=false]"
+        set => "set value at existing index", "<list> <index> <value>"
         swap => "swap two elements by index", "<list> <i> <j>"
-        rotate => "rotate list, positive n rotates right, negative rotates left", "<list> <n>"
-        splice => "remove elements starting at index and optionally insert new items, returns new list", "<list> <start> <delete_count> [items...]"
+        rotate => "rotate, n>0 right, n<0 left", "<list> <n>"
+        splice => "delete & optionally insert at index, returns new list", "<list> <start> <delete_count> [items...]"
 
         // 创建操作
-        concat => "concatenate multiple lists into one", "<list1|item1> <list2|item2> ..."
-        from => "create a list from a range", "<range|item...>"
-        fill => "create a list by repeating a value n times", "<value> <n>"
+        concat => "concat lists/items into one list", "<list1|item1> <list2|item2>..."
+        from => "list from range", "<range>"
+        fill => "repeat value n times", "<value> <n>"
 
         // 遍历操作
-        map => "apply function for each element", "<list> <fn>"
-        items => "iterate over index-value pairs", "<list>"
-        filter => "filter elements by condition", "<list> <fn>"
-        filter_map => "filter and map in one pass", "<list> <fn>"
-        any => "test if any element passes condition", "<list> <fn>"
-        all => "test if all elements pass condition", "<list> <fn>"
+        map => "apply fn([index],item) per element", "<list> <fn>"
+        items => "index-value pairs", "<list>"
+        filter => "filter by fn([index],item)", "<list> <fn>"
+        filter_map => "filter+map, drop None results", "<list> <fn>"
+        any => "any element passes?", "<list> <fn>"
+        all => "all elements pass?", "<list> <fn>"
 
         // 转换操作
-        join => "join string list with separator", "<list> <separator>"
-        to_map => "convert list to btreeMap using key function", "<list> [key_fn] [val_fn]"
-        to_hmap => "convert list to hashMap using key function", "<list> [key_fn] [val_fn]"
-        to_set => "convert list to btreeSet", "<list>"
+        join => "join strings with separator", "<list> <separator>"
+        to_map => "to btreeMap, default pairs [k,v,k,v...]", "<list> [key_fn] [val_fn]"
+        to_hmap => "to hashMap, default pairs [k,v,k,v...]", "<list> [key_fn] [val_fn]"
+        to_set => "to btreeSet", "<list>"
 
         // 结构操作
         transpose => "transpose matrix (list of lists)", "<matrix>"
-        chunks => "split list into chunks of size n", "<list> <size>"
-        fold => "fold list from left with function", "<list> <fn> <init>"
-        rfold => "fold list from right with function", "<list> <fn> <init>"
-        zip => "zip two lists into list of pairs", "<list1> <list2>"
-        unzip => "unzip list of pairs into two lists", "<list_of_pairs>"
-        windows => "get overlapping sliding windows of given size", "<list> <size>"
+        chunks => "split into chunks of size n", "<list> <size>"
+        fold => "fold left, fn(acc,item)", "<list> <fn> [init=0]"
+        rfold => "fold right, fn(acc,item)", "<list> <fn> [init=0]"
+        zip => "zip two lists into pairs", "<list1> <list2>"
+        unzip => "unzip pairs into two lists", "<list_of_pairs>"
+        windows => "overlapping sliding windows of size n", "<list> <size>"
 
         // 随机操作
-        shuffle => "randomly shuffle list order", "<list>"
-        sample => "randomly pick n distinct elements from list", "<list> <n>"
+        shuffle => "shuffle order", "<list>"
+        sample => "pick n distinct random elements", "<list> <n>"
     })
 }
 
@@ -179,7 +182,6 @@ fn average(
     }
 }
 
-// ---from top---
 fn insert(
     args: Vec<Expression>,
     _env: &mut Environment,
@@ -206,35 +208,6 @@ fn insert(
             0,
         ))
     }
-}
-
-fn len(
-    args: Vec<Expression>,
-    env: &mut Environment,
-    ctx: &Expression,
-) -> Result<Expression, RuntimeError> {
-    top::len(args, env, ctx)
-}
-fn dig(
-    args: Vec<Expression>,
-    env: &mut Environment,
-    ctx: &Expression,
-) -> Result<Expression, RuntimeError> {
-    top::dig(args, env, ctx)
-}
-fn rev(
-    args: Vec<Expression>,
-    env: &mut Environment,
-    ctx: &Expression,
-) -> Result<Expression, RuntimeError> {
-    top::rev(args, env, ctx)
-}
-fn flatten(
-    args: Vec<Expression>,
-    env: &mut Environment,
-    ctx: &Expression,
-) -> Result<Expression, RuntimeError> {
-    top::flatten(args, env, ctx)
 }
 
 // ---self---
@@ -986,18 +959,18 @@ fn map(
     let func = it.next().unwrap();
     let list = get_list_ref(&list_exp, ctx)?;
 
-    let (var_name, ind_name, body) = if check_fn_arg(&func, 2, ctx).is_ok() {
+    let (ind_name, var_name, body) = if check_fn_arg(&func, 2, ctx).is_ok() {
         match func {
             Expression::Function(_, mut p, _, body, _) => {
-                (p.pop().unwrap().0, Some(p.pop().unwrap().0), body)
+                (Some(p.pop().unwrap().0), Some(p.pop().unwrap().0), body)
             }
-            Expression::Lambda(mut p, body, _) => (p.pop().unwrap(), Some(p.pop().unwrap()), body),
+            Expression::Lambda(mut p, body, _) => (p.pop(), p.pop(), body),
             _ => unreachable!(),
         }
     } else if check_fn_arg(&func, 1, ctx).is_ok() {
         match func {
-            Expression::Function(_, mut p, _, body, _) => (p.pop().unwrap().0, None, body),
-            Expression::Lambda(mut p, body, _) => (p.pop().unwrap(), None, body),
+            Expression::Function(_, mut p, _, body, _) => (None, Some(p.pop().unwrap().0), body),
+            Expression::Lambda(mut p, body, _) => (None, p.pop(), body),
             _ => unreachable!(),
         }
     // } else if let Expression::Property(..) = &func {
@@ -1020,7 +993,7 @@ fn map(
     let count = list.iter().count();
     let iterator = BoxedIterator::Vec(list.as_ref().clone().into_iter());
     execute_iteration(
-        var_name,
+        var_name.unwrap(),
         ind_name,
         iterator,
         count,
@@ -1431,7 +1404,7 @@ fn fold(
     for item in list.as_ref().iter() {
         // acc = Expression::Apply(func.clone(), Rc::new(vec![item.clone(), acc]))
         //     .eval_mut(state, env, 0)?;
-        acc = func.eval_apply(&func, &[item.clone(), acc], state, env, 0)?;
+        acc = func.eval_apply(&func, &[acc, item.clone()], state, env, 0)?;
     }
     // let mut state = State::new(is_strict(env));
     // match f {
@@ -1469,7 +1442,7 @@ fn rfold(
     let state = &mut State::new();
     for item in list.as_ref().iter().rev() {
         // acc = Expression::Apply(func.clone(), Rc::new(vec![item.clone(), acc])).eval(env)?;
-        acc = func.eval_apply(&func, &[item.clone(), acc], state, env, 0)?;
+        acc = func.eval_apply(&func, &[acc, item.clone()], state, env, 0)?;
     }
     Ok(acc)
 }

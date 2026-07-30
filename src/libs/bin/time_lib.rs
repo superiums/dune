@@ -14,23 +14,24 @@ pub fn regist_lazy() -> LazyModule {
     reg_lazy!({
         // 基本时间获取
         sleep, display,
-        // 时间分量获取（参数格式统一为 [datetime]）
+        // 时间分量获取（参数格式统一为 [datetime]，datetime 在前以支持管道）
         year, month, weekday, day, hour, minute, second, seconds,
         // 时间戳
         stamp, stamp_ms,
         // 格式化
         fmt,
         // 核心操作
-        now, parse, add, diff, timezone, is_leap, from_map, to_string,
+        now, parse, add, diff, timezone, is_leap, to_string,
     })
 }
+
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
     reg_info!({
         // 基本时间获取
         sleep => "sleep for a given number of milliseconds [ms] or duration string (e.g. '1s', '2m')", "<duration>"
         display => "get preformatted datetime as map with time/date/datetime/etc.", "[datetime]"
 
-                // 时间分量获取（参数格式统一为 [datetime]）
+        // 时间分量获取（参数格式统一为 [datetime]，datetime 在前以支持管道）
         year => "get year (current or from specified datetime)", "[datetime]"
         month => "get month (1-12)", "[datetime]"
         weekday => "get weekday (1-7, Monday=1)", "[datetime]"
@@ -40,24 +41,24 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         second => "get second (0-59)", "[datetime]"
         seconds => "get seconds since midnight", "[datetime]"
 
-                // 时间戳
+        // 时间戳
         stamp => "get Unix timestamp in seconds", "[datetime]"
         stamp_ms => "get Unix timestamp in milliseconds", "[datetime]"
 
-                // 格式化
-        fmt => "format datetime (current or specified) using chrono format string", "<format_string> [datetime]"
+        // 格式化
+        fmt => "format datetime (current or specified) using chrono format string", "[datetime] <format_string>"
 
-                // 核心操作
+        // 核心操作
         now => "get current datetime as DateTime object or formatted string", "[format_string]"
-        parse => "parse datetime string according to format", "<datetime_string> [format_string]"
-        add => "add duration to datetime", "<datetime> <duration>"
-        diff => "calculate difference between two datetimes", "<datetime1> <datetime2> <unit>"
-        timezone => "convert datetime to different timezone", "<datetime> <offset_hours>"
+        parse => "parse datetime string, optionally with a chrono format string", "<datetime_string> [format_string]"
+        add => "add a signed duration string (e.g. '1d2h30m', '-1h') or integer seconds to a datetime (defaults to now)", "[datetime] <duration>"
+        diff => "calculate difference between two datetimes in given unit (defaults to seconds)", "<datetime1> <datetime2> [unit]"
+        timezone => "convert datetime to a different timezone offset (in hours)", "[datetime] <offset_hours> [format_string]"
         is_leap => "check if a year is a leap year", "[year]"
-        from_map => "create DateTime from components", "<map>"
         to_string => "convert DateTime to string", "<datetime> [format_string]"
     })
 }
+
 // Helper Functions
 fn parse_datetime_arg(
     arg: Expression,
@@ -68,44 +69,30 @@ fn parse_datetime_arg(
         Expression::DateTime(dt) => Ok(dt),
         Expression::String(s) => {
             // Try parsing common shell date formats
-            if let Ok(dt) = NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M") {
-                return Ok(dt);
-            }
-            if let Ok(dt) = NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S") {
-                return Ok(dt);
-            }
-            if let Ok(dt) = NaiveDateTime::parse_from_str(&s, "%Y/%m/%d %H:%M:%S") {
-                return Ok(dt);
-            }
-            if let Ok(dt) = NaiveDateTime::parse_from_str(&s, "%d/%m/%Y %H:%M:%S") {
-                return Ok(dt);
-            }
-            if let Ok(dt) = NaiveDateTime::parse_from_str(&s, "%m/%d/%Y %H:%M:%S") {
-                return Ok(dt);
-            }
-            if let Ok(dt) = NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %I:%M %p") {
-                return Ok(dt);
-            }
-            if let Ok(dt) = NaiveDateTime::parse_from_str(&s, "%Y/%m/%d %I:%M %p") {
-                return Ok(dt);
-            }
-            if let Ok(dt) = NaiveDateTime::parse_from_str(&s, "%d/%m/%Y %I:%M %p") {
-                return Ok(dt);
-            }
-            if let Ok(dt) = NaiveDateTime::parse_from_str(&s, "%m/%d/%Y %I:%M %p") {
-                return Ok(dt);
+            const DATETIME_FORMATS: &[&str] = &[
+                "%Y-%m-%d %H:%M",
+                "%Y-%m-%d %H:%M:%S",
+                "%Y/%m/%d %H:%M:%S",
+                "%d/%m/%Y %H:%M:%S",
+                "%m/%d/%Y %H:%M:%S",
+                "%Y-%m-%d %I:%M %p",
+                "%Y/%m/%d %I:%M %p",
+                "%d/%m/%Y %I:%M %p",
+                "%m/%d/%Y %I:%M %p",
+            ];
+            for f in DATETIME_FORMATS {
+                if let Ok(dt) = NaiveDateTime::parse_from_str(&s, f) {
+                    return Ok(dt);
+                }
             }
             if let Ok(dt) = NaiveDate::parse_from_str(&s, "%Y-%m-%d") {
                 return Ok(dt.and_hms_opt(0, 0, 0).unwrap());
             }
-            if let Ok(time) = NaiveTime::parse_from_str(&s, "%H:%M:%S") {
-                return Ok(NaiveDateTime::new(Local::now().date_naive(), time));
-            }
-            if let Ok(time) = NaiveTime::parse_from_str(&s, "%H:%M") {
-                return Ok(NaiveDateTime::new(Local::now().date_naive(), time));
-            }
-            if let Ok(time) = NaiveTime::parse_from_str(&s, "%I:%M %p") {
-                return Ok(NaiveDateTime::new(Local::now().date_naive(), time));
+            const TIME_FORMATS: &[&str] = &["%H:%M:%S", "%H:%M", "%I:%M %p"];
+            for f in TIME_FORMATS {
+                if let Ok(time) = NaiveTime::parse_from_str(&s, f) {
+                    return Ok(NaiveDateTime::new(Local::now().date_naive(), time));
+                }
             }
             // Try parsing common formats
             if let Ok(dt) = DateTime::parse_from_rfc3339(&s) {
@@ -124,48 +111,8 @@ fn parse_datetime_arg(
             ))
         }
         Expression::Integer(ts) => Ok(Utc.timestamp_opt(ts, 0).unwrap().naive_utc()),
-        Expression::Map(m) => {
-            let map = m.as_ref();
-            let year = get_map_value(map, "year", ctx)?.unwrap_or(Local::now().year() as i64);
-            let month = get_map_value(map, "month", ctx)?.unwrap_or(1) as u32;
-            let day = get_map_value(map, "day", ctx)?.unwrap_or(1) as u32;
-            let hour = get_map_value(map, "hour", ctx)?.unwrap_or(0) as u32;
-            let minute = get_map_value(map, "minute", ctx)?.unwrap_or(0) as u32;
-            let second = get_map_value(map, "second", ctx)?.unwrap_or(0) as u32;
-
-            NaiveDate::from_ymd_opt(year as i32, month, day)
-                .and_then(|d| d.and_hms_opt(hour, minute, second))
-                .ok_or(RuntimeError::common(
-                    "Invalid date components".into(),
-                    ctx.clone(),
-                    0,
-                ))
-        }
         _ => Err(RuntimeError::common(
-            "Expected DateTime, string, timestamp or map for datetime".into(),
-            ctx.clone(),
-            0,
-        )),
-    }
-}
-
-fn get_map_value(
-    map: &BTreeMap<String, Expression>,
-    key: &str,
-    ctx: &Expression,
-) -> Result<Option<i64>, RuntimeError> {
-    match map.get(key) {
-        Some(Expression::Integer(n)) => Ok(Some(*n)),
-        Some(Expression::String(s)) => s.parse().map(Some).map_err(|_| {
-            RuntimeError::common(
-                format!("Invalid integer value for {key}").into(),
-                ctx.clone(),
-                0,
-            )
-        }),
-        None => Ok(None),
-        _ => Err(RuntimeError::common(
-            format!("Expected integer for {key}").into(),
+            "Expected DateTime, string or timestamp for datetime".into(),
             ctx.clone(),
             0,
         )),
@@ -178,9 +125,18 @@ fn parse_duration_string(s: &str, ctx: &Expression) -> Result<Duration, RuntimeE
 
     for c in s.chars() {
         if c.is_ascii_digit() {
-            num = num * 10 + c.to_digit(10).unwrap() as u64;
+            num = num
+                .checked_mul(10)
+                .and_then(|v| v.checked_add(c.to_digit(10).unwrap() as u64))
+                .ok_or_else(|| {
+                    RuntimeError::common(
+                        format!("Duration number overflow in '{s}'").into(),
+                        ctx.clone(),
+                        0,
+                    )
+                })?;
         } else {
-            let multiplier = match c.to_ascii_lowercase() {
+            let multiplier: u64 = match c.to_ascii_lowercase() {
                 's' => 1_000,
                 'm' => 60 * 1_000,
                 'h' => 60 * 60 * 1_000,
@@ -193,18 +149,32 @@ fn parse_duration_string(s: &str, ctx: &Expression) -> Result<Duration, RuntimeE
                     ));
                 }
             };
-            total_ms += num * multiplier;
+            total_ms = total_ms.saturating_add(num.saturating_mul(multiplier));
             num = 0;
         }
     }
 
     // Handle case without unit, default to milliseconds
     if num > 0 {
-        total_ms += num;
+        total_ms = total_ms.saturating_add(num);
     }
 
     Ok(Duration::from_millis(total_ms))
 }
+
+/// Supports signed duration strings like "1d2h30m10s" or "-1h30m" (for subtraction).
+fn parse_signed_duration(s: &str, ctx: &Expression) -> Result<ChronoDuration, RuntimeError> {
+    let (neg, rest) = match s.strip_prefix('-') {
+        Some(r) => (true, r),
+        None => (false, s),
+    };
+    let std_duration = parse_duration_string(rest, ctx)?;
+    let d = ChronoDuration::from_std(std_duration).map_err(|e| {
+        RuntimeError::common(format!("Invalid duration: {e}").into(), ctx.clone(), 0)
+    })?;
+    Ok(if neg { -d } else { d })
+}
+
 // Basic Time Functions
 fn sleep(
     args: Vec<Expression>,
@@ -249,6 +219,7 @@ fn display(
         String::from("datetime_obj") => Expression::DateTime(naive),
     }))
 }
+
 // Time Component Functions
 fn get_time_component<F>(
     args: Vec<Expression>,
@@ -340,6 +311,7 @@ fn seconds(
         dt.time().num_seconds_from_midnight() as i64
     })
 }
+
 fn is_leap(
     args: Vec<Expression>,
     _env: &mut Environment,
@@ -364,17 +336,27 @@ fn is_leap(
 }
 
 // Timestamp Functions
-fn stamp(
+fn stamp_generic(
     args: Vec<Expression>,
     env: &mut Environment,
     ctx: &Expression,
+    to_value: impl Fn(DateTime<Utc>) -> i64,
 ) -> Result<Expression, RuntimeError> {
+    check_args_len("stamp", &args, 0..=1, ctx)?;
     let dt = if args.is_empty() {
         Utc::now()
     } else {
         parse_datetime_arg(args.into_iter().next().unwrap(), env, ctx)?.and_utc()
     };
-    Ok(Expression::Integer(dt.timestamp()))
+    Ok(Expression::Integer(to_value(dt)))
+}
+
+fn stamp(
+    args: Vec<Expression>,
+    env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    stamp_generic(args, env, ctx, |dt| dt.timestamp())
 }
 
 fn stamp_ms(
@@ -382,14 +364,11 @@ fn stamp_ms(
     env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    let dt = if args.is_empty() {
-        Utc::now()
-    } else {
-        parse_datetime_arg(args.into_iter().next().unwrap(), env, ctx)?.and_utc()
-    };
-    Ok(Expression::Integer(dt.timestamp_millis()))
+    stamp_generic(args, env, ctx, |dt| dt.timestamp_millis())
 }
+
 // Formatting Functions
+/// datetime 放在前面，以支持管道：`dt | time.fmt "%Y-%m-%d"`
 fn fmt(
     args: Vec<Expression>,
     env: &mut Environment,
@@ -397,22 +376,35 @@ fn fmt(
 ) -> Result<Expression, RuntimeError> {
     check_args_len("fmt", &args, 1..=2, ctx)?;
     let mut it = args.into_iter();
+    let a0 = it.next().unwrap();
 
-    let format_str = match it.next().unwrap() {
-        Expression::String(s) => s,
-        _ => {
-            return Err(RuntimeError::common(
-                "fmt requires format string as first argument".into(),
-                ctx.clone(),
-                0,
-            ));
-        }
-    };
-
-    let dt = if let Some(a) = it.next() {
-        parse_datetime_arg(a, env, ctx)?
+    let (dt, format_str) = if let Some(a1) = it.next() {
+        // 两个参数：第一个是 datetime，第二个是 format
+        let dt = parse_datetime_arg(a0, env, ctx)?;
+        let format = match a1 {
+            Expression::String(s) => s,
+            _ => {
+                return Err(RuntimeError::common(
+                    "fmt requires format string as second argument".into(),
+                    ctx.clone(),
+                    0,
+                ));
+            }
+        };
+        (dt, format)
     } else {
-        Local::now().naive_local()
+        // 单参数：只提供 format，datetime 默认当前时间
+        let format = match a0 {
+            Expression::String(s) => s,
+            _ => {
+                return Err(RuntimeError::common(
+                    "fmt requires a format string".into(),
+                    ctx.clone(),
+                    0,
+                ));
+            }
+        };
+        (Local::now().naive_local(), format)
     };
 
     Ok(Expression::String(dt.format(&format_str).to_string()))
@@ -446,6 +438,7 @@ fn now(
     }
 }
 
+/// datetime 放在前面，以支持管道：`dt | time.to_string "%Y-%m-%d"`
 fn to_string(
     args: Vec<Expression>,
     env: &mut Environment,
@@ -466,13 +459,15 @@ fn to_string(
             )),
         }
     } else {
-        // Default to RFC3339 format
+        // Default to RFC3339-like format
         Ok(Expression::String(
             dt.format("%Y-%m-%dT%H:%M:%S%.fZ").to_string(),
         ))
     }
 }
+
 // Parsing and Creation Functions
+/// datetime 字符串放在前面，以支持管道：`"2024-01-01" | time.parse "%Y-%m-%d"`
 pub fn parse(
     args: Vec<Expression>,
     env: &mut Environment,
@@ -535,117 +530,44 @@ pub fn parse(
     ))
 }
 
-fn from_map(
-    args: Vec<Expression>,
-    _env: &mut Environment,
-    ctx: &Expression,
-) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("from_map", &args, 1, ctx)?;
-
-    if let Expression::Map(m) = &args[0] {
-        let map = m.as_ref();
-        let year = get_map_value(map, "year", ctx)?.ok_or(RuntimeError::common(
-            "Missing year".into(),
-            ctx.clone(),
-            0,
-        ))? as i32;
-        let month = get_map_value(map, "month", ctx)?.ok_or(RuntimeError::common(
-            "Missing month".into(),
-            ctx.clone(),
-            0,
-        ))? as u32;
-        let day = get_map_value(map, "day", ctx)?.ok_or(RuntimeError::common(
-            "Missing day".into(),
-            ctx.clone(),
-            0,
-        ))? as u32;
-
-        let hour = get_map_value(map, "hour", ctx)?.unwrap_or(0) as u32;
-        let minute = get_map_value(map, "minute", ctx)?.unwrap_or(0) as u32;
-        let second = get_map_value(map, "second", ctx)?.unwrap_or(0) as u32;
-
-        let date = NaiveDate::from_ymd_opt(year, month, day).ok_or(RuntimeError::common(
-            "Invalid date components".into(),
-            ctx.clone(),
-            0,
-        ))?;
-
-        let datetime = date
-            .and_hms_opt(hour, minute, second)
-            .ok_or(RuntimeError::common(
-                "Invalid time components".into(),
-                ctx.clone(),
-                0,
-            ))?;
-
-        Ok(Expression::DateTime(datetime))
-    } else {
-        Err(RuntimeError::common(
-            "a map is required for time.from_map".into(),
-            ctx.clone(),
-            0,
-        ))
-    }
-}
 // Time Arithmetic Functions
+/// `time.add <duration>` — 以当前时间为基准
+/// `time.add <datetime> <duration>` — datetime 在前，以支持管道：`dt | time.add "1h"`
 fn add(
     args: Vec<Expression>,
     env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_args_len("add", &args, 1..=7, ctx)?;
-    let size = &args.len();
+    check_args_len("add", &args, 1..=2, ctx)?;
     let mut it = args.into_iter();
     let a0 = it.next().unwrap();
-    let base_dt = it.next().map_or(Ok(Local::now().naive_local()), |x| {
-        parse_datetime_arg(x, env, ctx)
-    })?;
 
-    let duration = match size - 1 {
-        0 => ChronoDuration::zero(),
-        1 => match a0 {
-            Expression::String(dur) => {
-                let std_duration = parse_duration_string(&dur, ctx)?;
-                ChronoDuration::from_std(std_duration).map_err(|e| {
-                    RuntimeError::common(format!("Invalid duration: {e}").into(), ctx.clone(), 0)
-                })?
-            }
-            Expression::Integer(secs) => ChronoDuration::seconds(secs),
-            e => {
-                return Err(RuntimeError::common(
-                    format!("Invalid duration: {e}").into(),
-                    ctx.clone(),
-                    0,
-                ));
-            }
-        },
-        2.. => {
-            let mut duration = ChronoDuration::zero();
+    let (base_dt, duration_arg) = if let Some(a1) = it.next() {
+        (parse_datetime_arg(a0, env, ctx)?, a1)
+    } else {
+        (Local::now().naive_local(), a0)
+    };
 
-            if let Some(Expression::Integer(secs)) = it.next() {
-                duration += ChronoDuration::seconds(secs);
-            }
-
-            if let Some(Expression::Integer(mins)) = it.next() {
-                duration += ChronoDuration::minutes(mins);
-            }
-
-            if let Some(Expression::Integer(hours)) = it.next() {
-                duration += ChronoDuration::hours(hours);
-            }
-
-            if let Some(Expression::Integer(days)) = it.next() {
-                duration += ChronoDuration::days(days);
-            }
-
-            duration
+    let duration = match duration_arg {
+        Expression::String(dur) => parse_signed_duration(&dur, ctx)?,
+        Expression::Integer(secs) => ChronoDuration::seconds(secs),
+        e => {
+            return Err(RuntimeError::common(
+                format!(
+                    "add expects a duration string (e.g. \"1d2h30m\", \"-1h\") or integer seconds, got {e}"
+                )
+                .into(),
+                ctx.clone(),
+                0,
+            ));
         }
     };
 
-    let result_dt = base_dt + duration;
-    Ok(Expression::DateTime(result_dt))
+    Ok(Expression::DateTime(base_dt + duration))
 }
 
+/// datetime1/datetime2 放在前面，unit 作为最后可选参数：
+/// `time.diff <datetime1> <datetime2> [unit]`
 fn diff(
     args: Vec<Expression>,
     env: &mut Environment,
@@ -653,16 +575,19 @@ fn diff(
 ) -> Result<Expression, RuntimeError> {
     check_args_len("diff", &args, 2..=3, ctx)?;
     let mut it = args.into_iter();
-    let dt1 = it.next().map_or(Ok(Local::now().naive_local()), |x| {
-        parse_datetime_arg(x, env, ctx)
-    })?;
-    let dt2 = it.next().map_or(Ok(Local::now().naive_local()), |x| {
-        parse_datetime_arg(x, env, ctx)
-    })?;
+    let dt1 = parse_datetime_arg(it.next().unwrap(), env, ctx)?;
+    let dt2 = parse_datetime_arg(it.next().unwrap(), env, ctx)?;
 
     let unit = match it.next() {
         Some(Expression::String(s)) => s,
-        _ => "s".to_string(),
+        Some(e) => {
+            return Err(RuntimeError::common(
+                format!("diff expects a unit string, got {e}").into(),
+                ctx.clone(),
+                0,
+            ));
+        }
+        None => "s".to_string(),
     };
 
     let duration = dt2 - dt1;
@@ -681,27 +606,57 @@ fn diff(
 }
 
 // Timezone Functions
+/// `time.timezone <offset_hours> [format_string]` — 以当前时间为基准
+/// `time.timezone <datetime> <offset_hours> [format_string]` — datetime 在前，以支持管道：
+/// `dt | time.timezone 8`
 fn timezone(
     args: Vec<Expression>,
     env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
     check_args_len("timezone", &args, 1..=3, ctx)?;
-
     let mut it = args.into_iter();
+    let a0 = it.next().unwrap();
+    let a1 = it.next();
 
-    let offset_hours = match it.next().unwrap() {
-        Expression::Integer(h) => h,
-        Expression::Float(h) => h.round() as i64,
-        _ => {
-            return Err(RuntimeError::common(
-                "timezone requires offset in hours as first argument".into(),
-                ctx.clone(),
-                0,
-            ));
+    let (base_dt, offset_expr) = match (a0, a1) {
+        // 第二参数存在且是数字：第一参数是 datetime
+        (dt_expr, Some(offset_expr @ (Expression::Integer(_) | Expression::Float(_)))) => {
+            (parse_datetime_arg(dt_expr, env, ctx)?, offset_expr)
+        }
+        // 否则第一参数本身就是 offset，基准为当前时间；此时 a1（若存在）应为 format
+        (offset_expr, format_opt) => {
+            let base_dt = Local::now().naive_local();
+            let offset_hours = match offset_expr {
+                Expression::Integer(h) => h,
+                Expression::Float(h) => h.round() as i64,
+                _ => {
+                    return Err(RuntimeError::common(
+                        "timezone requires offset in hours".into(),
+                        ctx.clone(),
+                        0,
+                    ));
+                }
+            };
+            return apply_timezone(base_dt, offset_hours, format_opt, ctx);
         }
     };
 
+    let offset_hours = match offset_expr {
+        Expression::Integer(h) => h,
+        Expression::Float(h) => h.round() as i64,
+        _ => unreachable!(),
+    };
+
+    apply_timezone(base_dt, offset_hours, it.next(), ctx)
+}
+
+fn apply_timezone(
+    base_dt: NaiveDateTime,
+    offset_hours: i64,
+    format_opt: Option<Expression>,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
     if !(-12..=14).contains(&offset_hours) {
         return Err(RuntimeError::common(
             "Timezone offset must be between -12 and +14 hours".into(),
@@ -714,18 +669,15 @@ fn timezone(
         RuntimeError::common("Invalid timezone offset".into(), ctx.clone(), 0),
     )?;
 
-    let dt = if let Some(a1) = it.next() {
-        let naive = parse_datetime_arg(a1, env, ctx)?;
-        offset.from_utc_datetime(&naive).naive_local()
-    } else {
-        Local::now().with_timezone(&offset).naive_local()
-    };
+    let dt = offset.from_utc_datetime(&base_dt).naive_local();
 
-    if let Some(a2) = it.next()
-        && let Expression::String(format) = a2
-    {
-        return Ok(Expression::String(dt.format(&format).to_string()));
+    match format_opt {
+        Some(Expression::String(format)) => Ok(Expression::String(dt.format(&format).to_string())),
+        Some(e) => Err(RuntimeError::common(
+            format!("timezone expects a format string, got {e}").into(),
+            ctx.clone(),
+            0,
+        )),
+        None => Ok(Expression::DateTime(dt)),
     }
-
-    Ok(Expression::DateTime(dt))
 }

@@ -1,4 +1,5 @@
 use crate::libs::BuiltinInfo;
+use crate::libs::bin::list_lib::get_list_ref;
 use crate::libs::helper::*;
 use crate::libs::lazy_module::LazyModule;
 use crate::utils::unescape_bytes;
@@ -14,7 +15,7 @@ pub fn regist_lazy() -> LazyModule {
         // 基本信息
         len, is_empty,
         // 查找
-        contains, index_of, starts_with, ends_with,
+        contains, position, starts_with, ends_with,
         // 切片/拼接
         slice, concat, repeat,
         // 结构修改
@@ -27,39 +28,39 @@ pub fn regist_lazy() -> LazyModule {
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
     reg_info!({
         // 构造/转换
-        from => "create bytes from a string (utf8) or list of integers", "<string|list>"
-        from_hex => "create bytes from a hex string", "<hex_string>"
-        from_base64 => "create bytes from a base64 string", "<base64_string>"
-        from_list => "create bytes from a list of integers(0-255)", "<list>"
-        from_escaped => "create bytes from escaped text", "<string>"
+        from => "bytes from utf8 string", "<string>"
+        from_hex => "bytes from hex string, '0x' prefix ok", "<hex_string>"
+        from_base64 => "bytes from base64 string", "<base64_string>"
+        from_list => "bytes from int(0-255) list", "<list>"
+        from_escaped => "bytes from escaped text. e.g. '\\n\\x41'", "<string>"
 
-        to_string => "convert bytes to a utf8 string (lossy)", "<bytes>"
-        to_hex => "convert bytes to a hex string", "<bytes>"
-        to_base64 => "convert bytes to a base64 string", "<bytes>"
-        to_list => "convert bytes to a list of integers", "<bytes>"
+        to_string => "to utf8 string (lossy)", "<bytes>"
+        to_hex => "to hex string", "<bytes>"
+        to_base64 => "to base64 string", "<bytes>"
+        to_list => "to list of int(0-255)", "<bytes>"
 
         // 基本信息
-        len => "get length of bytes", "<bytes>"
-        is_empty => "check if bytes is empty", "<bytes>"
+        len => "byte length", "<bytes>"
+        is_empty => "is empty?", "<bytes>"
 
         // 查找
-        contains => "check if bytes contains a sub-byte-sequence", "<bytes> <bytes>"
-        index_of => "find index of a sub-byte-sequence, -1 if not found", "<bytes> <bytes>"
-        starts_with => "check if bytes starts with a prefix", "<bytes> <bytes>"
-        ends_with => "check if bytes ends with a suffix", "<bytes> <bytes>"
+        contains => "contains sub-sequence?", "<bytes> <bytes>"
+        position => "index of sub-sequence, -1 if absent", "<bytes> <bytes>"
+        starts_with => "starts with prefix?", "<bytes> <bytes>"
+        ends_with => "ends with suffix?", "<bytes> <bytes>"
 
         // 切片/拼接
-        slice => "get a slice of bytes by start,end index", "<bytes> <start> <end>"
+        slice => "sub-bytes [start,end)", "<bytes> <start> <end>"
         concat => "concat two bytes", "<bytes> <bytes>"
-        repeat => "repeat bytes n times", "<bytes> <n>"
+        repeat => "repeat n times", "<bytes> <n>"
 
         // 结构修改
-        push => "append a byte(int 0-255) to bytes, return new bytes", "<bytes> <int>"
-        pop => "remove the last byte, return new bytes", "<bytes>"
+        push => "append byte(0-255), returns new bytes", "<bytes> <int>"
+        pop => "drop last byte, returns new bytes", "<bytes>"
         reverse => "reverse bytes", "<bytes>"
 
         // 分割
-        split => "split bytes by a byte separator(int 0-255)", "<bytes> <int>"
+        split => "split by byte value(0-255)", "<bytes> <int>"
     })
 }
 
@@ -71,44 +72,34 @@ fn from(
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
     check_exact_args_len("from", &args, 1, ctx)?;
-    let v = match args.pop().unwrap() {
-        Expression::String(s) | Expression::Symbol(s) => s.into_bytes(),
-        Expression::List(list) => list
-            .iter()
-            .map(|item| match item {
-                Expression::Integer(i) if (0..=255).contains(i) => Ok(*i as u8),
-                other => Err(RuntimeError::new(
-                    RuntimeErrorKind::TypeError {
-                        expected: "Integer(0-255)".into(),
-                        found: other.type_name(),
-                        sym: other.to_string(),
-                    },
-                    ctx.clone(),
-                    0,
-                )),
-            })
-            .collect::<Result<Vec<u8>, _>>()?,
-        other => {
-            return Err(RuntimeError::new(
+    let s = get_string_arg(args.pop().unwrap(), ctx)?;
+    Ok(Expression::Bytes(s.into_bytes()))
+}
+
+fn from_list(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("from_list", &args, 1, ctx)?;
+    let list = get_list_ref(&args[0], ctx)?;
+    let v = list
+        .iter()
+        .map(|item| match item {
+            Expression::Integer(i) if (0..=255).contains(i) => Ok(*i as u8),
+            other => Err(RuntimeError::new(
                 RuntimeErrorKind::TypeError {
-                    expected: "String/List".into(),
+                    expected: "Integer(0-255)".into(),
                     found: other.type_name(),
                     sym: other.to_string(),
                 },
                 ctx.clone(),
                 0,
-            ));
-        }
-    };
-    Ok(Expression::Bytes(v))
-}
+            )),
+        })
+        .collect::<Result<Vec<u8>, _>>()?;
 
-fn from_list(
-    args: Vec<Expression>,
-    env: &mut Environment,
-    ctx: &Expression,
-) -> Result<Expression, RuntimeError> {
-    from(args, env, ctx)
+    Ok(Expression::Bytes(v))
 }
 
 fn from_hex(
@@ -290,7 +281,7 @@ fn contains(
     ))
 }
 
-fn index_of(
+fn position(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,

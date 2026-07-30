@@ -31,41 +31,41 @@ pub fn regist_lazy() -> LazyModule {
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
     reg_info!({
         // 检查操作
-        contains => "check if set contains item", "<set> <item>"
-        is_empty => "check if set is empty", "<set>"
-        any => "test if any element passes condition", "<set> <fn>"
-        all => "test if all elements pass condition", "<set> <fn>"
+        contains => "contains item?", "<set> <item>"
+        is_empty => "is empty?", "<set>"
+        any => "any item passes fn(item)->bool?", "<set> <fn>"
+        all => "all items pass fn(item)->bool?", "<set> <fn>"
 
         // 数据获取
-        first => "get first item of set", "<set>"
-        last => "get last item of set", "<set>"
-        len => "get size of set", "<set>"
+        first => "smallest item", "<set>"
+        last => "largest item", "<set>"
+        len => "set size", "<set>"
 
         // 查找
-        find => "find first item matching condition", "<set> <predicate_fn>"
-        filter => "filter set by condition", "<set> <predicate_fn>"
+        find => "first item matching fn(item)->bool", "<set> <fn>"
+        filter => "keep items where fn(item)->bool", "<set> <fn>"
 
         // 结构修改
-        insert => "add item to set", "<set> <item>"
-        remove => "remove item from set", "<set> <item>"
-        split_first => "split at head", "<set>"
-        split_last => "split at tail", "<set>"
+        insert => "add item, returns new set", "<set> <item>"
+        remove => "remove item, returns new set", "<set> <item>"
+        split_first => "pop smallest, returns [item,rest]", "<set>"
+        split_last => "pop largest, returns [item,rest]", "<set>"
 
         // 创建操作
-        from_list => "create set from list", "<items>"
+        from_list => "create set from list", "<list>"
 
         // 集合运算
-        union => "union of two sets", "<set1> <set2>"
-        intersection => "intersection of two sets", "<set1> <set2>"
-        difference => "difference of two sets", "<set1> <set2>"
-        symmetric_difference => "symmetric_difference of two sets", "<set1> <set2>"
-        is_subset => "check if set1 is subset of set2", "<set1> <set2>"
-        is_superset => "check if set1 is superset of set2", "<set1> <set2>"
-        is_disjoint => "check if two sets never intersect", "<set1> <set2>"
+        union => "union", "<set1> <set2>"
+        intersection => "intersection", "<set1> <set2>"
+        difference => "items in set1 not in set2", "<set1> <set2>"
+        symmetric_difference => "items in either but not both", "<set1> <set2>"
+        is_subset => "set1 ⊆ set2?", "<set1> <set2>"
+        is_superset => "set1 ⊇ set2?", "<set1> <set2>"
+        is_disjoint => "no common items?", "<set1> <set2>"
 
         // 转换操作
-        map => "apply function to each item", "<set> <fn>"
-        to_list => "convert set to list", "<set>"
+        map => "apply fn(item)->new_item to each", "<set> <fn>"
+        to_list => "to list, sorted order", "<set>"
     })
 }
 

@@ -61,23 +61,28 @@ pub fn regist_lazy() -> LazyModule {
         choose, shuffle, sample,
     })
 }
+
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
     reg_info!({
         // 可复现性
-        seed => "seed the random generator for reproducible sequences", "<integer>"
+        seed => "seed generator for reproducible sequence", "<integer>"
+
         // 概率函数
-        chance => "get a bool with given probability (0.0~1.0), defaults to 0.5", "[probability]"
-        ratio => "get a bool with probability numerator/denominator", "<numerator> <denominator>"
+        chance => "random bool with probability p", "[p=0.5]"
+        ratio => "random bool with probability num/den", "<num> <den>"
+
         // 随机字符串生成
-        alpha => "get random alphabetic character(s)", "[length]"
-        alphanum => "get random alphanumeric string", "[length]"
+        alpha => "random alphabetic char(s)", "[len=1]"
+        alphanum => "random alphanumeric char(s)", "[len=1]"
+
         // 数值随机
-        int => "get random integer in range (exclusive upper bound)", "[min] [max]"
-        float => "get random float in [0,1), or in [min,max) if given", "[min] [max]"
+        int => "random integer. no args: any i64; 1 arg: [0,max]; 2 args: [min,max)", "[min] [max]"
+        float => "random float. no args: [0,1); 2 args: [min,max)", "[min] [max]"
+
         // 集合操作
-        choose => "choose random item from collection", "<list>"
-        shuffle => "randomly shuffle collection items", "<list>"
-        sample => "randomly pick n distinct elements from list without replacement", "<list> <n>"
+        choose => "pick random item", "<list>"
+        shuffle => "shuffle order, returns new list", "<list>"
+        sample => "pick n distinct items, no replacement", "<list> <n>"
     })
 }
 

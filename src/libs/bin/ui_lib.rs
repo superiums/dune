@@ -28,21 +28,20 @@ pub fn regist_lazy() -> LazyModule {
 
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
     reg_info!({
-        int => "read an int from input", "<msg>"
-        float => "read a float from input", "<msg> [decimal_places]"
-        text => "read a text input ", "<msg> [initValue]"
-        password => "read a password input", "<msg> [confirm?]"
-        confirm => "ask user to confirm", "<msg>"
-        pick => "select one from list/string", "<list|items...> [msg|cfg_map]"
-        multi_pick => "select multi from list/string", "<list|items...> [msg|cfg_map]"
-        date_pick => "pick a date from calendar", "[msg|cfg_map]"
-        editor => "open editor for multiline text input", "[msg|cfg_map]"
+        int => "read an int", "<msg>"
+        float => "read a float", "<msg> [decimal_places=2]"
+        text => "read text", "<msg> [init_value]"
+        password => "read password, masked", "<msg> [confirm=false]"
+        confirm => "ask yes/no", "<msg>"
+        pick => "select one from list/set/range/map/table/glob/string.\ncfg: {msg,page_size,vim_mode,formatter,scorer,sorter...}", "<options> [msg|cfg_map]"
+        multi_pick => "select multi, same options/cfg as pick.\ncfg Adds: {all_selected_by_default,keep_filter,validator}", "<options> [msg|cfg_map]"
+        date_pick => "pick a date.\ncfg: {msg,starting_date,min_date,max_date,week_start,formatter,validator}", "[msg|cfg_map]"
+        editor => "open external editor for multiline text.\ncfg: {msg,predefined_text,editor_command,validators...}", "[msg|cfg_map]"
 
-        widget => "create a text widget","<content> <title> [width] [height]"
-        joinx => "join two widgets horizontally","<widget1> <widget2>"
-        joiny => "join two widgets vertically","<widget1> <widget2>"
-        join_flow => "join widgets with flow layout","<max_width> <widgets...>"
-
+        widget => "draw a bordered text box", "<content> <title> [width] [height]"
+        joinx => "join two widgets side by side", "<widget1> <widget2>"
+        joiny => "stack two widgets vertically", "<widget1> <widget2>"
+        join_flow => "flow-wrap widgets into rows", "<max_width> <widgets...>"
     })
 }
 

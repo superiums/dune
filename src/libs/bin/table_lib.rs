@@ -24,35 +24,37 @@ pub fn regist_lazy() -> LazyModule {
         to_csv
     })
 }
+
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
     reg_info!({
-        len => "count rows", "<table>"
-        header_len => "count headers", "<table>"
-        get_column => "get column by header/index", "<table> <header|index>"
+        len => "row count", "<table>"
+        header_len => "column count", "<table>"
+        get_column => "column by header/index", "<table> <header|index>"
         select => "select columns", "<table> <cols...>"
         headers => "list headers", "<table>"
-        rows_map => "list rows as maps", "<table>"
-        first_map => "get first n row as maps", "<table> [n]"
-        last_map => "get last n row as maps", "<table> [n]"
-        get_map => "get nth row as map", "<table> <index>"
-        rows => "list rows as lists", "<table>"
-        first => "get first n row as lists", "<table> [n]"
-        last => "get last n row as lists", "<table> [n]"
-        get => "get nth row as list", "<table> <index>"
-        grep => "grep rows which contains the string", "<table> <string>"
-        position => "find first row_index of matching cell", "<table> <cell|fn> [start_index]"
-        rposition => "find last row_index of matching cell", "<table> <cell|fn> [start_index]"
-        filter => "filter rows by condition/cell match", "<table> <cell|fn>"
-        sort_by => "sort a table by column", "<table> <col>"
+
+        rows_map => "rows as maps", "<table>"
+        first_map => "first n rows as maps", "<table> [n=1]"
+        last_map => "last n rows as maps", "<table> [n=1]"
+        get_map => "nth row as map", "<table> <index>"
+        rows => "rows as lists", "<table>"
+        first => "first n rows as lists", "<table> [n=1]"
+        last => "last n rows as lists", "<table> [n=1]"
+        get => "nth row as list", "<table> <index>"
+
+        grep => "rows containing string", "<table> <string>"
+        position => "first row index matching cell/fn(row_map)->bool", "<table> <cell|fn> [start=0]"
+        rposition => "last row index matching cell/fn(row_map)->bool", "<table> <cell|fn> [start=0]"
+        filter => "filter rows by cell/fn(row_map)->bool", "<table> <cell|fn>"
+        sort_by => "sort by column", "<table> <col>"
         push => "append a row", "<table> <list|set>"
 
-        is_empty => "check if table has no rows", "<table>"
-        get_cell => "get single cell value by row index and column header/index", "<table> <row_index> <header|index>"
-        slice => "get a row range as maps, support negative index", "<table> <start> <end>"
-        from_maps => "build a table from a list of maps, using union of all keys as headers", "<list_of_maps>"
+        is_empty => "has no rows?", "<table>"
+        get_cell => "single cell, negative row index ok", "<table> <row_index> <header|index>"
+        slice => "row range as maps [start,end), negative index ok", "<table> <start> <end>"
+        from_maps => "build table from maps, headers = union of keys", "<list_of_maps>"
 
         to_csv => "serialize to CSV", "<table>"
-
     })
 }
 

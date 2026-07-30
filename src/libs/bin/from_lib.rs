@@ -28,23 +28,22 @@ pub fn regist_lazy() -> LazyModule {
         jq,
     })
 }
+
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
     reg_info!({
-
         // 数据格式解析
-        toml => "parse TOML into lumesh expression", "<toml_string>"
-        json => "parse JSON into lumesh expression", "<json_string>"
-        csv => "parse CSV into lumesh expression", "<csv_string>"
+        toml => "parse TOML string", "<toml_string>"
+        json => "parse JSON string", "<json_string>"
+        csv => "parse CSV string, headers row required", "<csv_string>"
 
         // 表达式解析
-        script => "parse script str to lumesh expression", "<script_string>"
+        script => "parse script text to expression (unevaluated)", "<script_string>"
 
         // 命令输出解析
-        cmd => "parse command output into structured data", "<cmd_output_string> [headers|header...]"
+        cmd => "parse cmd output into table", "<output> [split_regex] [headers...]"
 
         // 数据查询
-        jq => "Apply jq-like query to JSON or TOML data", "<query_string> <json_data>"
-
+        jq => "jq-like query on json string. e.g. '.a|.[]|select(.n>1)'", "<json_string> <query_string>"
     })
 }
 
@@ -318,8 +317,8 @@ fn jq(
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
     check_exact_args_len("jq", &args, 2, ctx)?;
-    let query = &args[0];
-    let input = &args[1];
+    let input = &args[0];
+    let query = &args[1];
 
     let json_value = match input {
         Expression::String(s) => s.parse::<JsonValue>().map_err(|e| {

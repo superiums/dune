@@ -36,45 +36,45 @@ pub fn regist_lazy() -> LazyModule {
         print_tty, discard
     })
 }
+
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
     reg_info!({
         // Console information
-        width => "get the width of the console", ""
-        height => "get the height of the console", ""
+        width => "console width", ""
+        height => "console height", ""
 
         // Output control
-        write => "write text to a specific position in the console", "<text> <x> <y>"
-        title => "set the title of the console", "<string>"
-        clear => "clear the console", ""
-        flush => "flush the console", ""
-        bell => "ring the terminal bell", ""
+        write => "write text at position", "<text> <x> <y>"
+        title => "set console title", "<string>"
+        clear => "clear console", ""
+        flush => "flush stdout", ""
+        bell => "ring terminal bell", ""
 
         // Mode control
-        raw_mode => "get/set raw_mode", "[bool]"
-        alt_screen => "enable/disable alternate screen", "<bool>"
+        raw_mode => "get/set raw mode", "[bool]"
+        alt_screen => "enter/leave alternate screen", "<bool>"
         line_wrap => "enable/disable line wrap", "<bool>"
 
         // Cursor control
-        cursor_to => "move the cursor to a specific position", "<x> <y>"
-        cursor_up => "move the cursor up", "<n>"
-        cursor_down => "move the cursor down", "<n>"
-        cursor_left => "move the cursor left", "<n>"
-        cursor_right => "move the cursor right", "<n>"
+        cursor_to => "move cursor to position", "<x> <y>"
+        cursor_up => "move cursor up n rows", "<n>"
+        cursor_down => "move cursor down n rows", "<n>"
+        cursor_left => "move cursor left n cols", "<n>"
+        cursor_right => "move cursor right n cols", "<n>"
         cursor_save => "save cursor position", ""
         cursor_restore => "restore cursor position", ""
         cursor_hide => "hide cursor", ""
         cursor_show => "show cursor", ""
 
         // Input control
-        read_line => "read line from keyboard", "[prompt]"
-        read_password => "read password from keyboard", "[prompt]"
-        read_key => "read key from keyboard", ""
-        keys => "list keys", ""
+        read_line => "read line from stdin", "[prompt]"
+        read_password => "read password, masked", "[prompt]"
+        read_key => "read one key, enters raw mode temporarily. e.g. 'enter','f1','a'", ""
+        keys => "list special key names", ""
 
         // Output control
-        print_tty => "print control sequence to tty", "<arg>"
-        discard => "send data to /dev/null", "<arg>"
-
+        print_tty => "write raw text directly to tty, bypass pipes", "<text>"
+        discard => "no-op, discards args", "<args>..."
     })
 }
 

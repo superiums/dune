@@ -35,6 +35,23 @@ pub fn parse_ls_args(
     // dbg!(args);
     for arg in args {
         if let Expression::Symbol(s) | Expression::String(s) = arg {
+            if s.starts_with("--help") {
+                {
+                    println!(
+                        "-l: detailed
+                        -a: show hidden
+                        -h: human readable
+                        -t: unix time
+                        -L: follow links
+                        -c: show create time
+                        -u: show user
+                        -g: show group
+                        -m: show mode
+                        -p: show path
+                        "
+                    );
+                }
+            }
             match s.strip_prefix("-") {
                 Some(opt) => {
                     for char in opt.chars() {
@@ -51,6 +68,7 @@ pub fn parse_ls_args(
                             'g' => options.show_group = true,
                             'm' => options.show_mode = true,
                             'p' => options.show_path = true,
+
                             other => {
                                 return Err(RuntimeError::common(
                                     format!("unkown option for fs.ls: `{}`", other).into(),

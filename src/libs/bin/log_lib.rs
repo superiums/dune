@@ -24,19 +24,19 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
 
         // 日志级别控制
         level => "get/set the log level", "[int]"
-        enable => "enable log level/all", "[int]"
-        disable => "disable all logging output", ""
-        is_enabled => "check if a log level is enabled", "<level>"
+        enable => "enable all log, or level", "[int]"
+        disable => "disable all log", ""
+        is_enabled => "log level is enabled?", "<level>"
 
         // 日志记录函数
-        info => "log info message", "<message>"
-        warn => "log warning message", "<message>"
-        debug => "log debug message", "<message>"
-        error => "log error message", "<message>"
-        trace => "log trace message", "<message>"
+        info => "log info", "<msg>"
+        warn => "log warning", "<msg>"
+        debug => "log debug", "<msg>"
+        error => "log error", "<msg>"
+        trace => "log trace", "<msg>"
 
         // 原始输出
-        echo => "print message without formatting", "<message>"
+        echo => "print message without formatting", "<msg>"
     })
 }
 

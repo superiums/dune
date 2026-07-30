@@ -18,11 +18,11 @@ pub fn regist_lazy() -> LazyModule {
 }
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
     reg_info!({
-        version => "print version",""
-        bin => "print bin path",""
-        prelude => "print prelude path",""
-        history => "print history path",""
-        info => "print all info",""
+        version => "version",""
+        bin => "bin path",""
+        prelude => "prelude path",""
+        history => "history path",""
+        info => "all info",""
     })
 }
 
