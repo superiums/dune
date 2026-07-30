@@ -1,14 +1,10 @@
-use regex_lite::Regex;
-
 use crate::{
-    Environment, Expression, Int, RuntimeError, RuntimeErrorKind,
+    Environment, Expression, Int, RuntimeError,
     expression::FileSize,
-    libs::{BuiltinInfo, helper::check_exact_args_len, lazy_module::LazyModule},
+    libs::{BuiltinInfo, bin::into_lib, helper::check_exact_args_len, lazy_module::LazyModule},
     reg_info, reg_lazy,
 };
-use std::{collections::BTreeMap, sync::OnceLock};
-
-static FSIZE_RE: OnceLock<Regex> = OnceLock::new();
+use std::collections::BTreeMap;
 
 pub fn regist_lazy() -> LazyModule {
     reg_lazy!({
@@ -30,48 +26,12 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
 }
 
 fn from(
-    mut args: Vec<Expression>,
-    _env: &mut Environment,
+    args: Vec<Expression>,
+    env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
     check_exact_args_len("from", &args, 1, ctx)?;
-    let s = match args.pop().unwrap() {
-        Expression::String(s) => {
-            // 使用正则表达式来匹配数字和单位
-            let re = FSIZE_RE.get_or_init(|| Regex::new(r"(\d+)([KMGT]?)B?").unwrap());
-
-            if let Some(caps) = re.captures(&s) {
-                // 提取数字部分并转换为u64
-                let number = caps[1]
-                    .parse::<u64>()
-                    .map_err(|e| RuntimeError::common(e.to_string().into(), ctx.clone(), 0))?;
-                // 提取单位部分并转换为String
-                let unit = caps[2].as_ref();
-                FileSize::from(number, unit)
-            } else {
-                return Err(RuntimeError::common(
-                    format!("invalid Filesize string: `{s}`").into(),
-                    ctx.clone(),
-                    0,
-                ));
-            }
-        }
-        Expression::Integer(i) => FileSize::from_bytes(i as u64),
-        Expression::FileSize(r) => r,
-        other => {
-            return Err(RuntimeError::new(
-                RuntimeErrorKind::TypeError {
-                    expected: "String/Integer as Filesize".into(),
-                    found: other.type_name(),
-                    sym: other.to_string(),
-                },
-                ctx.clone(),
-                0,
-            ));
-        }
-    };
-
-    Ok(Expression::FileSize(s))
+    into_lib::filesize(args, env, ctx)
 }
 
 fn b(
