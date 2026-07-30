@@ -178,26 +178,12 @@ pub fn max(
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    // let nums = args_collect_iter(args, env, ctx)?;
-    let mut max_val_int: Option<i64> = None;
-    let mut max_val_float: Option<f64> = None;
+    let mut best: Option<Expression> = None;
 
     for num in args {
-        match num {
-            Expression::Integer(i) => {
-                if let Some(current_max) = max_val_int {
-                    max_val_int = Some(current_max.max(i));
-                } else {
-                    max_val_int = Some(i);
-                }
-            }
-            Expression::Float(f) => {
-                if let Some(current_max) = max_val_float {
-                    max_val_float = Some(current_max.max(f));
-                } else {
-                    max_val_float = Some(f);
-                }
-            }
+        let val = match &num {
+            Expression::Integer(i) => *i as f64,
+            Expression::Float(f) => *f,
             _ => {
                 return Err(RuntimeError::common(
                     "max requires numeric arguments".into(),
@@ -205,19 +191,21 @@ pub fn max(
                     0,
                 ));
             }
+        };
+
+        let replace = match &best {
+            Some(Expression::Integer(bi)) => val > *bi as f64,
+            Some(Expression::Float(bf)) => val > *bf,
+            Some(_) => unreachable!(),
+            None => true,
+        };
+
+        if replace {
+            best = Some(num);
         }
     }
 
-    match max_val_float {
-        Some(m_float) => match max_val_int {
-            Some(m) => Ok(Expression::Float(m_float.max(m as f64))),
-            None => Ok(Expression::Float(m_float)),
-        },
-        None => match max_val_int {
-            Some(m) => Ok(Expression::Integer(m)),
-            None => Ok(Expression::None),
-        },
-    }
+    Ok(best.unwrap_or(Expression::None))
 }
 
 pub fn min(
@@ -225,24 +213,12 @@ pub fn min(
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    let mut min_val: Option<f64> = None;
+    let mut best: Option<Expression> = None;
 
     for num in args {
-        match num {
-            Expression::Integer(i) => {
-                if let Some(current_min) = min_val {
-                    min_val = Some(current_min.min(i as f64));
-                } else {
-                    min_val = Some(i as f64);
-                }
-            }
-            Expression::Float(f) => {
-                if let Some(current_min) = min_val {
-                    min_val = Some(current_min.min(f));
-                } else {
-                    min_val = Some(f);
-                }
-            }
+        let val = match &num {
+            Expression::Integer(i) => *i as f64,
+            Expression::Float(f) => *f,
             _ => {
                 return Err(RuntimeError::common(
                     "min requires numeric arguments".into(),
@@ -250,42 +226,48 @@ pub fn min(
                     0,
                 ));
             }
+        };
+
+        let replace = match &best {
+            Some(Expression::Integer(bi)) => val < *bi as f64,
+            Some(Expression::Float(bf)) => val < *bf,
+            Some(_) => unreachable!(),
+            None => true,
+        };
+
+        if replace {
+            best = Some(num);
         }
     }
 
-    match min_val {
-        Some(m) => Ok(Expression::Float(m)),
-        None => Ok(Expression::None),
-    }
+    Ok(best.unwrap_or(Expression::None))
 }
-
 fn clamp(
     args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
     check_exact_args_len("clamp", &args, 3, ctx)?;
-    let value = get_float_arg(&args[0], ctx)?;
-    let min_val = get_float_arg(&args[1], ctx)?;
-    let max_val = get_float_arg(&args[2], ctx)?;
 
-    if min_val > max_val {
-        return Err(RuntimeError::common(
-            "clamp min must be <= max".into(),
-            ctx.clone(),
-            0,
-        ));
-    }
+    let value_f = get_float_arg(&args[0], ctx)?;
+    let min_f = get_float_arg(&args[1], ctx)?;
+    let max_f = get_float_arg(&args[2], ctx)?;
 
-    let result = if value < min_val {
-        min_val
-    } else if value > max_val {
-        max_val
+    let (min_f, max_f) = if min_f <= max_f {
+        (min_f, max_f)
     } else {
-        value
+        (max_f, min_f)
     };
 
-    Ok(Expression::Float(result))
+    let result = if value_f < min_f {
+        args[1].clone()
+    } else if value_f > max_f {
+        args[2].clone()
+    } else {
+        args[0].clone()
+    };
+
+    Ok(result)
 }
 // Bitwise Operations
 fn bit_and(
