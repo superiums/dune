@@ -70,7 +70,7 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         merge => "deep merge maps, recurse on nested maps", "<map1> <map2> [<map3>...]"
 
         // 转换操作
-        map => "transform keys/values, fn_k(k)->k', fn_v(v)->v'", "<map> <key_fn> <val_fn>"
+        map => "transform keys/values, fn(k,v)->[k,v]", "<map> <map_fn>"
         to_list => "to list of [k,v] pairs", "<map>"
         to_hmap => "to hashMap (unordered)", "<map>"
     })
@@ -456,26 +456,47 @@ fn map(
     env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("map", &args, 3, ctx)?;
+    check_exact_args_len("map", &args, 2, ctx)?;
 
-    let key_func = &args[1];
-    let val_func = &args[2];
-    check_fn_arg(key_func, 1, ctx)?;
-    check_fn_arg(val_func, 1, ctx)?;
+    let map_fn = &args[1];
+
+    check_fn_arg(map_fn, 2, ctx)?;
+
     let map = get_map_ref(&args[0], ctx)?;
-
-    let items = map
-        .iter()
-        .map(|(k, v)| vec![Expression::String(k.clone()), v.clone()])
-        .collect::<Vec<_>>();
 
     let mut new_map = BTreeMap::new();
     let mut state = State::new();
-    for it in items {
-        let new_k = key_func.eval_apply(key_func, &[it[0].clone()], &mut state, env, 0)?;
-        let new_v = val_func.eval_apply(key_func, &[it[1].clone()], &mut state, env, 0)?;
-
-        new_map.insert(new_k.to_string(), new_v);
+    for (k, v) in map.iter() {
+        let new_kv = map_fn.eval_apply(
+            map_fn,
+            &[Expression::String(k.clone()), v.clone()],
+            &mut state,
+            env,
+            0,
+        )?;
+        match new_kv {
+            Expression::List(ls) => {
+                new_map.insert(
+                    ls.get(0).map_or(k.clone(), |nk| nk.to_string()),
+                    ls.get(1).cloned().unwrap_or(Expression::None),
+                );
+            }
+            Expression::BSet(ls) => {
+                new_map.insert(
+                    ls.first().map_or(k.clone(), |nk| nk.to_string()),
+                    ls.last().cloned().unwrap_or(Expression::None),
+                );
+            }
+            Expression::Map(nm) => new_map.extend(nm.as_ref().clone()),
+            Expression::HMap(nm) => new_map.extend(nm.as_ref().clone()),
+            _ => {
+                return Err(RuntimeError::common(
+                    "map fn should return List/Map".into(),
+                    ctx.clone(),
+                    0,
+                ));
+            }
+        }
     }
 
     Ok(Expression::from(new_map))
