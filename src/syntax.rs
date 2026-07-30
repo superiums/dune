@@ -99,6 +99,17 @@ pub fn highlight(line: &str, theme: &HashMap<String, String>) -> String {
                     result.push_str(s);
                 }
             }
+            (TokenKind::Radix, s) => {
+                if let Diagnostic::InvalidNumber(e) = diagnostic {
+                    result.push_str(get_color("number_error", theme));
+                    result.push_str(e.to_str(line));
+                    is_colored = true;
+                } else {
+                    result.push_str(get_color("radix", theme));
+                    is_colored = true;
+                    result.push_str(s);
+                }
+            }
             (TokenKind::FloatLiteral, s) => {
                 if let Diagnostic::InvalidNumber(e) = diagnostic {
                     result.push_str(get_color("number_error", theme));
@@ -241,6 +252,7 @@ pub fn get_dark_theme() -> HashMap<String, String> {
         String::from("number_literal") => "\x1b[38;5;209m".to_string(),    // 橙色 (#D19A66)
         String::from("number_error") => "\x1b[38;5;196m".to_string(),      // 亮红色
         String::from("integer_literal") => "\x1b[38;5;215m".to_string(),   // 金橙色
+        String::from("radix") => "\x1b[38;5;218m".to_string(),
         String::from("float_literal") => "\x1b[38;5;221m".to_string(),     // 黄色
 
         // 符号和标识符
@@ -310,6 +322,7 @@ pub fn get_ayu_dark_theme() -> HashMap<String, String> {
         String::from("number_literal") => "\x1b[38;5;215m".to_string(),    // 黄色 (#FFEE99)
         String::from("number_error") => "\x1b[38;5;196m".to_string(),      // 亮红色
         String::from("integer_literal") => "\x1b[38;5;221m".to_string(),   // 金黄色
+        String::from("radix") => "\x1b[38;5;224m".to_string(),
         String::from("float_literal") => "\x1b[38;5;228m".to_string(),     // 淡黄色
 
         // 符号和标识符
@@ -380,6 +393,7 @@ pub fn get_light_theme() -> HashMap<String, String> {
         String::from("number_literal") => "\x1b[38;5;130m".to_string(),    // 深黄色 (#A37ACC)
         String::from("number_error") => "\x1b[38;5;160m".to_string(),      // 深红色
         String::from("integer_literal") => "\x1b[38;5;136m".to_string(),   // 棕黄色
+        String::from("radix") => "\x1b[38;5;139m".to_string(),
         String::from("float_literal") => "\x1b[38;5;142m".to_string(),     // 橄榄色
 
         // 符号和标识符

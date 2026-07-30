@@ -145,7 +145,8 @@ fn parse_token_dispatch(
 
         '_' => underscore_dispatch(input, ctx), // standalone _ vs _ in symbol
 
-        '0'..='9' => number_literal(input),
+        '0' => radix_literal(input),
+        '1'..='9' => number_literal(input),
 
         'a'..='z' | 'A'..='Z' => alpha_dispatch(input, ctx, last_ctx, first, is_cfm), // keyword / value_symbol / string / symbol
 
@@ -1015,6 +1016,46 @@ fn ip_literal(input: Input<'_>) -> TokenizationResult<'_, (Token, Diagnostic)> {
     }
 }
 
+fn radix_literal(input: Input<'_>) -> TokenizationResult<'_, (Token, Diagnostic)> {
+    let radix_specs: [(&str, fn(char) -> bool); 3] = [
+        ("0b", |c: char| c == '0' || c == '1'),
+        ("0o", |c: char| c.is_digit(8)),
+        ("0x", |c: char| c.is_ascii_hexdigit()),
+    ];
+
+    for (prefix, is_digit) in radix_specs {
+        if let Some((after_prefix, _)) = input.strip_prefix(prefix) {
+            let places = after_prefix
+                .chars()
+                .take_while(|&c| is_digit(c) || c == '_')
+                .count();
+
+            let (remain, _) = after_prefix.split_at(places);
+            let (remain, number) = input.split_until(remain);
+
+            if places == 0 {
+                // 前缀后没有合法数字
+                return Ok((
+                    remain,
+                    (
+                        Token::new(TokenKind::Radix, number),
+                        Diagnostic::InvalidNumber(number),
+                    ),
+                ));
+            }
+
+            return Ok((
+                remain,
+                (
+                    Token::new(TokenKind::Radix, number), // 整体 token 含 "0x..","0b..","0o.."
+                    Diagnostic::Valid,
+                ),
+            ));
+        }
+    }
+    number_literal(input)
+}
+
 fn number_literal(input: Input<'_>) -> TokenizationResult<'_, (Token, Diagnostic)> {
     // First, try to parse as an IP address (e.g., 192.168.0.1)
     if let Ok(res) = ip_literal(input) {
@@ -1028,7 +1069,7 @@ fn number_literal(input: Input<'_>) -> TokenizationResult<'_, (Token, Diagnostic
     }
     // skip leading digits
     let digit_start = i;
-    while i < bytes.len() && bytes[i].is_ascii_digit() {
+    while i < bytes.len() && (bytes[i].is_ascii_digit() || bytes[i] == b'_') {
         i += 1;
     }
     if i == digit_start {
@@ -1052,7 +1093,7 @@ fn number_literal(input: Input<'_>) -> TokenizationResult<'_, (Token, Diagnostic
     if has_tailing_dot {
         i += 1;
         let frac_start = i;
-        while i < bytes.len() && bytes[i].is_ascii_digit() {
+        while i < bytes.len() && (bytes[i].is_ascii_digit() || bytes[i] == b'_') {
             i += 1;
         }
         if i == frac_start {

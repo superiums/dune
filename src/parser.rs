@@ -465,6 +465,7 @@ impl PrattParser {
             TokenKind::Bytes if PREC_LITERAL >= min_prec => parse_bytes(input),
             TokenKind::IntegerLiteral if PREC_LITERAL >= min_prec => parse_integer(input),
             TokenKind::FloatLiteral if PREC_LITERAL >= min_prec => parse_float(input),
+            TokenKind::Radix if PREC_LITERAL >= min_prec => parse_radix(input),
             TokenKind::ValueSymbol if PREC_LITERAL >= min_prec => parse_value_symbol(input),
             TokenKind::Regex if PREC_LITERAL >= min_prec => parse_regex(input),
             TokenKind::Time if PREC_LITERAL >= min_prec => parse_time(input),
@@ -1627,6 +1628,7 @@ fn parse_literal(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErr
         parse_value_symbol,
         parse_regex,
         parse_time,
+        parse_radix,
     ))(input)
 }
 
@@ -1886,6 +1888,7 @@ fn parse_integer(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErr
     let (input, num) = kind(TokenKind::IntegerLiteral)(input)?;
     let num = num
         .to_str(input.str)
+        .replace('_', "")
         .parse::<Int>()
         .map_err(|e| SyntaxErrorKind::failure(num, "Integer", Some(format!("error: {e}")), None))?;
     Ok((input, Expression::Integer(num)))
@@ -1893,15 +1896,44 @@ fn parse_integer(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErr
 
 fn parse_float(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
     let (input, num) = kind(TokenKind::FloatLiteral)(input)?;
-    let num = num.to_str(input.str).parse::<f64>().map_err(|e| {
-        SyntaxErrorKind::failure(
-            num,
-            "float",
-            Some(format!("error: {e}")),
-            Some("valid floats can be written like 1.0 or 5.23"),
-        )
-    })?;
+    let num = num
+        .to_str(input.str)
+        .replace('_', "")
+        .parse::<f64>()
+        .map_err(|e| {
+            SyntaxErrorKind::failure(
+                num,
+                "float",
+                Some(format!("error: {e}")),
+                Some("valid floats can be written like 1.0 or 5.23"),
+            )
+        })?;
     Ok((input, Expression::Float(num)))
+}
+
+fn parse_radix(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
+    let (input, num) = kind(TokenKind::Radix)(input)?;
+    let raw = num.to_str(input.str);
+
+    let parsed: Result<Int, _> =
+        if let Some(hex) = raw.strip_prefix("0x").or(raw.strip_prefix("0X")) {
+            Int::from_str_radix(&hex.replace('_', ""), 16)
+        } else if let Some(oct) = raw.strip_prefix("0o").or(raw.strip_prefix("0O")) {
+            Int::from_str_radix(&oct.replace('_', ""), 8)
+        } else if let Some(bin) = raw.strip_prefix("0b").or(raw.strip_prefix("0B")) {
+            Int::from_str_radix(&bin.replace('_', ""), 2)
+        } else {
+            return Err(nom::Err::Failure(SyntaxErrorKind::CustomError(
+                "invalid radix prefix".to_string(),
+                input.get_str_slice(),
+            )));
+        };
+
+    let value = parsed.map_err(|e| {
+        SyntaxErrorKind::failure(num, "Radix Integer", Some(format!("error: {e}")), None)
+    })?;
+
+    Ok((input, Expression::Integer(value)))
 }
 
 #[inline]

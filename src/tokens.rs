@@ -123,6 +123,7 @@ pub enum TokenKind {
     StringSafe,
     Bytes,
     IntegerLiteral,
+    Radix,
     FloatLiteral,
     ValueSymbol,
     Symbol,
