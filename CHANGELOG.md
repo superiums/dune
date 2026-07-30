@@ -1,12 +1,65 @@
 # Changelog
 
 ## [0.17.0]
+- improve support for `Bytes`
+  + literal supported: `b'\x41'`
+  + slice/compare supported
+  + overop supported
+  + print/pipe/as cmd arg supported
+
 - introduce `StringSafe`
+```bash
+let s = s'(rm -rf /)'
+let s2 = into.safe 'mkfs /dev/sda'
+eval(`echo $s $s2`)  # never unsafe eval
+```
+
+- introduce `SymbolRaw`
+now eval escape could be used in not only cmd but also args
+
+```bash
+let add = 5
+git add^
+```
+
+- introduce Radix numbers:
+`0b100_100` `0o170` `0xff`
+- support `_` within all numbers:
+`999_999` `999_999.999_999`
+
+- add following func to se_lib:
+  + `quote`
+  + `get_local`
+  + `get_env`
+  + `get_var`
+
+- remove CommandRaw
 - rm local var and modify env while using `set`
 - support `\}` for StringTemplate;
 - allow `2^x` without space;
-- fix .. as postfix for range
+- fix `..` as postfix for range
 now unclosed range could work well without `_`
+- fix `_` after `..`
+- allow bare `:2` as range at ctx start
+now `a[:2]` for slice is ok
+- adjust prec of range to 10, lower than add_sub
+- reject `1 a`
+- fix string parser eat tailing quote
+- more compare with filesize/int; string/stringSafe/symbo/symboRaw
+- fix completion replace with dot starting
+
+**Break Changes**
+added/renamed a lot functions to adjust rust/js style.
+
+- rename following functions:
+  + `sys.safe` -> `string.to_safe`, `into.safe`;
+  + `into.highlighted` -> `into.highlit`;
+  + `into.striped` -> `into.strip`;
+  + `string.to_upper` -> `string.upper`;
+  + `string.to_lower` -> `string.lower`;
+  + `string.to_title` -> `string.title`;
+- and more
+
 
 ## [0.16.13]
 - rewrite unescape for all string
