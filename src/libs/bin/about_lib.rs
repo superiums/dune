@@ -12,6 +12,7 @@ pub fn regist_lazy() -> LazyModule {
         version,
         bin,
         prelude,
+        history,
         info
     })
 }
@@ -20,6 +21,7 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         version => "print version",""
         bin => "print bin path",""
         prelude => "print prelude path",""
+        history => "print history path",""
         info => "print all info",""
     })
 }
@@ -37,7 +39,8 @@ fn info(
         String::from("bin") => bin(vec![], env, ctx)?,
 
         String::from("license") => Expression::String("MIT".to_string()),
-        String::from("prelude") => prelude(args, env, ctx)?
+        String::from("prelude") => prelude(args, env, ctx)?,
+        String::from("history") => history(vec![], env, ctx)?
     };
     Ok(Expression::from(info))
 }
@@ -59,9 +62,12 @@ fn bin(
 }
 fn prelude(
     _args: Vec<Expression>,
-    _env: &mut Environment,
+    env: &mut Environment,
     _ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
+    if let Some(profile) = env.get("LUME_PROFILE") {
+        return Ok(profile);
+    }
     Ok(if let Some(c) = dirs::config_dir() {
         let prelude_path = c.join("lumesh").join("config.lm");
         if prelude_path.exists() {
@@ -71,5 +77,24 @@ fn prelude(
         }
     } else {
         Expression::String("config.lm".to_string())
+    })
+}
+fn history(
+    _args: Vec<Expression>,
+    env: &mut Environment,
+    _ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    if let Some(hist) = env.get("LUME_HISTORY_FILE") {
+        return Ok(hist);
+    }
+    Ok(if let Some(c) = dirs::cache_dir() {
+        let hist = c.join("lumesh").join("history.log");
+        if hist.exists() {
+            Expression::String(hist.to_string_lossy().to_string())
+        } else {
+            Expression::String(format!("{} !", hist.to_string_lossy()))
+        }
+    } else {
+        Expression::String("history.log".to_string())
     })
 }
