@@ -1,7 +1,7 @@
 use super::catcher::catch_error;
 use super::eval::State;
 use crate::{
-    Environment, Expression, RuntimeError, RuntimeErrorKind,
+    Environment, Expression, Int, RuntimeError, RuntimeErrorKind,
     expression::{BoxedIterator, CatchType, DestructurePattern},
     modman::use_module,
     runtime::{IFS_FOR, ifs_contains},
@@ -298,7 +298,16 @@ impl Expression {
         // .as_list()?;
         match list_excuted {
             Expression::Range(range, step) => {
-                let count = range.clone().step_by(step).count(); //.div_ceil(step.max(1));
+                let count = {
+                    let (start, end) = (range.start, range.end);
+                    let step = (step).max(1) as Int;
+                    let count = if end > start {
+                        (end - start) / (step)
+                    } else {
+                        0
+                    };
+                    count as usize
+                };
                 let iterator = BoxedIterator::Range(range.step_by(step));
                 execute_iteration(var, index_name, iterator, count, body, state, env, depth)
             }

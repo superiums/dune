@@ -1,6 +1,7 @@
 use std::{
     collections::{BTreeMap, HashMap},
     io::Write,
+    ops::Div,
     rc::Rc,
 };
 
@@ -650,7 +651,16 @@ pub fn len(
         Expression::Table(t) => t.row_count() as Int,
         Expression::Symbol(x) | Expression::String(x) => x.chars().count() as Int,
         Expression::Bytes(bytes) => bytes.len() as Int,
-        Expression::Range(a, b) => a.to_owned().step_by(*b).count() as Int,
+        Expression::Range(a, b) => {
+            let (start, end) = (a.start, a.end);
+            let step = (*b).max(1) as Int;
+            let count = if end > start {
+                (end - start).div(step)
+            } else {
+                0
+            };
+            count as Int
+        }
         Expression::None => 0,
         expr => {
             return Err(RuntimeError::new(
