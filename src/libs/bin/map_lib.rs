@@ -338,6 +338,12 @@ fn from_list(
                 && pair.as_ref().len() == 2
             {
                 map.insert(pair.as_ref()[0].to_string(), pair.as_ref()[1].clone());
+            } else {
+                return Err(RuntimeError::common(
+                    "items in list must be [k,v]".into(),
+                    ctx.clone(),
+                    0,
+                ));
             }
         }
         Ok(Expression::from(map))
