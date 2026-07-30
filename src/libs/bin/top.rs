@@ -140,7 +140,7 @@ fn help(
                 writeln!(s, "\n    'lume' | .green()").unwrap();
             }
             "tops" => {
-                writeln!(s, "Top level Functions List\n").unwrap();
+                writeln!(s, "Top level Builtin Functions\n").unwrap();
                 LIBS_INFO.with(|h| {
                     if let Some(map) = h.get("") {
                         for (func, info) in map {
@@ -181,7 +181,7 @@ fn help(
                 _ => {
                     LIBS_INFO.with(|h| match h.get(&name) {
                         Some(map) => {
-                            writeln!(s, "Functions for lib {name}\n").unwrap();
+                            writeln!(s, "Builtin Functions for Lib: {name}\n").unwrap();
                             for (func, info) in map {
                                 writeln!(
                                     s,
@@ -215,7 +215,7 @@ fn help(
                                     }
                                 }
                             });
-                            writeln!(s, "no lib named `{name}`\n").unwrap();
+                            writeln!(s, "No such Lib: `{name}`\n").unwrap();
                         }
                     });
                 }
