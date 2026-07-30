@@ -14,6 +14,8 @@ INSTALL_DIR="$HOME/.local/bin"  # Default to user installation
 CONFIG_DIR="$HOME/.config/lumesh"
 DOC_DIR="$HOME/.local/share"
 SYSTEM_INSTALL_DIR="/usr/local/bin"
+VARIANT_SUFFIX=""   # 新增：普通版为空，AI-HTTPS版为 "-ai-https"  
+
 sudo_cmd=""
 # Platform detection
 detect_platform() {
@@ -56,19 +58,19 @@ get_asset_name() {
     case "$PLATFORM" in
         linux)
             local libc_suffix; [ "$LIBC" = "musl" ] && libc_suffix="musl" || libc_suffix="gnu"
-            echo "lume-$ARCH-linux-$libc_suffix"
+            echo "lume-$ARCH-linux-$libc_suffix${VARIANT_SUFFIX}"
             ;;
         darwin)
-            echo "lume-$ARCH-apple-darwin"
+            echo "lume-$ARCH-apple-darwin${VARIANT_SUFFIX}"
             ;;
         windows)
-            echo "lume-x86_64-pc-windows-gnu.exe"
+            echo "lume-x86_64-pc-windows-gnu${VARIANT_SUFFIX}.exe"
             ;;
         freebsd)
-            echo "lume-$ARCH-freebsd"
+            echo "lume-$ARCH-freebsd${VARIANT_SUFFIX}"
             ;;
         android)
-            echo "lume-$ARCH-linux-android"
+            echo "lume-$ARCH-linux-android${VARIANT_SUFFIX}"
             ;;
     esac
 }
@@ -83,6 +85,31 @@ set_macos_path() {
         fi
     fi
 }
+# Ask user which binary variant to install  
+ask_variant_type() {  
+    echo -e "${YELLOW}Choose binary variant:${NC}"  
+    echo "1) Standard (default) - AI on HTTPS via system TLS on windows/macos; HTTP only on linux/freebsd"  
+    echo "2) ai-https - AI on HTTPS via ureq on all platforms (larger binary)"  
+    echo ""  
+    read -p "Enter choice (1-2) [1]: " variant_choice  
+    variant_choice=${variant_choice:-1}  
+  
+    case $variant_choice in  
+        1)  
+            VARIANT_SUFFIX=""  
+            echo -e "${GREEN}Standard variant selected${NC}"  
+            ;;  
+        2)  
+            VARIANT_SUFFIX="-ai-https"  
+            echo -e "${GREEN}ai-https variant selected${NC}"  
+            ;;  
+        *)  
+            echo -e "${RED}Invalid choice. Defaulting to standard variant.${NC}"  
+            VARIANT_SUFFIX=""  
+            ;;  
+    esac  
+}
+
 # Ask for installation type
 ask_install_type() {
     echo -e "${YELLOW}Choose installation type:${NC}"
@@ -401,6 +428,7 @@ main() {
     echo "======================================"
     # Ask for installation type first
     ask_install_type
+    ask_variant_type
     echo ""
     detect_platform
     echo -e "${GREEN}Detected platform: $PLATFORM-$ARCH ($LIBC)${NC}"
