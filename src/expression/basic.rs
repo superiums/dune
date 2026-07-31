@@ -1088,6 +1088,22 @@ impl Expression {
         }
     }
 
+    /// 如果该变体的语义等价于“一段文本”，返回其内部 &str，否则 None。
+    /// 注意：这里把 Symbol/Variable/RegexDef/TimeDef 也当作纯文本，
+    /// 意味着 Symbol("x") 和 String("x") 会被认为“相等”——
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            Self::String(s)
+            | Self::Symbol(s)
+            | Self::Variable(s)
+            | Self::RegexDef(s)
+            | Self::TimeDef(s)
+            | Self::StringSafe(s)
+            | Self::SymbolRaw(s) => Some(s.as_str()),
+            _ => None,
+        }
+    }
+
     pub fn apply(&self, args: Vec<Self>) -> Self {
         Self::Apply(Rc::new(self.clone()), Rc::new(args))
     }

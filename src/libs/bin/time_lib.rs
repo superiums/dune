@@ -60,9 +60,8 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
 }
 
 // Helper Functions
-fn parse_datetime_arg(
+pub fn parse_datetime_arg(
     arg: Expression,
-    _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<NaiveDateTime, RuntimeError> {
     match arg {
@@ -223,7 +222,7 @@ fn display(
 // Time Component Functions
 fn get_time_component<F>(
     args: Vec<Expression>,
-    env: &mut Environment,
+    _env: &mut Environment,
     ctx: &Expression,
     extractor: F,
 ) -> Result<Expression, RuntimeError>
@@ -233,7 +232,7 @@ where
     match args.len() {
         0 => Ok(Expression::Integer(extractor(Local::now().naive_local()))),
         1 => {
-            let dt = parse_datetime_arg(args.into_iter().next().unwrap(), env, ctx)?;
+            let dt = parse_datetime_arg(args.into_iter().next().unwrap(), ctx)?;
             Ok(Expression::Integer(extractor(dt)))
         }
         _ => Err(RuntimeError::common(
@@ -338,7 +337,7 @@ fn is_leap(
 // Timestamp Functions
 fn stamp_generic(
     args: Vec<Expression>,
-    env: &mut Environment,
+    _env: &mut Environment,
     ctx: &Expression,
     to_value: impl Fn(DateTime<Utc>) -> i64,
 ) -> Result<Expression, RuntimeError> {
@@ -346,7 +345,7 @@ fn stamp_generic(
     let dt = if args.is_empty() {
         Utc::now()
     } else {
-        parse_datetime_arg(args.into_iter().next().unwrap(), env, ctx)?.and_utc()
+        parse_datetime_arg(args.into_iter().next().unwrap(), ctx)?.and_utc()
     };
     Ok(Expression::Integer(to_value(dt)))
 }
@@ -371,7 +370,7 @@ fn stamp_ms(
 /// datetime 放在前面，以支持管道：`dt | time.fmt "%Y-%m-%d"`
 fn fmt(
     args: Vec<Expression>,
-    env: &mut Environment,
+    _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
     check_args_len("fmt", &args, 1..=2, ctx)?;
@@ -380,7 +379,7 @@ fn fmt(
 
     let (dt, format_str) = if let Some(a1) = it.next() {
         // 两个参数：第一个是 datetime，第二个是 format
-        let dt = parse_datetime_arg(a0, env, ctx)?;
+        let dt = parse_datetime_arg(a0, ctx)?;
         let format = match a1 {
             Expression::String(s) => s,
             _ => {
@@ -441,13 +440,13 @@ fn now(
 /// datetime 放在前面，以支持管道：`dt | time.to_string "%Y-%m-%d"`
 fn to_string(
     args: Vec<Expression>,
-    env: &mut Environment,
+    _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
     check_args_len("to_string", &args, 1..=2, ctx)?;
     let mut it = args.into_iter();
 
-    let dt = parse_datetime_arg(it.next().unwrap(), env, ctx)?;
+    let dt = parse_datetime_arg(it.next().unwrap(), ctx)?;
 
     if let Some(a) = it.next() {
         match a {
@@ -470,7 +469,7 @@ fn to_string(
 /// datetime 字符串放在前面，以支持管道：`"2024-01-01" | time.parse "%Y-%m-%d"`
 pub fn parse(
     args: Vec<Expression>,
-    env: &mut Environment,
+    _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
     check_args_len("parse", &args, 1..=2, ctx)?;
@@ -502,7 +501,6 @@ pub fn parse(
         // Try to parse without format
         return Ok(Expression::DateTime(parse_datetime_arg(
             Expression::String(datetime_str),
-            env,
             ctx,
         )?));
     };
@@ -535,7 +533,7 @@ pub fn parse(
 /// `time.add <datetime> <duration>` — datetime 在前，以支持管道：`dt | time.add "1h"`
 fn add(
     args: Vec<Expression>,
-    env: &mut Environment,
+    _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
     check_args_len("add", &args, 1..=2, ctx)?;
@@ -543,7 +541,7 @@ fn add(
     let a0 = it.next().unwrap();
 
     let (base_dt, duration_arg) = if let Some(a1) = it.next() {
-        (parse_datetime_arg(a0, env, ctx)?, a1)
+        (parse_datetime_arg(a0, ctx)?, a1)
     } else {
         (Local::now().naive_local(), a0)
     };
@@ -570,13 +568,13 @@ fn add(
 /// `time.diff <datetime1> <datetime2> [unit]`
 fn diff(
     args: Vec<Expression>,
-    env: &mut Environment,
+    _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
     check_args_len("diff", &args, 2..=3, ctx)?;
     let mut it = args.into_iter();
-    let dt1 = parse_datetime_arg(it.next().unwrap(), env, ctx)?;
-    let dt2 = parse_datetime_arg(it.next().unwrap(), env, ctx)?;
+    let dt1 = parse_datetime_arg(it.next().unwrap(), ctx)?;
+    let dt2 = parse_datetime_arg(it.next().unwrap(), ctx)?;
 
     let unit = match it.next() {
         Some(Expression::String(s)) => s,
@@ -611,7 +609,7 @@ fn diff(
 /// `dt | time.timezone 8`
 fn timezone(
     args: Vec<Expression>,
-    env: &mut Environment,
+    _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
     check_args_len("timezone", &args, 1..=3, ctx)?;
@@ -622,7 +620,7 @@ fn timezone(
     let (base_dt, offset_expr) = match (a0, a1) {
         // 第二参数存在且是数字：第一参数是 datetime
         (dt_expr, Some(offset_expr @ (Expression::Integer(_) | Expression::Float(_)))) => {
-            (parse_datetime_arg(dt_expr, env, ctx)?, offset_expr)
+            (parse_datetime_arg(dt_expr, ctx)?, offset_expr)
         }
         // 否则第一参数本身就是 offset，基准为当前时间；此时 a1（若存在）应为 format
         (offset_expr, format_opt) => {

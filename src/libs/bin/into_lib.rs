@@ -3,10 +3,10 @@ use std::collections::BTreeMap;
 
 use crate::{
     Environment, Expression, Int, RuntimeError, RuntimeErrorKind,
-    expression::{FileSize, table::TableData},
+    expression::table::TableData,
     libs::{
         BuiltinInfo,
-        bin::time_lib,
+        bin::{filesize_lib, time_lib},
         helper::{
             check_args_len, check_exact_args_len, convert_list_map_to_table, get_integer_arg,
             get_string_ref,
@@ -313,58 +313,11 @@ pub fn float(
 
 pub fn filesize(
     args: Vec<Expression>,
-    _env: &mut Environment,
+    env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
     check_exact_args_len("filesize", &args, 1, ctx)?;
-    match args.into_iter().next().unwrap() {
-        Expression::Integer(x) => Ok(Expression::FileSize(FileSize::from_bytes(x as u64))),
-        Expression::Float(x) => Ok(Expression::FileSize(FileSize::from_bytes(x as u64))),
-        Expression::FileSize(x) => Ok(Expression::FileSize(x)),
-        Expression::String(x) => {
-            if let Ok(n) = x.parse::<u64>() {
-                Ok(Expression::FileSize(FileSize::from_bytes(n)))
-            } else if let Some((num, unit)) = split_file_size(&x) {
-                Ok(Expression::FileSize(FileSize::from_float(num, unit)))
-            } else {
-                Err(RuntimeError::common(
-                    format!("could not convert {x:?} to a filesize").into(),
-                    ctx.clone(),
-                    0,
-                ))
-            }
-        }
-        otherwise => Err(RuntimeError::common(
-            format!("could not convert {otherwise:?} to a filesize").into(),
-            ctx.clone(),
-            0,
-        )),
-    }
-}
-
-fn split_file_size(size_str: &str) -> Option<(f64, &'static str)> {
-    let trimmed = size_str.trim();
-
-    // 找到最后一个数字字符（含小数点）的位置，作为数字/单位分界
-    let split_pos = trimmed.rfind(|c: char| c.is_ascii_digit() || c == '.')?;
-    let (number_part, unit_part) = trimmed.split_at(split_pos + 1);
-
-    let unit = unit_part.trim().to_uppercase();
-
-    // 天然支持 K/KB/KiB、大小写混用等多种格式
-    let canonical_unit: &'static str = match unit.as_str() {
-        "" | "B" => "B",
-        "K" | "KB" | "KIB" => "K",
-        "M" | "MB" | "MIB" => "M",
-        "G" | "GB" | "GIB" => "G",
-        "T" | "TB" | "TIB" => "T",
-        "P" | "PB" | "PIB" => "P",
-        _ => return None,
-    };
-
-    let number: f64 = number_part.trim().parse().ok()?;
-
-    Some((number, canonical_unit))
+    filesize_lib::from(args, env, ctx)
 }
 
 // ===========serializers==============

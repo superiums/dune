@@ -1,5 +1,5 @@
 use crate::expression::table::TableData;
-use crate::{Environment, Int};
+use crate::{Environment, Int, libs};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::ops::Range;
@@ -257,6 +257,12 @@ pub enum CatchType {
 
 impl PartialOrd for Expression {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        // 字符串之间比较
+        // 先拦截所有“文本类”变体之间的比较，替代原来十几条两两分支
+        if let (Some(a), Some(b)) = (self.as_str(), other.as_str()) {
+            return a.partial_cmp(b);
+        }
+
         match (self, other) {
             // ===== 数值类型互比 =====
             (Self::Integer(a), Self::Integer(b)) => a.partial_cmp(b),
@@ -265,46 +271,43 @@ impl PartialOrd for Expression {
             (Self::Integer(a), Self::Float(b)) => (&(*a as f64)).partial_cmp(b),
 
             // ===== 字符串与数字互比 =====
-            (Self::String(a), Self::Integer(b)) => a.parse::<i64>().ok()?.partial_cmp(b),
-            (Self::Integer(a), Self::String(b)) => b.parse::<i64>().ok()?.partial_cmp(a),
+            (Self::String(a), Self::Integer(b)) => {
+                if let Ok(ai) = a.parse::<i64>() {
+                    ai.partial_cmp(b)
+                } else {
+                    a.parse::<f64>().ok()?.partial_cmp(&(*b as f64))
+                }
+            }
+            (Self::Integer(a), Self::String(b)) => {
+                if let Ok(bi) = b.parse::<i64>() {
+                    a.partial_cmp(&bi)
+                } else {
+                    (*a as f64).partial_cmp(&b.parse::<f64>().ok()?)
+                }
+            }
             (Self::String(a), Self::Float(b)) => a.parse::<f64>().ok()?.partial_cmp(b),
-            (Self::Float(a), Self::String(b)) => b.parse::<f64>().ok()?.partial_cmp(a),
-
-            // 字符串之间比较
-            (Self::String(a), Self::StringSafe(b)) => a.partial_cmp(b),
-            (Self::String(a), Self::Symbol(b)) => a.partial_cmp(b),
-            (Self::String(a), Self::SymbolRaw(b)) => a.partial_cmp(b),
-
-            (Self::StringSafe(a), Self::String(b)) => a.partial_cmp(b),
-            (Self::StringSafe(a), Self::Symbol(b)) => a.partial_cmp(b),
-            (Self::StringSafe(a), Self::SymbolRaw(b)) => a.partial_cmp(b),
-            (Self::Symbol(a), Self::String(b)) => a.partial_cmp(b),
-            (Self::Symbol(a), Self::StringSafe(b)) => a.partial_cmp(b),
-            (Self::Symbol(a), Self::SymbolRaw(b)) => a.partial_cmp(b),
-            (Self::SymbolRaw(a), Self::String(b)) => a.partial_cmp(b),
-            (Self::SymbolRaw(a), Self::Symbol(b)) => a.partial_cmp(b),
-            (Self::SymbolRaw(a), Self::StringSafe(b)) => a.partial_cmp(b),
+            (Self::Float(a), Self::String(b)) => a.partial_cmp(&b.parse::<f64>().ok()?),
 
             // bytes
             (Self::Bytes(a), Self::String(b)) => a.as_slice().partial_cmp(b.as_bytes()),
             (Self::String(a), Self::Bytes(b)) => a.as_bytes().partial_cmp(b.as_slice()),
 
             // ===== 同类型简单比较 =====
-            (Self::String(a), Self::String(b)) => a.partial_cmp(b),
-            (Self::StringTemplate(a), Self::StringTemplate(b)) => a.partial_cmp(b),
-            (Self::StringSafe(a), Self::StringSafe(b)) => a.partial_cmp(b),
-            (Self::Symbol(a), Self::Symbol(b)) => a.partial_cmp(b),
-            (Self::SymbolRaw(a), Self::SymbolRaw(b)) => a.partial_cmp(b),
-            (Self::Variable(a), Self::Variable(b)) => a.partial_cmp(b),
-            (Self::Bytes(a), Self::Bytes(b)) => a.partial_cmp(b),
-            (Self::Boolean(a), Self::Boolean(b)) => a.partial_cmp(b),
             (Self::None, Self::None) => Some(Ordering::Equal),
             (Self::Blank, Self::Blank) => Some(Ordering::Equal),
-            (Self::RegexDef(a), Self::RegexDef(b)) => a.partial_cmp(b),
-            (Self::TimeDef(a), Self::TimeDef(b)) => a.partial_cmp(b),
+            // (Self::String(a), Self::String(b)) => a.partial_cmp(b),
+            (Self::Bytes(a), Self::Bytes(b)) => a.partial_cmp(b),
+            (Self::Boolean(a), Self::Boolean(b)) => a.partial_cmp(b),
             (Self::DateTime(a), Self::DateTime(b)) => a.partial_cmp(b),
             (Self::FileSize(a), Self::FileSize(b)) => a.partial_cmp(b),
+
             // 文件大小与数值比较
+            (Self::FileSize(a), Self::String(b)) => {
+                a.partial_cmp(&libs::from_size_str(b, other).ok()?)
+            }
+            (Self::String(a), Self::FileSize(b)) => {
+                libs::from_size_str(a, self).ok()?.partial_cmp(b)
+            }
             (Self::FileSize(a), Self::Integer(b)) => {
                 Some(if *b < 0 {
                     Ordering::Greater // u64 >= 0 > i64 负数
@@ -319,7 +322,31 @@ impl PartialOrd for Expression {
                     (*a as u64).cmp(&b.to_bytes())
                 })
             }
+            (Self::FileSize(a), Self::Float(b)) => {
+                if *b < 0.0 {
+                    Some(Ordering::Greater)
+                } else {
+                    (a.to_bytes() as f64).partial_cmp(b)
+                }
+            }
+            (Self::Float(a), Self::FileSize(b)) => {
+                if *a < 0.0 {
+                    Some(Ordering::Less)
+                } else {
+                    a.partial_cmp(&(b.to_bytes() as f64))
+                }
+            }
 
+            // 时间
+            (Self::DateTime(a), Self::Integer(b)) => a.and_utc().timestamp().partial_cmp(b),
+            (Self::Integer(a), Self::DateTime(b)) => a.partial_cmp(&b.and_utc().timestamp()),
+            (Self::DateTime(a), Self::String(_)) => {
+                a.partial_cmp(&libs::from_time_str(other.clone(), other).ok()?)
+            }
+
+            (Self::String(_), Self::DateTime(b)) => {
+                libs::from_time_str(self.clone(), self).ok()?.partial_cmp(b)
+            }
             // ===== 集合类型 =====
             (Self::List(a), Self::List(b)) => a.as_slice().partial_cmp(b.as_slice()),
 
