@@ -20,7 +20,7 @@ pub enum RuntimeErrorKind {
     #[error("symbol `{0}` not defined in module {1}\npath trace: {2}")]
     SymbolNotDefinedInModule(String, String, String),
     #[error("symbol `{0}` is not a module, but a `{1}` in {2}\npath trace: {3}")]
-    SymbolNotModule(String, String, Cow<'static, str>, String),
+    SymbolNotModule(String, &'static str, Cow<'static, str>, String),
     #[error("command `{0}` failed with args:\n  {1:?}")]
     CommandFailed(String, Vec<Expression>),
     #[error("command `{0}` failed:\n  {1}")]
@@ -81,7 +81,7 @@ pub enum RuntimeErrorKind {
     TypeError {
         expected: Cow<'static, str>,
         sym: String,
-        found: String,
+        found: &'static str,
     },
     #[error("illegal return outside function")]
     EarlyReturn(Expression),

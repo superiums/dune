@@ -286,15 +286,8 @@ impl PartialOrd for Expression {
             (Self::SymbolRaw(a), Self::StringSafe(b)) => a.partial_cmp(b),
 
             // bytes
-            (Self::Bytes(a), Self::String(b)) => {
-                // 只有 Bytes 是合法 UTF-8 才能比较
-                let a_str = std::str::from_utf8(a).ok()?;
-                a_str.as_bytes().partial_cmp(b.as_bytes())
-            }
-            (Self::String(a), Self::Bytes(b)) => {
-                let b_str = std::str::from_utf8(b).ok()?;
-                a.as_bytes().partial_cmp(b_str.as_bytes())
-            }
+            (Self::Bytes(a), Self::String(b)) => a.as_slice().partial_cmp(b.as_bytes()),
+            (Self::String(a), Self::Bytes(b)) => a.as_bytes().partial_cmp(b.as_slice()),
 
             // ===== 同类型简单比较 =====
             (Self::String(a), Self::String(b)) => a.partial_cmp(b),
@@ -327,58 +320,24 @@ impl PartialOrd for Expression {
                 })
             }
 
-            // ===== 集合类型按长度比较 =====
-            (Self::List(a), Self::List(b)) => match a.len().cmp(&b.len()) {
-                Ordering::Equal => {
-                    for (i, item) in a.iter().enumerate() {
-                        let v = item.partial_cmp(&b[i]);
-                        if Some(Ordering::Equal) != v {
-                            return v;
-                        }
-                    }
-                    return Some(Ordering::Equal);
-                }
-                o => Some(o),
-            },
-            (Self::BSet(a), Self::BSet(b)) => match a.len().cmp(&b.len()) {
-                Ordering::Equal => {
-                    for item in a.iter() {
-                        if !b.contains(item) {
-                            return Some(Ordering::Greater);
-                        }
-                    }
-                    return Some(Ordering::Equal);
-                }
-                o => Some(o),
-            },
-            (Self::HMap(a), Self::HMap(b)) => match a.len().cmp(&b.len()) {
-                Ordering::Equal => {
-                    for k in a.keys() {
-                        let v_b = b.get(k);
+            // ===== 集合类型 =====
+            (Self::List(a), Self::List(b)) => a.as_slice().partial_cmp(b.as_slice()),
 
-                        let result = a.get(k).partial_cmp(&v_b);
-                        if Some(Ordering::Equal) != result {
-                            return result;
-                        }
-                    }
-                    return Some(Ordering::Equal);
-                }
-                o => Some(o),
-            },
-            (Self::Map(a), Self::Map(b)) => match a.len().cmp(&b.len()) {
-                Ordering::Equal => {
-                    for k in a.keys() {
-                        let v_b = b.get(k);
+            (Self::BSet(a), Self::BSet(b)) => a.partial_cmp(b),
 
-                        let result = a.get(k).partial_cmp(&v_b);
-                        if Some(Ordering::Equal) != result {
-                            return result;
-                        }
+            (Self::Map(a), Self::Map(b)) => a.partial_cmp(b),
+            (Self::HMap(a), Self::HMap(b)) => {
+                let mut keys: Vec<_> = a.keys().chain(b.keys()).collect();
+                keys.sort();
+                keys.dedup();
+                for k in keys {
+                    let cmp = a.get(k).partial_cmp(&b.get(k));
+                    if cmp != Some(Ordering::Equal) {
+                        return cmp;
                     }
-                    return Some(Ordering::Equal);
                 }
-                o => Some(o),
-            },
+                Some(Ordering::Equal)
+            }
 
             // ===== 不同种类不比较 =====
             _ => None,

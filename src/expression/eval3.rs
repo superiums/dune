@@ -351,7 +351,7 @@ impl Expression {
             o => {
                 // dbg!(o.type_name());
                 Err(RuntimeError::new(
-                    RuntimeErrorKind::CannotApply(o.type_name(), func.clone()),
+                    RuntimeErrorKind::CannotApply(o.type_name().to_string(), func.clone()),
                     self.clone(),
                     depth,
                 ))
@@ -692,7 +692,7 @@ impl Expression {
                                 RuntimeErrorKind::TypeError {
                                     expected: "Symbol for Function/Builtin".into(),
                                     sym: cmd_sym.to_string(),
-                                    found: "invalid Symbol".to_string(),
+                                    found: "invalid Symbol",
                                 },
                                 self.clone(),
                                 depth,
@@ -824,8 +824,8 @@ impl Expression {
             _ => Err(RuntimeError::new(
                 RuntimeErrorKind::TypeError {
                     expected: "Symbol".into(),
-                    sym: cmd.type_name(),
-                    found: cmd.to_string(),
+                    sym: cmd.to_string(),
+                    found: cmd.type_name(),
                 },
                 self.clone(),
                 depth,

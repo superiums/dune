@@ -612,31 +612,7 @@ fn sort(
 
     let mut sorted: Vec<_> = match list {
         Expression::List(l) => l.as_ref().clone(),
-        Expression::String(s) => {
-            let mut elist = s
-                .lines()
-                .map(|s| Expression::String(s.to_owned()))
-                .collect::<Vec<_>>();
-            if elist.len() < 2 {
-                elist = s
-                    .split_ascii_whitespace()
-                    .map(|s| Expression::String(s.to_owned()))
-                    .collect::<Vec<_>>();
-                if elist.len() < 2 {
-                    elist = s
-                        .split_terminator(";")
-                        .map(|s| Expression::String(s.to_owned()))
-                        .collect::<Vec<_>>();
-                    if elist.len() < 2 {
-                        elist = s
-                            .split_terminator(",")
-                            .map(|s| Expression::String(s.to_owned()))
-                            .collect::<Vec<_>>();
-                    }
-                }
-            }
-            elist
-        }
+
         s => {
             return Err(RuntimeError::new(
                 RuntimeErrorKind::TypeError {

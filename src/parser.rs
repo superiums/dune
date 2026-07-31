@@ -816,7 +816,7 @@ impl PrattParser {
                             return Err(SyntaxErrorKind::failure(
                                 input.get_str_slice(),
                                 "symbol in parameter list",
-                                Some(boxed_expr.type_name()),
+                                Some(boxed_expr.type_name().to_string()),
                                 "put only valid symbols in lambda param list".into(),
                             ));
                         } // },
@@ -2738,73 +2738,6 @@ fn parse_index(
 
     Ok((input, Expression::Index(Rc::new(target), Rc::new(expr))))
 }
-// fn parse_index_or_slice(
-//     target: Expression,
-//     input: Tokens<'_>,
-//     depth: usize,
-// ) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
-//     let (input, (params, is_slice)) = delimited(
-//         text("["),
-//         |input| parse_slice_params(input, depth),
-//         cut(text_close("]")),
-//     )(input)?;
-
-//     Ok((
-//         input,
-//         match is_slice {
-//             true => Expression::Slice(Rc::new(target), params),
-//             false => Expression::Index(
-//                 Rc::new(target),
-//                 params.start.unwrap_or(Rc::new(Expression::Integer(0))),
-//             ),
-//         },
-//     ))
-// }
-
-// fn parse_slice_params(
-//     input: Tokens<'_>,
-//     depth: usize,
-// ) -> IResult<Tokens<'_>, (SliceParams, bool), SyntaxErrorKind> {
-//     // 解析 start 部分
-//     // allow neg int.
-//     // let (input, start) = opt(alt((parse_integer, parse_variable, parse_symbol)))(input)?;
-//     let (input, start) =
-//         opt(|inp| PrattParser::parse_expr_with_precedence(inp, PREC_ADD_SUB, depth + 1))(input)?;
-
-//     // 检查第一个冒号
-//     let (input, has_first_colon) = opt(text(".."))(input)?;
-
-//     // 解析 end 部分
-//     let (input, end) = if has_first_colon.is_some() {
-//         // opt(alt((parse_integer, parse_variable, parse_symbol)))(input)?
-//         opt(|inp| PrattParser::parse_expr_with_precedence(inp, PREC_ADD_SUB, depth + 1))(input)?
-//     } else {
-//         (input, None) // 如果没有第一个冒号，就没有 end
-//     };
-
-//     // 检查第二个冒号
-//     let (input, has_second_colon) = opt(text(":"))(input)?;
-
-//     // 解析 step 部分
-//     let (input, step) = if has_second_colon.is_some() {
-//         // opt(alt((parse_integer, parse_variable, parse_symbol)))(input)?
-//         opt(|inp| PrattParser::parse_expr_with_precedence(inp, PREC_UNARY, depth + 1))(input)?
-//     } else {
-//         (input, None) // 如果没有第二个冒号，就没有 step
-//     };
-
-//     Ok((
-//         input,
-//         (
-//             SliceParams {
-//                 start: start.map(Rc::new),
-//                 end: end.map(Rc::new),
-//                 step: step.map(Rc::new),
-//             },
-//             has_first_colon.is_some(),
-//         ),
-//     ))
-// }
 
 #[derive(Debug, Clone)]
 pub struct ModuleInfo {

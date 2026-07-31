@@ -1,0 +1,16 @@
+
+let libs = [ about,boolean,bytes, console,filesize,from, fs,hmap,into, list,log,map, math,rand,regex, set,string,sys, table,time,ui,]
+fs.mkdir /tmp/full
+# fs.mkdir /tmp/lite
+
+for lib in libs {
+	let head = `
+---
+title: 内置库{lib}
+date: {time.now()}
+---
+	`
+	
+	help $lib | .strip_ansi() | .replace(`{lib}.`,'') | `{head}\n## ` + _ >> `/tmp/full/{lib}.md`
+	# help $lib | .strip_ansi() | .replace(`{lib}.`,'') | .lines() | .filter(x -> !x.starts_with("\t")) | .join("\n") | `{head}\n## ` + _ >> `/tmp/lite/{lib}.md`
+}

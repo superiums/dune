@@ -26,7 +26,7 @@ pub fn catch_error(
                             String::from("msg") => Expression::String(e.kind.to_string()),
                             String::from("expr") => Expression::String(e.context.to_string()),
                             String::from("ast") => Expression::String(format!("{:?}",e.context)),
-                            String::from("type") => Expression::String(e.context.type_name()),
+                            String::from("type") => Expression::String(e.context.type_name().to_string()),
                             String::from("depth") => Expression::Integer(e.depth as i64),
                             // String::from("expr") => Expression::Quote(body.clone())
                         })])
@@ -51,7 +51,7 @@ pub fn catch_error(
             String::from("msg") => Expression::String(e.kind.to_string()),
             String::from("expr") => Expression::String(e.context.to_string()),
             String::from("ast") => Expression::String(format!("{:?}",e.context)),
-            String::from("type") => Expression::String(e.context.type_name()),
+            String::from("type") => Expression::String(e.context.type_name().to_string()),
             String::from("depth") => Expression::Integer(e.depth as i64),
             // String::from("expr") => Expression::Quote(body.clone())
         })),

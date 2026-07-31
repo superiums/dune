@@ -190,7 +190,10 @@ fn debug(
         map.insert("expr".to_string(), Expression::String(expr_repr));
         match y {
             Ok(r) => {
-                map.insert("type".to_string(), Expression::String(r.type_name()));
+                map.insert(
+                    "type".to_string(),
+                    Expression::String(r.type_name().to_string()),
+                );
                 map.insert("value".to_string(), r);
             }
             Err(e) => {
@@ -218,7 +221,10 @@ fn ddebug(
         map.insert("expr".to_string(), Expression::String(expr_repr));
         match y {
             Ok(r) => {
-                map.insert("type".to_string(), Expression::String(r.type_name()));
+                map.insert(
+                    "type".to_string(),
+                    Expression::String(r.type_name().to_string()),
+                );
                 map.insert("value".to_string(), r);
             }
             Err(e) => {

@@ -226,17 +226,6 @@ fn plus_dispatch(
     ctx: Ctx,
     is_cfm: bool,
 ) -> TokenizationResult<'_, (Token, Diagnostic)> {
-    // if ctx == Ctx::Space {
-    //     map_valid_token(
-    //         |input: Input<'_>| {
-    //             input
-    //                 .strip_prefix("+")
-    //                 .filter(|(rest, _)| !rest.starts_with(is_symbol_char))
-    //                 .ok_or(NOT_FOUND)
-    //         },
-    //         TokenKind::Operator,
-    //     )(input)
-    // } else {
     match ctx {
         Ctx::Space if is_cfm => alt((
             map_valid_token(punctuation_tag("+="), TokenKind::Operator),
@@ -700,26 +689,6 @@ fn path_tag(punct: &str, alone_ok: bool) -> impl '_ + Fn(Input<'_>) -> Tokenizat
             return Err(NOT_FOUND);
         }
 
-        // let mut chars = input.chars();
-        // let mut places = 0;
-
-        // while let Some(c) = chars.next() {
-        //     if c == '\\' {
-        //         if let Some(next_c) = chars.next() {
-        //             if matches!(&next_c, ' ' | '"' | '\'') {
-        //                 places += c.len_utf8() + next_c.len_utf8();
-        //                 continue;
-        //             }
-        //             places += next_c.len_utf8();
-        //         }
-        //     } else if c.is_ascii_whitespace() {
-        //         break;
-        //     } else if is_path_delimiter(c) {  // 直接传 char，不需要 b as char
-        //         break;
-        //     }
-        //     places += c.len_utf8();  // c 是真正的 char，len_utf8() 结果正确
-        // }
-
         let bytes = input.as_ref().as_bytes();
         let prefix_len = punct.len();
         let mut i = prefix_len;
@@ -814,71 +783,6 @@ fn win_abpath_tag(input: Input<'_>) -> TokenizationResult<'_> {
         Err(NOT_FOUND)
     }
 }
-
-// parse argument such as ipconfig /all; C:\
-// #[cfg(windows)]
-// fn argument_symbol(input: Input<'_>) -> TokenizationResult<'_> {
-//     alt((
-//         // unix-style paths (also valid on Windows)
-//         path_tag("../"),
-//         path_tag("./"),
-//         path_tag("*/"),
-//         path_tag("**/"),
-//         // windows drive paths
-//         win_abpath_tag(":"),
-//         // windows paths
-//         path_tag("..\\"),
-//         path_tag(".\\"),
-//         path_tag("*\\"),
-//         path_tag("**\\"),
-//         // flags and special tokens
-//         path_tag("--"),
-//         path_tag("-"),
-//         path_tag("~"),
-//         path_tag("*."),
-//         // url schemes
-//         path_tag("http:"),
-//         path_tag("https:"),
-//         path_tag("ftp:"),
-//         path_tag("ftps:"),
-//         path_tag("file:"),
-//         postfix_break_tag("."),
-//         postfix_break_tag(".."),
-//         postfix_break_tag("&-"),
-//         postfix_break_tag("&?"),
-//         postfix_break_tag("&+"),
-//         postfix_break_tag("&."),
-//     ))(input)
-// }
-// parse argument such as ls -l --color=auto ./
-// #[cfg(unix)]
-// fn argument_symbol(input: Input<'_>) -> TokenizationResult<'_> {
-//     alt((
-//         // flags
-//         path_tag("--"),
-//         path_tag("-"),
-//         // paths
-//         path_tag("/"),
-//         path_tag("../"),
-//         path_tag("./"),
-//         path_tag("*/"),
-//         path_tag("**/"),
-//         path_tag("*."),
-//         path_tag("~"),
-//         // url schemes
-//         path_tag("http:"),
-//         path_tag("https:"),
-//         path_tag("ftp:"),
-//         path_tag("ftps:"),
-//         path_tag("file:"),
-//         postfix_break_tag("."),
-//         postfix_break_tag(".."),
-//         postfix_break_tag("&-"),
-//         postfix_break_tag("&?"),
-//         postfix_break_tag("&+"),
-//         postfix_break_tag("&."),
-//     ))(input)
-// }
 
 fn protocols(input: Input<'_>) -> TokenizationResult<'_> {
     alt((

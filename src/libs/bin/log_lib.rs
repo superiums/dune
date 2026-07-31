@@ -85,8 +85,8 @@ fn level(
         Err(RuntimeError::new(
             RuntimeErrorKind::TypeError {
                 expected: "Integer".into(),
-                sym: args[0].type_name(),
-                found: args[0].to_string(),
+                sym: args[0].to_string(),
+                found: args[0].type_name(),
             },
             ctx.clone(),
             0,
@@ -116,8 +116,8 @@ fn is_enabled(
         Err(RuntimeError::new(
             RuntimeErrorKind::TypeError {
                 expected: "Integer".into(),
-                sym: args[0].type_name(),
-                found: args[0].to_string(),
+                sym: args[0].to_string(),
+                found: args[0].type_name(),
             },
             ctx.clone(),
             0,
