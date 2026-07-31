@@ -257,13 +257,23 @@ pub enum CatchType {
 
 impl PartialOrd for Expression {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        // 字符串之间比较
+        // ===== 字符串之间比较 =====
         // 先拦截所有“文本类”变体之间的比较，替代原来十几条两两分支
         if let (Some(a), Some(b)) = (self.as_str(), other.as_str()) {
             return a.partial_cmp(b);
         }
 
         match (self, other) {
+            // ===== 同类型简单比较 =====
+            (Self::None, Self::None) => Some(Ordering::Equal),
+            (Self::Blank, Self::Blank) => Some(Ordering::Equal),
+            // (Self::String(a), Self::String(b)) => a.partial_cmp(b),
+            (Self::Bytes(a), Self::Bytes(b)) => a.partial_cmp(b),
+            (Self::Boolean(a), Self::Boolean(b)) => a.partial_cmp(b),
+            (Self::DateTime(a), Self::DateTime(b)) => a.partial_cmp(b),
+            (Self::FileSize(a), Self::FileSize(b)) => a.partial_cmp(b),
+            (Self::Table(a), Self::Table(b)) => a.rows().partial_cmp(b.rows()),
+
             // ===== 数值类型互比 =====
             (Self::Integer(a), Self::Integer(b)) => a.partial_cmp(b),
             (Self::Float(a), Self::Float(b)) => a.partial_cmp(b),
@@ -291,15 +301,6 @@ impl PartialOrd for Expression {
             // bytes
             (Self::Bytes(a), Self::String(b)) => a.as_slice().partial_cmp(b.as_bytes()),
             (Self::String(a), Self::Bytes(b)) => a.as_bytes().partial_cmp(b.as_slice()),
-
-            // ===== 同类型简单比较 =====
-            (Self::None, Self::None) => Some(Ordering::Equal),
-            (Self::Blank, Self::Blank) => Some(Ordering::Equal),
-            // (Self::String(a), Self::String(b)) => a.partial_cmp(b),
-            (Self::Bytes(a), Self::Bytes(b)) => a.partial_cmp(b),
-            (Self::Boolean(a), Self::Boolean(b)) => a.partial_cmp(b),
-            (Self::DateTime(a), Self::DateTime(b)) => a.partial_cmp(b),
-            (Self::FileSize(a), Self::FileSize(b)) => a.partial_cmp(b),
 
             // 文件大小与数值比较
             (Self::FileSize(a), Self::String(b)) => {

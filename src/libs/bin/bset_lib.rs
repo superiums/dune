@@ -1,5 +1,6 @@
 use crate::eval::State;
 use crate::libs::BuiltinInfo;
+use crate::libs::bin::list_lib::clamp;
 use crate::libs::helper::*;
 use crate::libs::lazy_module::LazyModule;
 use crate::{Environment, Expression, RuntimeError, RuntimeErrorKind};
@@ -13,7 +14,7 @@ pub fn regist_lazy() -> LazyModule {
         // 检查操作
         contains, is_empty, any, all,
         // 数据获取
-        first,last,len,
+        first,last,get, len,
         // 查找
         find, filter,
         // 结构修改
@@ -39,6 +40,7 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         // 数据获取
         first => "smallest item", "<set>"
         last => "largest item", "<set>"
+        get => "nth element, negative index from end", "<set> <index>"
         len => "set size", "<set>"
 
         // 查找
@@ -121,7 +123,25 @@ fn last(
         .cloned()
         .ok_or_else(|| RuntimeError::common("cannot get last of empty set".into(), ctx.clone(), 0))
 }
+fn get(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("get", &args, 2, ctx)?;
+    let set = get_bset_ref(&args[0], ctx)?;
+    let n = get_integer_ref(&args[1], ctx)?;
+    let index = clamp(n, set.len());
 
+    set.iter().nth(index).cloned().ok_or(RuntimeError::new(
+        RuntimeErrorKind::IndexOutOfBounds {
+            index: n,
+            len: set.len(),
+        },
+        ctx.clone(),
+        0,
+    ))
+}
 fn len(
     args: Vec<Expression>,
     _env: &mut Environment,

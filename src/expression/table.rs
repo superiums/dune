@@ -1,4 +1,4 @@
-use crate::Expression;
+use crate::{Expression, RuntimeErrorKind};
 use std::fmt;
 
 /// Table
@@ -31,6 +31,45 @@ impl TableData {
             padded_row.truncate(self.headers.len());
         }
         self.rows.push(padded_row);
+    }
+
+    /// 清空并设置数据
+    pub fn set_rows(&mut self, rows: Vec<Vec<Expression>>) -> Result<(), RuntimeErrorKind> {
+        // 确保行的列数与表头一致
+        for row in rows.iter() {
+            if row.len() != self.column_count() {
+                return Err(RuntimeErrorKind::CustomError(
+                    "row size mismatch: {row}".into(),
+                ));
+            }
+        }
+        self.rows = rows;
+        Ok(())
+    }
+    pub fn set_rows_vec(&mut self, rows: Vec<Expression>) -> Result<(), RuntimeErrorKind> {
+        // 确保行的列数与表头一致
+        let rs = rows
+            .into_iter()
+            .map(|row| match row {
+                Expression::List(r) => r.as_ref().clone(),
+                Expression::Map(m) => self
+                    .headers
+                    .iter()
+                    .map(|header| m.get(header.as_str()).cloned().unwrap_or(Expression::None))
+                    .collect::<Vec<_>>(),
+                _ => vec![],
+            })
+            .collect::<Vec<Vec<_>>>();
+
+        for row in rs.iter() {
+            if row.len() != self.column_count() {
+                return Err(RuntimeErrorKind::CustomError(
+                    "row size mismatch: {row}".into(),
+                ));
+            }
+        }
+        self.rows = rs;
+        Ok(())
     }
 
     /// 获取列数据
@@ -97,18 +136,13 @@ impl TableData {
     }
 
     /// 按列排序
-    pub fn sort_by_column(&self, column: usize) -> TableData {
+    pub fn sort_by_column(&mut self, column: usize) {
         let mut rows = self.rows.clone();
         rows.sort_by(|a, b| match (a.get(column), b.get(column)) {
-            (Some(a_val), Some(b_val)) => a_val
-                .partial_cmp(b_val)
-                .unwrap_or(std::cmp::Ordering::Equal),
+            (Some(a_val), Some(b_val)) => a_val.cmp(b_val),
             _ => std::cmp::Ordering::Equal,
         });
-        TableData {
-            headers: self.headers.clone(),
-            rows,
-        }
+        let _ = self.set_rows(rows);
     }
 
     /// 获取表头

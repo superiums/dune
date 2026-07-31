@@ -109,7 +109,7 @@ fn get(
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("at", &args, 2, ctx)?;
+    check_exact_args_len("get", &args, 2, ctx)?;
     let key = get_string_ref(&args[1], ctx)?.as_str();
     let map = get_hmap_ref(&args[0], ctx)?;
 

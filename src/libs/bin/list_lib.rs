@@ -10,7 +10,7 @@ use crate::libs::bin::{
 };
 use crate::libs::helper::{
     check_args_len, check_exact_args_len, check_fn_arg, get_integer_arg, get_integer_ref,
-    get_string_arg, get_string_ref,
+    get_string_ref,
 };
 use crate::libs::lazy_module::LazyModule;
 use crate::{
@@ -81,7 +81,7 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         unique => "dedupe, preserve order", "<list>"
         split_at => "split at index, returns [left,right]", "<list> <index>"
         split_first => "split head/tail, returns [head,rest]", "<list>"
-        sort => "sort, optional fn(a,b)->[-1/0/1]. e.g. sort list 'name'", "<string|list> [key_fn|key...]"
+        sort => "sort, optional fn(a,b)->[-1/0/1]. e.g. sort list 'name'", "<list> [key_fn|±key...]"
         group => "group by key fn or map field, e.g.  fn(item)->string", "<list> <key_fn|key>"
         remove_at => "remove n items from index", "<list> <index> [count=1]"
         remove => "remove item, default first-only", "<list> <item> [all=false]"
@@ -270,7 +270,7 @@ fn last(
         }),
     }
 }
-fn clamp(n: Int, len: usize) -> usize {
+pub fn clamp(n: Int, len: usize) -> usize {
     if n < 0 {
         len + n as usize
     } else {
@@ -282,7 +282,7 @@ fn get(
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("at", &args, 2, ctx)?;
+    check_exact_args_len("get", &args, 2, ctx)?;
     let list = get_list_ref(&args[0], ctx)?;
     let n = get_integer_ref(&args[1], ctx)?;
 
@@ -575,64 +575,150 @@ fn split_first(
     }
 }
 
-fn sort(
+/// 排序键：描述如何从一个元素中取出用于比较的值，以及排序方向。
+enum SortKey {
+    /// Map/HMap 字段名 + 是否升序
+    Field(String, bool),
+    /// List 内部索引（已转换为非负值）+ 是否升序
+    Index(usize, bool),
+    /// 直接用整个元素比较，仅用于标量（如字符串）列表；bool 表示是否升序
+    Whole(bool),
+}
+
+impl SortKey {
+    /// 解析单个 key 描述：
+    ///   "+" / "-"          -> Whole(true/false)         用于字符串等标量列表
+    ///   "+field"/"-field"  -> Field(field, true/false)  用于 Map/HMap
+    ///   "field"            -> Field(field, true)        默认升序
+    ///   正整数 n            -> Index(n, true)            用于 List，按下标 n 升序
+    ///   负整数 -n           -> Index(n, false)           用于 List，按下标 n 降序
+    fn parse(expr: &Expression, ctx: &Expression) -> Result<Self, RuntimeError> {
+        match expr {
+            Expression::Integer(i) => Ok(SortKey::Index(i.unsigned_abs() as usize, i >= &0)),
+            Expression::Symbol(s) | Expression::String(s) => match s.as_str() {
+                "+" => Ok(SortKey::Whole(true)),
+                "-" => Ok(SortKey::Whole(false)),
+                _ => {
+                    let mut chars = s.chars();
+                    match chars.next() {
+                        Some('+') => Ok(SortKey::Field(chars.as_str().to_string(), true)),
+                        Some('-') => Ok(SortKey::Field(chars.as_str().to_string(), false)),
+                        _ => Ok(SortKey::Field(s.clone(), true)),
+                    }
+                }
+            },
+            e => Err(RuntimeError::new(
+                RuntimeErrorKind::TypeError {
+                    expected: "String('+field'/'-field'/'+'/'-') or Integer as sort key".into(),
+                    sym: e.to_string(),
+                    found: e.type_name(),
+                },
+                ctx.clone(),
+                0,
+            )),
+        }
+    }
+
+    /// 从一个元素里取出用于比较的值；取不到（字段不存在/索引越界/类型不匹配）时
+    /// 统一退化为 &Expression::None，与标准库 Option 语义（None 排最前）保持一致。
+    fn extract<'a>(&self, elem: &'a Expression) -> &'a Expression {
+        match self {
+            SortKey::Whole(_) => elem,
+            SortKey::Field(name, _) => match elem {
+                Expression::Map(m) => m.get(name).unwrap_or(&Expression::None),
+                Expression::HMap(m) => m.get(name).unwrap_or(&Expression::None),
+                _ => &Expression::None,
+            },
+            SortKey::Index(idx, _) => match elem {
+                Expression::List(l) => l.get(*idx).unwrap_or(&Expression::None),
+                Expression::BSet(l) => l.iter().nth(*idx).unwrap_or(&Expression::None),
+                _ => &Expression::None,
+            },
+        }
+    }
+
+    fn is_asc(&self) -> bool {
+        match self {
+            SortKey::Whole(a) | SortKey::Field(_, a) | SortKey::Index(_, a) => *a,
+        }
+    }
+}
+
+/// 依次按多个 key 比较，前面相等才比较下一个（tie-break）。
+fn compare_by_keys(keys: &[SortKey], a: &Expression, b: &Expression) -> Ordering {
+    for key in keys {
+        let va = key.extract(a);
+        let vb = key.extract(b);
+        // 用 Ord::cmp 而不是 partial_cmp().unwrap_or(Equal)：
+        // 不可比较时仍能按类型名兜底给出一个确定的全序，而不是直接判等。
+        let mut ord = va.cmp(vb);
+        if !key.is_asc() {
+            ord = ord.reverse();
+        }
+        if ord != Ordering::Equal {
+            return ord;
+        }
+    }
+    Ordering::Equal
+}
+
+pub fn sort(
     args: Vec<Expression>,
     env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
     check_args_len("sort", &args, 1.., ctx)?;
-    let size = args.len();
-    let mut it = args.into_iter();
-    let list = it.next().unwrap();
 
-    let (func, headers) = match size {
-        2 => {
-            let key_func = it.next().unwrap();
-
-            match key_func {
-                Expression::Lambda(..) | Expression::Function(..) => {
-                    (Some(Rc::new(key_func)), None)
+    if let Some((list, ops)) = args.split_first() {
+        let target = get_list_ref(list, ctx)?.as_ref().clone();
+        let ops = ops.to_vec();
+        let r = sort_vec(target, ops, env, ctx)?;
+        return Ok(Expression::List(Rc::new(r)));
+    }
+    Ok(Expression::None)
+}
+pub fn sort_vec(
+    mut sorted: Vec<Expression>,
+    ops: Vec<Expression>,
+    env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Vec<Expression>, RuntimeError> {
+    let (func, keys) = match ops.len() {
+        0 => (None, None),
+        1 => {
+            let key_arg = ops.into_iter().next().unwrap();
+            match key_arg {
+                Expression::Lambda(..) | Expression::Function(..) => (Some(Rc::new(key_arg)), None),
+                Expression::List(items) => {
+                    let keys = items
+                        .as_ref()
+                        .iter()
+                        .map(|e| SortKey::parse(e, ctx))
+                        .collect::<Result<Vec<_>, _>>()?;
+                    (None, Some(keys))
                 }
-                Expression::Symbol(s) | Expression::String(s) => (None, Some(vec![s])),
-                Expression::List(s) => (
-                    None,
-                    Some(s.iter().map(|e| e.to_string()).collect::<Vec<_>>()),
-                ),
-                _ => (None, None),
+                other => (None, Some(vec![SortKey::parse(&other, ctx)?])),
             }
         }
-        3.. => {
-            let cols = it
-                .map(|arg| get_string_arg(arg, ctx))
-                .collect::<Result<Vec<_>, RuntimeError>>()?;
-            (None, Some(cols))
-        }
-        _ => (None, None),
-    };
-
-    let mut sorted: Vec<_> = match list {
-        Expression::List(l) => l.as_ref().clone(),
-
-        s => {
-            return Err(RuntimeError::new(
-                RuntimeErrorKind::TypeError {
-                    expected: "List as first argument".into(),
-                    sym: s.to_string(),
-                    found: s.type_name(),
-                },
-                ctx.clone(),
-                0,
-            ));
+        _ => {
+            // 3 个及以上参数：每个都是一个独立的 sort key，
+            // 支持 "+field"/"-field"/"+"/"-"/整数索引 任意混合
+            let keys = ops
+                .iter()
+                .map(|e| SortKey::parse(e, ctx))
+                .collect::<Result<Vec<_>, _>>()?;
+            (None, Some(keys))
         }
     };
-
-    let state = &mut State::new();
 
     if let Some(sort_func) = func {
         sorted.sort_by(|a, b| {
-            let result = &sort_func.eval_apply(&sort_func, &[a.clone(), b.clone()], state, env, 0);
-
-            match result {
+            let sort_result = Expression::Apply(
+                Rc::new((*sort_func).clone()),
+                Rc::new(vec![a.clone(), b.clone()]),
+            )
+            .eval(env);
+            match sort_result {
                 Ok(Expression::Integer(i)) => match i {
                     1.. => Ordering::Greater,
                     0 => Ordering::Equal,
@@ -645,52 +731,28 @@ fn sort(
                 _ => Ordering::Equal,
             }
         });
-    } else if let Some(heads) = headers {
-        sorted.sort_by(|a, b| match (a, b) {
-            (Expression::Map(map_a), Expression::Map(map_b)) => {
-                let key_a = heads
-                    .iter()
-                    .map(|col| map_a.get(col).unwrap_or(&Expression::None))
-                    .collect::<Vec<_>>();
-                let key_b = heads
-                    .iter()
-                    .map(|col| map_b.get(col).unwrap_or(&Expression::None))
-                    .collect::<Vec<_>>();
-
-                key_a
-                    .iter()
-                    .zip(key_b.iter())
-                    .find_map(|(a_val, b_val)| match a_val.partial_cmp(b_val) {
-                        Some(Ordering::Equal) => None,
-                        other => other,
-                    })
-                    .unwrap_or(Ordering::Equal)
-            }
-            (Expression::HMap(map_a), Expression::HMap(map_b)) => {
-                let key_a = heads
-                    .iter()
-                    .map(|col| map_a.get(col).unwrap_or(&Expression::None))
-                    .collect::<Vec<_>>();
-                let key_b = heads
-                    .iter()
-                    .map(|col| map_b.get(col).unwrap_or(&Expression::None))
-                    .collect::<Vec<_>>();
-
-                key_a
-                    .iter()
-                    .zip(key_b.iter())
-                    .find_map(|(a_val, b_val)| match a_val.partial_cmp(b_val) {
-                        Some(Ordering::Equal) => None,
-                        other => other,
-                    })
-                    .unwrap_or(Ordering::Equal)
-            }
-            _ => Ordering::Equal,
-        });
+    } else if let Some(keys) = keys {
+        // 字符串标量列表只允许 "+"/"-"，不允许字段名/索引 key
+        if matches!(
+            sorted.first(),
+            Some(Expression::String(_)) | Some(Expression::Symbol(_))
+        ) && keys.iter().any(|k| !matches!(k, SortKey::Whole(_)))
+        {
+            return Err(RuntimeError::common(
+                "sorting a list of strings only supports '+'/'-' as sort key, not field name or index"
+                    .to_string()
+                    .into(),
+                ctx.clone(),
+                0,
+            ));
+        }
+        // 按指定key比较
+        sorted.sort_by(|a, b| compare_by_keys(&keys, a, b));
     } else {
-        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        // 未指定 key：直接复用 Expression 自身实现的全序 Ord
+        sorted.sort_by(|a, b| a.cmp(b));
     }
-    Ok(Expression::List(Rc::new(sorted)))
+    Ok(sorted)
 }
 
 fn group(

@@ -1,5 +1,6 @@
 use crate::expression::table::TableData;
 use crate::libs::bin::into_lib::csv as to_csv;
+use crate::libs::bin::list_lib;
 use crate::libs::helper::{
     check_args_len, check_exact_args_len, get_integer_arg, get_integer_ref, get_table_arg,
 };
@@ -17,7 +18,7 @@ pub fn regist_lazy() -> LazyModule {
         get_map, rows_map, first_map, last_map,
         rows, first, last, get,
         grep, position, rposition, filter,
-        sort_by,
+        sort, sort_by,
         push,
 
         is_empty,get_cell,slice,from_maps,
@@ -46,7 +47,8 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         position => "first row index matching cell/fn(row_map)->bool", "<table> <cell|fn> [start=0]"
         rposition => "last row index matching cell/fn(row_map)->bool", "<table> <cell|fn> [start=0]"
         filter => "filter rows by cell/fn(row_map)->bool", "<table> <cell|fn>"
-        sort_by => "sort by column", "<table> <col>"
+        sort => "sort, optional fn(a,b)->[-1/0/1]. e.g. sort table 'name'", "<list> [key_fn|±key...]"
+        sort_by => "simple sort by column", "<table> <col>"
         push => "append a row", "<table> <list|set>"
 
         is_empty => "has no rows?", "<table>"
@@ -66,8 +68,8 @@ fn len(
     check_exact_args_len("len", &args, 1, ctx)?;
     let mut it = args.into_iter();
     let data = it.next().unwrap();
-    let table = get_table_arg(data, ctx)?;
-    Ok(Expression::Integer(table.row_count() as i64))
+    let t = get_table_arg(data, ctx)?;
+    Ok(Expression::Integer(t.row_count() as i64))
 }
 fn header_len(
     args: Vec<Expression>,
@@ -77,8 +79,8 @@ fn header_len(
     check_exact_args_len("header_len", &args, 1, ctx)?;
     let mut it = args.into_iter();
     let data = it.next().unwrap();
-    let table = get_table_arg(data, ctx)?;
-    Ok(Expression::Integer(table.column_count() as i64))
+    let t = get_table_arg(data, ctx)?;
+    Ok(Expression::Integer(t.column_count() as i64))
 }
 fn get_column(
     args: Vec<Expression>,
@@ -88,19 +90,19 @@ fn get_column(
     check_exact_args_len("get_column", &args, 2, ctx)?;
     let mut it = args.into_iter();
     let data = it.next().unwrap();
-    let table = get_table_arg(data, ctx)?;
+    let t = get_table_arg(data, ctx)?;
     let key = it.next().unwrap();
     let idx = match key {
         Expression::Integer(i) => i as usize,
-        Expression::String(s) | Expression::Symbol(s) => table
+        Expression::String(s) | Expression::Symbol(s) => t
             .headers()
             .iter()
             .position(|x| x == &s)
             .ok_or(RuntimeError::common(
-                format!("column {} not found", &s).into(),
-                ctx.clone(),
-                0,
-            ))?,
+            format!("column {} not found", &s).into(),
+            ctx.clone(),
+            0,
+        ))?,
         e => {
             return Err(RuntimeError::new(
                 RuntimeErrorKind::TypeError {
@@ -113,9 +115,7 @@ fn get_column(
             ));
         }
     };
-    Ok(table
-        .get_column(idx)
-        .map_or(Expression::None, Expression::from))
+    Ok(t.get_column(idx).map_or(Expression::None, Expression::from))
 }
 pub fn select(
     mut args: Vec<Expression>,
@@ -148,8 +148,8 @@ fn headers(
     check_exact_args_len("headers", &args, 1, ctx)?;
     let mut it = args.into_iter();
     let data = it.next().unwrap();
-    let table = get_table_arg(data, ctx)?;
-    Ok(Expression::from(table.headers().to_vec()))
+    let t = get_table_arg(data, ctx)?;
+    Ok(Expression::from(t.headers().to_vec()))
 }
 
 ///every row as a map
@@ -161,9 +161,9 @@ fn rows_map(
     check_exact_args_len("rows_map", &args, 1, ctx)?;
     let mut it = args.into_iter();
     let data = it.next().unwrap();
-    let table = get_table_arg(data, ctx)?;
+    let t = get_table_arg(data, ctx)?;
 
-    Ok(table.to_map())
+    Ok(t.to_map())
 }
 fn rows(
     args: Vec<Expression>,
@@ -173,9 +173,9 @@ fn rows(
     check_exact_args_len("rows", &args, 1, ctx)?;
     let mut it = args.into_iter();
     let data = it.next().unwrap();
-    let table = get_table_arg(data, ctx)?;
+    let t = get_table_arg(data, ctx)?;
 
-    Ok(Expression::from(table.rows().to_vec()))
+    Ok(Expression::from(t.rows().to_vec()))
 }
 
 ///first row as map
@@ -187,15 +187,15 @@ fn first_map(
     check_args_len("first_map", &args, 1..=2, ctx)?;
     let mut it = args.into_iter();
     let data = it.next().unwrap();
-    let table = get_table_arg(data, ctx)?;
+    let t = get_table_arg(data, ctx)?;
     match it.next() {
         Some(Expression::Integer(i)) if i > 1 => {
-            let r = table
+            let r = t
                 .rows()
                 .iter()
                 .take(i as usize)
                 .map(|row| {
-                    let map: BTreeMap<String, Expression> = table
+                    let map: BTreeMap<String, Expression> = t
                         .headers()
                         .iter()
                         .enumerate()
@@ -210,7 +210,7 @@ fn first_map(
             return Ok(Expression::from(r));
         }
         _ => {
-            let row = table.rows().first();
+            let row = t.rows().first();
             match row {
                 None => Ok(Expression::None),
                 Some(row) => {
@@ -219,11 +219,7 @@ fn first_map(
                         .enumerate()
                         .map(|(i, x)| {
                             (
-                                table
-                                    .headers()
-                                    .get(i)
-                                    .cloned()
-                                    .unwrap_or("unkown".to_string()),
+                                t.headers().get(i).cloned().unwrap_or("unkown".to_string()),
                                 x.clone(),
                             )
                         })
@@ -243,11 +239,11 @@ fn first(
     check_args_len("first", &args, 1..=2, ctx)?;
     let mut it = args.into_iter();
     let data = it.next().unwrap();
-    let table = get_table_arg(data, ctx)?;
+    let t = get_table_arg(data, ctx)?;
 
     match it.next() {
         Some(Expression::Integer(i)) if i > 1 => {
-            let r = table
+            let r = t
                 .rows()
                 .iter()
                 .take(i as usize)
@@ -256,7 +252,7 @@ fn first(
             Ok(Expression::from(r))
         }
         _ => {
-            let row = table.rows().first();
+            let row = t.rows().first();
             match row {
                 None => Ok(Expression::None),
                 Some(row) => Ok(Expression::from(row.clone())),
@@ -274,17 +270,17 @@ fn last_map(
     check_args_len("last_map", &args, 1..=2, ctx)?;
     let mut it = args.into_iter();
     let data = it.next().unwrap();
-    let table = get_table_arg(data, ctx)?;
+    let t = get_table_arg(data, ctx)?;
     match it.next() {
         Some(Expression::Integer(i)) if i > 1 => {
-            let r = table
+            let r = t
                 .rows()
                 .iter()
                 .rev()
                 .take(i as usize)
                 .rev()
                 .map(|row| {
-                    let map: BTreeMap<String, Expression> = table
+                    let map: BTreeMap<String, Expression> = t
                         .headers()
                         .iter()
                         .enumerate()
@@ -299,7 +295,7 @@ fn last_map(
             return Ok(Expression::from(r));
         }
         _ => {
-            let row = table.rows().last();
+            let row = t.rows().last();
             match row {
                 None => Ok(Expression::None),
                 Some(row) => {
@@ -308,11 +304,7 @@ fn last_map(
                         .enumerate()
                         .map(|(i, x)| {
                             (
-                                table
-                                    .headers()
-                                    .get(i)
-                                    .cloned()
-                                    .unwrap_or("unkown".to_string()),
+                                t.headers().get(i).cloned().unwrap_or("unkown".to_string()),
                                 x.clone(),
                             )
                         })
@@ -332,11 +324,11 @@ fn last(
     check_args_len("last", &args, 1..=2, ctx)?;
     let mut it = args.into_iter();
     let data = it.next().unwrap();
-    let table = get_table_arg(data, ctx)?;
+    let t = get_table_arg(data, ctx)?;
 
     match it.next() {
         Some(Expression::Integer(i)) if i > 1 => {
-            let r = table
+            let r = t
                 .rows()
                 .iter()
                 .rev()
@@ -347,7 +339,7 @@ fn last(
             Ok(Expression::from(r))
         }
         _ => {
-            let row = table.rows().last();
+            let row = t.rows().last();
             match row {
                 None => Ok(Expression::None),
                 Some(row) => Ok(Expression::from(row.clone())),
@@ -364,11 +356,11 @@ fn get_map(
     check_exact_args_len("get_map", &args, 1, ctx)?;
     let mut it = args.into_iter();
     let data = it.next().unwrap();
-    let table = get_table_arg(data, ctx)?;
+    let t = get_table_arg(data, ctx)?;
     let index = it.next().unwrap();
     let idx = get_integer_arg(index, ctx)? as usize;
 
-    let row = table.rows().get(idx);
+    let row = t.rows().get(idx);
     match row {
         None => Ok(Expression::None),
         Some(row) => {
@@ -377,11 +369,7 @@ fn get_map(
                 .enumerate()
                 .map(|(i, x)| {
                     (
-                        table
-                            .headers()
-                            .get(i)
-                            .cloned()
-                            .unwrap_or("unkown".to_string()),
+                        t.headers().get(i).cloned().unwrap_or("unkown".to_string()),
                         x.clone(),
                     )
                 })
@@ -399,17 +387,40 @@ fn get(
     check_exact_args_len("get", &args, 1, ctx)?;
     let mut it = args.into_iter();
     let data = it.next().unwrap();
-    let table = get_table_arg(data, ctx)?;
+    let t = get_table_arg(data, ctx)?;
     let index = it.next().unwrap();
     let idx = get_integer_arg(index, ctx)? as usize;
 
-    let row = table.rows().get(idx);
+    let row = t.rows().get(idx);
     match row {
         None => Ok(Expression::None),
         Some(row) => Ok(Expression::from(row.clone())),
     }
 }
 
+pub fn sort(
+    args: Vec<Expression>,
+    env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_args_len("sort", &args, 1.., ctx)?;
+    let mut it = args.into_iter();
+    let list = it.next().unwrap();
+    let ops = it.collect();
+
+    let mut t = get_table_arg(list, ctx)?;
+    let target = t.to_map_vec();
+
+    // sort
+    let sorted = list_lib::sort_vec(target, ops, env, ctx)?;
+
+    t.set_rows_vec(sorted).map_err(|e| RuntimeError {
+        kind: e,
+        context: ctx.clone(),
+        depth: 0,
+    })?;
+    Ok(Expression::Table(t))
+}
 pub fn sort_by(
     args: Vec<Expression>,
     _env: &mut Environment,
@@ -420,17 +431,17 @@ pub fn sort_by(
     let list = it.next().unwrap();
     let key = it.next().unwrap();
 
-    let table = get_table_arg(list, ctx)?;
+    let mut t = get_table_arg(list, ctx)?;
 
     let col = match key {
         Expression::Integer(i) => i as usize,
         Expression::String(s) | Expression::Symbol(s) => {
-            table.headers().iter().position(|x| x == &s).unwrap_or(0)
+            t.headers().iter().position(|x| x == &s).unwrap_or(0)
         }
         e => {
             return Err(RuntimeError::new(
                 RuntimeErrorKind::TypeError {
-                    expected: "Integer/String as 2nd arg to sort a table".into(),
+                    expected: "Integer/String as 2nd arg to sort a t".into(),
                     found: e.type_name(),
                     sym: e.to_string(),
                 },
@@ -439,7 +450,8 @@ pub fn sort_by(
             ));
         }
     };
-    Ok(Expression::Table(table.sort_by_column(col)))
+    t.sort_by_column(col);
+    Ok(Expression::Table(t))
 }
 
 fn grep(
@@ -450,10 +462,10 @@ fn grep(
     check_exact_args_len("grep", &args, 2, ctx)?;
     let mut it = args.into_iter();
     let data = it.next().unwrap();
-    let table = get_table_arg(data, ctx)?;
+    let t = get_table_arg(data, ctx)?;
     let keyword = it.next().unwrap().to_string();
 
-    let r: Vec<Vec<Expression>> = table
+    let r: Vec<Vec<Expression>> = t
         .rows()
         .iter()
         .filter(|x| x.iter().any(|c| c.to_string().contains(&keyword)))
@@ -471,7 +483,7 @@ fn position(
 
     let mut it = args.into_iter();
     let data = it.next().unwrap();
-    let table = get_table_arg(data, ctx)?;
+    let t = get_table_arg(data, ctx)?;
     let target = it.next().unwrap();
     let start = if let Some(start_expr) = it.next() {
         get_integer_ref(&start_expr, ctx)? as usize
@@ -482,7 +494,7 @@ fn position(
     match &target {
         Expression::Function(..) | Expression::Lambda(..) => {
             let state = &mut State::new();
-            for (i, row) in table.to_map_vec().into_iter().enumerate().skip(start) {
+            for (i, row) in t.to_map_vec().into_iter().enumerate().skip(start) {
                 let r = &target.eval_apply(&target, &[row], state, env, 0)?;
                 if let Expression::Boolean(true) = r {
                     return Ok(Expression::Integer(i as i64));
@@ -491,7 +503,7 @@ fn position(
             Ok(Expression::None)
         }
         _ => Ok(
-            match table
+            match t
                 .rows()
                 .iter()
                 .skip(start)
@@ -513,7 +525,7 @@ fn rposition(
 
     let mut it = args.into_iter();
     let data = it.next().unwrap();
-    let table = get_table_arg(data, ctx)?;
+    let t = get_table_arg(data, ctx)?;
     let target = it.next().unwrap();
     let start = if let Some(start_expr) = it.next() {
         get_integer_ref(&start_expr, ctx)? as usize
@@ -524,7 +536,7 @@ fn rposition(
     match &target {
         Expression::Function(..) | Expression::Lambda(..) => {
             let state = &mut State::new();
-            for (i, row) in table.to_map_vec().into_iter().enumerate().rev().skip(start) {
+            for (i, row) in t.to_map_vec().into_iter().enumerate().rev().skip(start) {
                 let r = &target.eval_apply(&target, &[row], state, env, 0)?;
                 if let Expression::Boolean(true) = r {
                     return Ok(Expression::Integer(i as i64));
@@ -533,7 +545,7 @@ fn rposition(
             Ok(Expression::None)
         }
         _ => Ok(
-            match table
+            match t
                 .rows()
                 .iter()
                 .rev()
@@ -556,13 +568,13 @@ fn filter(
 
     let mut it = args.into_iter();
     let data = it.next().unwrap();
-    let table = get_table_arg(data, ctx)?;
+    let t = get_table_arg(data, ctx)?;
     let target = it.next().unwrap();
 
     let result: Vec<Vec<Expression>> = match &target {
         Expression::Function(..) | Expression::Lambda(..) => {
             let state = &mut State::new();
-            let r = table
+            let r = t
                 .to_map_vec()
                 .into_iter()
                 .filter(|row| {
@@ -575,7 +587,7 @@ fn filter(
                 .collect::<Vec<_>>();
             return Ok(Expression::from(r));
         }
-        _ => table
+        _ => t
             .rows()
             .iter()
             .filter(|row| row.iter().any(|col| col == &target))

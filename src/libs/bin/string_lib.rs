@@ -6,7 +6,8 @@ use crate::{
         BuiltinInfo,
         bin::{
             colors::{COLOR_MAP, true_color_by_hex},
-            top,
+            list_lib,
+            top::rev,
         },
         helper::{
             check_args_len, check_exact_args_len, get_integer_arg, get_integer_ref, get_string_arg,
@@ -40,7 +41,7 @@ pub fn regist_lazy() -> LazyModule {
         split, split_at, chars, words, words_quoted, lines, paragraphs, concat,
         // 修改操作
         insert, repeat, replace, slice, strip_prefix, strip_suffix, trim, trim_start, trim_end, lower, upper, title,
-        rev,
+        rev,sort,
         // 高级操作
         max_len, grep,
         strip_ansi,
@@ -104,6 +105,7 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         repeat => "repeat n times", "<string> <count>"
         replace => "replace all matches", "<string> <old> <new>"
         slice => "substring [start,end)", "<string> <start> [end]"
+        sort => "sort lines", "<string> ['+'|'-'|key_fn]"
         rev => "reverse", "<string>"
         strip_prefix => "remove prefix", "<string> <prefix>"
         strip_suffix => "remove suffix", "<string> <suffix>"
@@ -572,13 +574,6 @@ fn concat(
 
     Ok(Expression::from(others))
 }
-fn rev(
-    args: Vec<Expression>,
-    env: &mut Environment,
-    ctx: &Expression,
-) -> Result<Expression, RuntimeError> {
-    top::rev(args, env, ctx)
-}
 
 fn repeat(
     args: Vec<Expression>,
@@ -655,6 +650,32 @@ fn slice(
     Ok(Expression::String(result))
 }
 
+pub fn sort(
+    args: Vec<Expression>,
+    env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_args_len("sort", &args, 1.., ctx)?;
+    let mut it = args.into_iter();
+    let data = it.next().unwrap();
+    let ops = it.collect();
+
+    let base_str = get_string_arg(data, ctx)?;
+    let target: Vec<Expression> = base_str
+        .lines()
+        .into_iter()
+        .map(|line| Expression::String(line.to_string()))
+        .collect();
+
+    // sort
+    let sorted = list_lib::sort_vec(target, ops, env, ctx)?;
+    let r = sorted
+        .iter()
+        .map(|item| item.to_string())
+        .collect::<Vec<_>>()
+        .join("\n");
+    return Ok(Expression::String(r));
+}
 fn insert(
     args: Vec<Expression>,
     _env: &mut Environment,
