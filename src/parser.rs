@@ -1030,7 +1030,8 @@ fn parse_list(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorK
             map(
                 separated_list0(
                     terminated(text(","), opt(kind(TokenKind::LineBreak))),
-                    parse_expr,
+                    |inp| PrattParser::parse_expr_with_precedence(inp, PREC_FUNC_ARG, 0),
+                    // parse_expr,
                 ),
                 Expression::from,
             ),
@@ -1714,28 +1715,29 @@ fn parse_map_inner<'a>(
             opt(preceded(
                 terminated(text(":"), opt(kind(TokenKind::LineBreak))),
                 cut(|inp| {
-                    alt((
-                        parse_literal,
-                        parse_variable,
-                        parse_symbol,
-                        parse_list,
-                        parse_bmap,
-                        parse_hashmap,
-                        parse_map,
-                        parse_bset,
-                    ))(inp)
-                    .map_err(|e| match e {
-                        // Failure 来自内部 cut（如未闭合的列表），直接透传保留具体错误
-                        nom::Err::Failure(inner) => nom::Err::Failure(inner),
-                        // Error 表示完全没识别出任何元素（如遇到 `}`），转为 Error 而非 Failure
-                        // 这样 separated_list0 才能回退，允许末尾逗号
-                        _ => SyntaxErrorKind::failure(
-                            inp.get_str_slice(),
-                            "a value",
-                            None,
-                            Some("add a value for this item"),
-                        ),
-                    })
+                    PrattParser::parse_expr_with_precedence(inp, PREC_FUNC_ARG, 0)
+                        // alt((
+                        //     parse_literal,
+                        //     parse_variable,
+                        //     parse_symbol,
+                        //     parse_list,
+                        //     parse_bmap,
+                        //     parse_hashmap,
+                        //     parse_map,
+                        //     parse_bset,
+                        // ))(inp)
+                        .map_err(|e| match e {
+                            // Failure 来自内部 cut（如未闭合的列表），直接透传保留具体错误
+                            nom::Err::Failure(inner) => nom::Err::Failure(inner),
+                            // Error 表示完全没识别出任何元素（如遇到 `}`），转为 Error 而非 Failure
+                            // 这样 separated_list0 才能回退，允许末尾逗号
+                            _ => SyntaxErrorKind::failure(
+                                inp.get_str_slice(),
+                                "a value",
+                                None,
+                                Some("add a value for this item"),
+                            ),
+                        })
                 }),
             )),
         )),
