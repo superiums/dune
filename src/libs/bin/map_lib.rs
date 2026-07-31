@@ -487,12 +487,6 @@ fn map(
                     ls.get(1).cloned().unwrap_or(Expression::None),
                 );
             }
-            Expression::BSet(ls) => {
-                new_map.insert(
-                    ls.first().map_or(k.clone(), |nk| nk.to_string()),
-                    ls.last().cloned().unwrap_or(Expression::None),
-                );
-            }
             Expression::Map(nm) => new_map.extend(nm.as_ref().clone()),
             Expression::HMap(nm) => new_map.extend(nm.as_ref().clone()),
             _ => {

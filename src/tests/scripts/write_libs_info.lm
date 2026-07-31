@@ -1,5 +1,5 @@
-let libs = [ about,boolean,bytes, console,filesize,from, fs,hmap,into, list,log,map, math,rand,regex, set,string,sys, table,time,ui,]
+[about, boolean, bytes, console, filesize, from, fs, hmap, into, list, log, map, math, rand, regex, set, string, sys, table, time, tops, ui]
 for lib in libs {
-	help $lib | .strip_ansi() | .replace(`{lib}.`,'') | '## ' + _ >> /tmp/libs_full.md
+	help $lib | .strip_ansi() | .replace(`{lib}.`,'') | '### ' + _ >> /tmp/libs_full.md
 	help $lib | .strip_ansi() | .replace(`{lib}.`,'') | .lines() | .filter(x -> !x.starts_with("\t")) | .join("\n") | '## ' + _ >> /tmp/libs.md
 }
