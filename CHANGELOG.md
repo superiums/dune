@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.17.1]
+- optimize all tips for libs
+- allow expr in map value
+- optimize `sort` of list/map/str
+- improve cmp
+- type_name static
+- optimize range count
+- `fs.ls -?` to print help info
+- optimize math min/max/clamp
+- throw while map.from_list data wrong
+- update map.map
+- improve tip for help
+- reuse into.filesize
+- add `about.history`
+- display runtime profile info
+
 ## [0.17.0]
 - improve support for `Bytes`
   + literal supported: `b'\x41'`
