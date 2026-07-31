@@ -109,7 +109,7 @@ let {name, age} = user
 
 # 类型丰富：List、Map、Set、Range，全部原生支持
 let scores = [95, 87, 72, 88]
-let avg = scores | list.foldl((a, b) -> a + b) | _ / scores.len()
+let avg = scores | list.fold((a, b) -> a + b) | _ / scores.len()
 ```
 
 ### 模块化脚本：写大项目不再是灾难

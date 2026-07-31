@@ -109,7 +109,7 @@ let {name, age} = user
 
 # Rich types: List, Map, Set, Range, all natively supported
 let scores = [95, 87, 72, 88]
-let avg = scores | list.foldl((a, b) -> a + b) | _ / scores.len()
+let avg = scores | list.fold((a, b) -> a + b) | _ / scores.len()
 ```
 
 ### Modular Scripting: Writing Large Projects Is No Longer a Disaster
