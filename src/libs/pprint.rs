@@ -8,24 +8,7 @@ use tabled::{
     },
 };
 
-use crate::{Expression, expression::table::TableData};
-
-use regex_lite::Regex;
-pub fn strip_ansi_escapes(text: &str) -> String {
-    use std::sync::OnceLock;
-    static ANSI_RE: OnceLock<Regex> = OnceLock::new();
-    let re = ANSI_RE.get_or_init(|| {
-        Regex::new(
-            // 1. CSI sequences:  ESC [ params final_byte  (e.g. \x1b[92m, \x1b[38;5;141m)
-            // 2. OSC sequences:  ESC ] ... BEL|ST         (e.g. \x1b]2;title\x07)
-            // 3. Other 2-char:   ESC + any [@-_] char     (fallback)
-            // 4. C1 8-bit codes: \x80-\x9F
-            r"\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-_]|[\x80-\x9F]",
-        )
-        .unwrap()
-    });
-    re.replace_all(text, "").into_owned()
-}
+use crate::{Expression, expression::table::TableData, libs::bin::into_lib::strip_ansi_escapes};
 
 pub fn pretty_printer(arg: &Expression) -> Result<Expression, crate::RuntimeError> {
     match arg {

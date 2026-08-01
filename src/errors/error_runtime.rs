@@ -111,6 +111,7 @@ pub enum RuntimeErrorKind {
 }
 
 impl RuntimeError {
+    #[inline]
     pub fn new(kind: RuntimeErrorKind, context: Expression, depth: usize) -> Self {
         Self {
             kind,
@@ -138,6 +139,7 @@ impl RuntimeError {
             depth,
         )
     }
+    #[inline]
     pub fn common(msg: Cow<'static, str>, context: Expression, depth: usize) -> Self {
         Self {
             kind: RuntimeErrorKind::CustomError(msg),

@@ -36,9 +36,9 @@ pub struct History {
     index: Option<usize>,
     saved_line: String,
     // ── 搜索状态 ──
-    search_query: String,
-    search_matches: Vec<usize>,
-    search_index: usize,
+    // search_query: String,
+    // search_matches: Vec<usize>,
+    // search_index: usize,
 }
 
 impl Default for History {
@@ -57,9 +57,9 @@ impl History {
             current_dir: String::new(),
             index: None,
             saved_line: String::new(),
-            search_query: String::new(),
-            search_matches: Vec::new(),
-            search_index: 0,
+            // search_query: String::new(),
+            // search_matches: Vec::new(),
+            // search_index: 0,
         }
     }
 
@@ -69,6 +69,7 @@ impl History {
         self.current_dir = path;
     }
 
+    #[inline]
     pub fn current_dir(&self) -> &str {
         &self.current_dir
     }
@@ -135,6 +136,7 @@ impl History {
     // ── 复合评分（用于多结果排序）────────────────────────────────
 
     /// 本目录专属命令获得 1_000_000 加权，使其排在全局命令之前。
+    #[inline]
     fn dir_score(&self, entry: &HistoryEntry) -> u64 {
         let local_boost = if !entry.is_multi_dir && entry.last_path == self.current_dir {
             1_000_000u64
@@ -146,6 +148,7 @@ impl History {
 
     // ── 导航（按时间顺序，不受权重影响）──────────────────────────
 
+    #[inline]
     pub fn previous(&mut self, current_line: &str) -> Option<&str> {
         if self.entries.is_empty() {
             return None;
@@ -163,6 +166,7 @@ impl History {
         self.index.map(|i| self.entries[i].command.as_str())
     }
 
+    #[inline]
     pub fn next(&mut self, _current_line: &str) -> Option<&str> {
         match self.index {
             Some(i) if i + 1 < self.entries.len() => {
@@ -192,12 +196,14 @@ impl History {
         if saved.is_empty() { None } else { Some(saved) }
     }
 
+    #[inline]
     pub fn is_navigating(&self) -> bool {
         self.index.is_some()
     }
 
     // ── Hint（两阶段：本目录专属优先，再全局）───────────────────
 
+    #[inline]
     pub fn search_hint(&self, current_line: &str) -> Option<String> {
         if current_line.is_empty() {
             return None;
@@ -349,134 +355,134 @@ impl History {
 
     // ── Ctrl+R 搜索（按 dir_score 排序）─────────────────────────
 
-    fn build_matches(&self, query: &str) -> Vec<usize> {
-        let mut matches: Vec<usize> = self
-            .entries
-            .iter()
-            .enumerate()
-            .filter(|(_, e)| e.command.contains(query))
-            .map(|(i, _)| i)
-            .collect();
-        matches.sort_by(|&a, &b| {
-            self.dir_score(&self.entries[b])
-                .cmp(&self.dir_score(&self.entries[a]))
-                .then(b.cmp(&a))
-        });
-        matches
-    }
+    // fn build_matches(&self, query: &str) -> Vec<usize> {
+    //     let mut matches: Vec<usize> = self
+    //         .entries
+    //         .iter()
+    //         .enumerate()
+    //         .filter(|(_, e)| e.command.contains(query))
+    //         .map(|(i, _)| i)
+    //         .collect();
+    //     matches.sort_by(|&a, &b| {
+    //         self.dir_score(&self.entries[b])
+    //             .cmp(&self.dir_score(&self.entries[a]))
+    //             .then(b.cmp(&a))
+    //     });
+    //     matches
+    // }
 
-    pub fn start_search(&mut self, current_line: &str) {
-        self.saved_line = current_line.to_string();
-        self.search_query = current_line.to_string();
-        if self.search_query.is_empty() {
-            self.search_matches.clear();
-            self.search_index = 0;
-            return;
-        }
-        self.search_matches = self.build_matches(&self.search_query);
-        self.search_index = 0;
-    }
+    // pub fn start_search(&mut self, current_line: &str) {
+    //     self.saved_line = current_line.to_string();
+    //     self.search_query = current_line.to_string();
+    //     if self.search_query.is_empty() {
+    //         self.search_matches.clear();
+    //         self.search_index = 0;
+    //         return;
+    //     }
+    //     self.search_matches = self.build_matches(&self.search_query);
+    //     self.search_index = 0;
+    // }
 
-    pub fn search_current_match(&self) -> Option<&str> {
-        self.search_matches
-            .get(self.search_index)
-            .map(|&i| self.entries[i].command.as_str())
-    }
+    // pub fn search_current_match(&self) -> Option<&str> {
+    //     self.search_matches
+    //         .get(self.search_index)
+    //         .map(|&i| self.entries[i].command.as_str())
+    // }
 
-    pub fn search_append(&mut self, c: char) -> Option<&str> {
-        self.search_query.push(c);
-        self.search_matches = self.build_matches(&self.search_query);
-        self.search_index = 0;
-        if let Some(&i) = self.search_matches.first() {
-            self.index = Some(i);
-            Some(self.entries[i].command.as_str())
-        } else {
-            self.index = None;
-            None
-        }
-    }
+    // pub fn search_append(&mut self, c: char) -> Option<&str> {
+    //     self.search_query.push(c);
+    //     self.search_matches = self.build_matches(&self.search_query);
+    //     self.search_index = 0;
+    //     if let Some(&i) = self.search_matches.first() {
+    //         self.index = Some(i);
+    //         Some(self.entries[i].command.as_str())
+    //     } else {
+    //         self.index = None;
+    //         None
+    //     }
+    // }
 
-    pub fn search_backspace(&mut self) -> Option<&str> {
-        self.search_query.pop();
-        if self.search_query.is_empty() {
-            self.search_matches.clear();
-            self.search_index = 0;
-            self.index = None;
-            return self.as_ref_saved();
-        }
-        self.search_matches = self.build_matches(&self.search_query);
-        self.search_index = 0;
-        if let Some(&i) = self.search_matches.first() {
-            self.index = Some(i);
-            Some(self.entries[i].command.as_str())
-        } else {
-            self.index = None;
-            None
-        }
-    }
+    // pub fn search_backspace(&mut self) -> Option<&str> {
+    //     self.search_query.pop();
+    //     if self.search_query.is_empty() {
+    //         self.search_matches.clear();
+    //         self.search_index = 0;
+    //         self.index = None;
+    //         return self.as_ref_saved();
+    //     }
+    //     self.search_matches = self.build_matches(&self.search_query);
+    //     self.search_index = 0;
+    //     if let Some(&i) = self.search_matches.first() {
+    //         self.index = Some(i);
+    //         Some(self.entries[i].command.as_str())
+    //     } else {
+    //         self.index = None;
+    //         None
+    //     }
+    // }
 
-    pub fn search_next(&mut self) -> Option<&str> {
-        if self.search_matches.is_empty() || self.search_index + 1 >= self.search_matches.len() {
-            return None;
-        }
-        self.search_index += 1;
-        let i = self.search_matches[self.search_index];
-        self.index = Some(i);
-        Some(self.entries[i].command.as_str())
-    }
+    // pub fn search_next(&mut self) -> Option<&str> {
+    //     if self.search_matches.is_empty() || self.search_index + 1 >= self.search_matches.len() {
+    //         return None;
+    //     }
+    //     self.search_index += 1;
+    //     let i = self.search_matches[self.search_index];
+    //     self.index = Some(i);
+    //     Some(self.entries[i].command.as_str())
+    // }
 
-    pub fn search_prev(&mut self) -> Option<&str> {
-        if self.search_matches.is_empty() || self.search_index == 0 {
-            return None;
-        }
-        self.search_index -= 1;
-        let i = self.search_matches[self.search_index];
-        self.index = Some(i);
-        Some(self.entries[i].command.as_str())
-    }
+    // pub fn search_prev(&mut self) -> Option<&str> {
+    //     if self.search_matches.is_empty() || self.search_index == 0 {
+    //         return None;
+    //     }
+    //     self.search_index -= 1;
+    //     let i = self.search_matches[self.search_index];
+    //     self.index = Some(i);
+    //     Some(self.entries[i].command.as_str())
+    // }
 
-    pub fn cancel_search(&mut self) -> Option<String> {
-        let saved = self.saved_line.clone();
-        self.search_query.clear();
-        self.search_matches.clear();
-        self.search_index = 0;
-        self.index = None;
-        self.saved_line.clear();
-        if saved.is_empty() { None } else { Some(saved) }
-    }
+    // pub fn cancel_search(&mut self) -> Option<String> {
+    //     let saved = self.saved_line.clone();
+    //     self.search_query.clear();
+    //     self.search_matches.clear();
+    //     self.search_index = 0;
+    //     self.index = None;
+    //     self.saved_line.clear();
+    //     if saved.is_empty() { None } else { Some(saved) }
+    // }
 
-    pub fn accept_search(&mut self) -> Option<String> {
-        let result = self.index.map(|i| self.entries[i].command.clone());
-        self.search_query.clear();
-        self.search_matches.clear();
-        self.search_index = 0;
-        self.index = None;
-        self.saved_line.clear();
-        result
-    }
+    // pub fn accept_search(&mut self) -> Option<String> {
+    //     let result = self.index.map(|i| self.entries[i].command.clone());
+    //     self.search_query.clear();
+    //     self.search_matches.clear();
+    //     self.search_index = 0;
+    //     self.index = None;
+    //     self.saved_line.clear();
+    //     result
+    // }
 
-    pub fn search_query(&self) -> &str {
-        &self.search_query
-    }
+    // pub fn search_query(&self) -> &str {
+    //     &self.search_query
+    // }
 
-    pub fn search_match_count(&self) -> usize {
-        self.search_matches.len()
-    }
+    // pub fn search_match_count(&self) -> usize {
+    //     self.search_matches.len()
+    // }
 
-    pub fn search_match_index(&self) -> usize {
-        self.search_index
-    }
+    // pub fn search_match_index(&self) -> usize {
+    //     self.search_index
+    // }
 
-    pub fn search_entries(&self) -> Vec<String> {
-        self.search_matches
-            .iter()
-            .map(|&i| self.entries[i].command.clone())
-            .collect()
-    }
+    // pub fn search_entries(&self) -> Vec<String> {
+    //     self.search_matches
+    //         .iter()
+    //         .map(|&i| self.entries[i].command.clone())
+    //         .collect()
+    // }
 
-    pub fn is_searching(&self) -> bool {
-        !self.search_query.is_empty() || !self.saved_line.is_empty()
-    }
+    // pub fn is_searching(&self) -> bool {
+    //     !self.search_query.is_empty() || !self.saved_line.is_empty()
+    // }
 
     // ── 文件 I/O ──────────────────────────────────────────────────
 
@@ -686,13 +692,14 @@ impl History {
 }
 
 // ── 字段转义（制表符分隔格式）────────────────────────────────────
-
+#[inline]
 fn escape_field(s: &str) -> String {
     s.replace('\\', "\\\\")
         .replace('\n', "\\n")
         .replace('\t', "\\t")
 }
 
+#[inline]
 fn unescape_field(s: &str) -> String {
     let mut result = String::with_capacity(s.len());
     let mut chars = s.chars();

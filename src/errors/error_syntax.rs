@@ -73,6 +73,7 @@ impl StdError for SyntaxError {
 }
 
 impl SyntaxError {
+    #[inline]
     pub fn new(source: Str, kind: SyntaxErrorKind) -> Self {
         Self { source, kind }
     }
@@ -108,6 +109,7 @@ impl SyntaxError {
     // }
 }
 impl SyntaxErrorKind {
+    #[inline]
     pub fn failure(
         input: StrSlice,
         expected: &'static str,
@@ -148,6 +150,7 @@ impl SyntaxErrorKind {
         }
     }
 
+    #[inline]
     pub fn expected(
         input: StrSlice,
         expected: &'static str,

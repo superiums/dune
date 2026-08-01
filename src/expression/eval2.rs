@@ -16,7 +16,6 @@ use std::{
 // Expression求值2
 impl Expression {
     /// 处理复杂表达式的递归求值
-    #[inline]
     pub fn eval_flows(
         &self,
         state: &mut State,
@@ -281,7 +280,6 @@ impl Expression {
 
     // }
 
-    #[inline]
     #[allow(clippy::too_many_arguments)]
     fn handle_for(
         &self,
@@ -816,6 +814,7 @@ impl Expression {
     }
 }
 
+#[inline]
 pub fn glob_expand(s: &str) -> Vec<String> {
     let mut elist = vec![];
     if let Ok(g) = glob(s) {
@@ -851,7 +850,6 @@ pub fn ifs_split(s: &str, env: &mut Environment) -> Vec<String> {
     }
 }
 
-#[inline]
 #[allow(clippy::too_many_arguments)]
 pub fn execute_iteration<I>(
     var_name: String,

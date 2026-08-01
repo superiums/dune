@@ -157,6 +157,7 @@ pub enum Cmd {
     Noop,
 }
 
+#[inline]
 pub fn shift_char(c: char, is_cap: bool) -> char {
     match c {
         '1' => '!',

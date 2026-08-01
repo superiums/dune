@@ -369,6 +369,7 @@ pub fn handle_command(
     Ok(to_expr(result))
 }
 
+#[inline]
 pub fn to_expr(bytes_out: Option<Vec<u8>>) -> Expression {
     match bytes_out {
         Some(b) => match String::from_utf8(b) {
@@ -379,6 +380,8 @@ pub fn to_expr(bytes_out: Option<Vec<u8>>) -> Expression {
         _ => Expression::None,
     }
 }
+
+#[inline]
 fn to_bytes(expr_out: Option<Expression>) -> Option<Vec<u8>> {
     expr_out.map(|p| {
         if let Expression::Bytes(b) = p {

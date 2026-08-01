@@ -3,8 +3,8 @@ use std::rc::Rc;
 use crate::eval::State;
 use crate::libs::bin::top::{dig, flatten, len};
 use crate::libs::helper::{
-    check_args_len, check_exact_args_len, check_fn_arg, get_hmap_ref, get_string_arg,
-    get_string_ref, into_hmap,
+    check_args_len, check_exact_args_len, check_fn_arg, get_hmap_arg, get_hmap_ref, get_string_arg,
+    get_string_ref,
 };
 use crate::libs::lazy_module::LazyModule;
 use crate::{
@@ -255,7 +255,7 @@ fn remove(
 ) -> Result<Expression, RuntimeError> {
     check_exact_args_len("remove", &args, 2, ctx)?;
     let mut it = args.into_iter();
-    let map = into_hmap(it.next().unwrap(), ctx)?;
+    let map = get_hmap_arg(it.next().unwrap(), ctx)?;
     let key = it.next().unwrap();
 
     let mut new_map = map.as_ref().clone();
@@ -270,7 +270,7 @@ fn set(
 ) -> Result<Expression, RuntimeError> {
     check_exact_args_len("set", &args, 3, ctx)?;
     let mut it = args.into_iter();
-    let map = into_hmap(it.next().unwrap(), ctx)?;
+    let map = get_hmap_arg(it.next().unwrap(), ctx)?;
     let key_expr = it.next().unwrap();
     let val_expr = it.next().unwrap();
 
@@ -381,7 +381,7 @@ fn merge(
 
     let maps = args
         .into_iter()
-        .map(|a| into_hmap(a, ctx).unwrap_or(Rc::new(HashMap::new())))
+        .map(|a| get_hmap_arg(a, ctx).unwrap_or(Rc::new(HashMap::new())))
         .collect::<Vec<_>>();
 
     if maps.is_empty() {

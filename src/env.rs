@@ -27,6 +27,7 @@ impl Environment {
         }
     }
 
+    #[inline]
     pub fn get(&self, name: &str) -> Option<Expression> {
         match self.bindings.get(name) {
             Some(expr) => Some(expr.clone()),
@@ -34,24 +35,29 @@ impl Environment {
         }
     }
 
+    #[inline]
     pub fn has(&self, name: &str) -> bool {
         self.bindings.contains_key(name)
     }
 
+    #[inline]
     pub fn is_defined(&self, name: &str) -> bool {
         self.bindings.contains_key(name) || self.parent.as_ref().is_some_and(|p| p.is_defined(name))
     }
 
+    #[inline]
     pub fn undefine(&mut self, name: &str) {
         let bindings = Rc::make_mut(&mut self.bindings);
         bindings.remove(name);
     }
 
+    #[inline]
     pub fn define(&mut self, name: &str, expr: Expression) {
         let bindings = Rc::make_mut(&mut self.bindings);
         bindings.insert(name.to_string(), expr);
     }
 
+    #[inline]
     pub fn get_parent_mut(&mut self) -> Option<&mut Self> {
         self.parent.as_mut().map(|p| p.as_mut())
     }
@@ -91,6 +97,7 @@ impl Environment {
             .collect()
     }
 
+    #[inline]
     pub fn get_root(&self) -> &Self {
         match self.parent.as_ref() {
             Some(p) => p.get_root(),

@@ -59,7 +59,6 @@ pub fn prepare_args(
 /// 执行
 impl Expression {
     // 函数应用
-    #[inline]
     pub fn eval_normal_function(
         &self,
         func: Expression,
@@ -238,7 +237,6 @@ impl Expression {
         }
     }
 
-    #[inline]
     pub fn eval_apply(
         &self,
         func: &Expression,
@@ -464,7 +462,6 @@ impl Expression {
     }
 
     /// 执行
-    #[inline]
     pub fn eval_command(
         &self,
         args: &[Expression],
@@ -544,7 +541,6 @@ impl Expression {
         }
     }
 
-    #[inline]
     pub fn eval_symbo(
         &self,
         args: &[Expression],
@@ -744,7 +740,6 @@ pub fn bind_arguments(
     }
 }
 
-#[inline]
 pub fn handle_builtin(
     base: &Expression,
     method: &str,
@@ -778,7 +773,6 @@ pub fn handle_builtin(
 }
 
 impl Expression {
-    #[inline]
     pub fn handle_builtin_n_normal_cmd(
         &self,
         cmd: &Expression,
@@ -834,7 +828,6 @@ impl Expression {
     }
 
     /// chain call
-    #[inline]
     pub fn eval_chain(
         &self,
         base: &Expression,
@@ -965,7 +958,6 @@ impl Expression {
         Ok(current_base)
     }
 
-    // #[inline]
     // pub fn eval_lib_method(
     //     &self,
     //     lib: Cow<'static, str>,

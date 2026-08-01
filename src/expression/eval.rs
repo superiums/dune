@@ -78,9 +78,11 @@ impl State {
 impl State {
     pub const IN_DOMAINS: u8 = 1 << 6;
 
+    #[inline]
     pub fn extend_lookup_domains(&mut self, domains: &[String]) {
         self.2.extend_from_slice(domains);
     }
+    #[inline]
     pub fn truncate_lookup_domains(&mut self, size: usize) {
         self.2.truncate(self.2.len() - size);
     }
@@ -92,6 +94,7 @@ impl State {
     //     self.2.pop();
     // }
 
+    #[inline]
     pub fn get_lookup_domains(&self) -> &Vec<String> {
         &self.2
     }
@@ -129,17 +132,21 @@ impl State {
     pub fn get_local_var(&self, name: &str) -> Option<&Expression> {
         self.3.get(name)
     }
+    #[inline]
     pub fn clear_local_var(&mut self) {
         self.3.clear();
     }
+    #[inline]
     pub fn set_local_vars(&mut self, map: HashMap<String, Expression>) {
         self.3 = map;
     }
+    #[inline]
     pub fn get_local_vars(&self) -> HashMap<String, Expression> {
         self.3.clone()
     }
 
     // 添加循环状态字段
+    #[inline]
     pub fn set_iter(
         &mut self,
         var_name: String,
@@ -168,12 +175,15 @@ impl State {
             None => Ok(false),
         }
     }
+    #[inline]
     pub fn clear_iter(&mut self) {
         self.4 = None;
     }
+    #[inline]
     pub fn take_iter(&mut self) -> Option<(String, Option<String>, usize, BoxedIterator)> {
         self.4.take()
     }
+    #[inline]
     pub fn retain_local_vars<F>(&mut self, f: F)
     where
         F: FnMut(&String, &mut Expression) -> bool,
@@ -187,7 +197,6 @@ pub fn is_strict() -> bool {
 }
 impl Expression {
     /// 交互命令入口
-    #[inline]
     pub fn eval_cmd(&self, env: &mut Environment) -> Result<Self, RuntimeError> {
         self.eval_mut(&mut State::new(), env, 0)
         // let result =self.eval_mut(&mut State::new(), env, 0);
@@ -205,7 +214,6 @@ impl Expression {
         // }
     }
     /// 脚本计算入口
-    #[inline]
     pub fn eval(&self, env: &mut Environment) -> Result<Self, RuntimeError> {
         self.eval_mut(&mut State::new(), env, 0)
     }
@@ -226,7 +234,6 @@ impl Expression {
         self.eval_mut(state, env, 0)
     }
     /// 求值主逻辑
-    #[inline]
     pub fn eval_mut(
         &self,
         state: &mut State,

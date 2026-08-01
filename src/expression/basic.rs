@@ -1091,6 +1091,7 @@ impl Expression {
     /// 如果该变体的语义等价于“一段文本”，返回其内部 &str，否则 None。
     /// 注意：这里把 Symbol/Variable/RegexDef/TimeDef 也当作纯文本，
     /// 意味着 Symbol("x") 和 String("x") 会被认为“相等”——
+    #[inline]
     pub fn as_str(&self) -> Option<&str> {
         match self {
             Self::String(s)
@@ -1387,6 +1388,7 @@ impl Expression {
     //     env.define("STATUS", Expression::Integer(code));
     // }
 
+    #[inline]
     pub fn is_truthy(&self) -> bool {
         match self {
             Self::Integer(i) => *i != 0,

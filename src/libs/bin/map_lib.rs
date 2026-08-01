@@ -3,8 +3,8 @@ use std::rc::Rc;
 use crate::eval::State;
 use crate::libs::bin::top::{dig, flatten, len};
 use crate::libs::helper::{
-    check_args_len, check_exact_args_len, check_fn_arg, get_map_ref, get_string_arg,
-    get_string_ref, into_map,
+    check_args_len, check_exact_args_len, check_fn_arg, get_map_arg, get_map_ref, get_string_arg,
+    get_string_ref,
 };
 use crate::libs::lazy_module::LazyModule;
 use crate::{
@@ -288,7 +288,7 @@ fn remove(
 ) -> Result<Expression, RuntimeError> {
     check_exact_args_len("remove", &args, 2, ctx)?;
     let mut it = args.into_iter();
-    let map = into_map(it.next().unwrap(), ctx)?;
+    let map = get_map_arg(it.next().unwrap(), ctx)?;
     let key = it.next().unwrap();
 
     let mut new_map = map.as_ref().clone();
@@ -303,7 +303,7 @@ fn set(
 ) -> Result<Expression, RuntimeError> {
     check_exact_args_len("set", &args, 3, ctx)?;
     let mut it = args.into_iter();
-    let map = into_map(it.next().unwrap(), ctx)?;
+    let map = get_map_arg(it.next().unwrap(), ctx)?;
     let key_expr = it.next().unwrap();
     let val_expr = it.next().unwrap();
 
@@ -420,7 +420,7 @@ fn merge(
 
     let maps = args
         .into_iter()
-        .map(|a| into_map(a, ctx).unwrap_or(Rc::new(BTreeMap::new())))
+        .map(|a| get_map_arg(a, ctx).unwrap_or(Rc::new(BTreeMap::new())))
         .collect::<Vec<_>>();
 
     let mut it = maps.into_iter();

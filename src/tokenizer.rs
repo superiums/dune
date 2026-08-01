@@ -46,6 +46,7 @@ impl Ctx {
     /// Whitespace/LineBreak/Comment → Space
     /// Alphanumeric/`_`/closing bracket/quote → Word
     /// Other symbols → Open
+    #[inline]
     fn after_token(token: &Token, original: &str) -> Self {
         let last_char = token.range.to_str(original).chars().next_back();
         match token.kind {
@@ -165,6 +166,7 @@ fn parse_token_dispatch(
     }
 }
 
+#[inline]
 fn map_valid_token(
     mut parser: impl FnMut(Input<'_>) -> TokenizationResult<'_>,
     kind: TokenKind,
@@ -398,6 +400,7 @@ fn minus_dispatch(
 
 /// Matches `-` as a prefix operator when followed by a literal/number/paren/identifier.
 /// This lets the parser decide: `-42` → negation, `-arg` → flag, `-(expr)` → grouped negation.
+#[inline]
 fn prefix_minus_tag(input: Input<'_>) -> TokenizationResult<'_> {
     input
         .strip_prefix("-")
@@ -412,6 +415,7 @@ fn prefix_minus_tag(input: Input<'_>) -> TokenizationResult<'_> {
 /// Maches range prefix, allow followed by literal/number/(_:]
 /// prefix: ..b  .._ ..-2 ..(c)
 /// infix : a..-2  a.._  a..(c)
+#[inline]
 fn prefix_range_tag(prefix: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResult<'_> {
     move |input: Input<'_>| {
         input
@@ -427,6 +431,7 @@ fn prefix_range_tag(prefix: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResu
 
 /// a..:2  [a..]
 /// a..  _.. followed by space/:/] or end delimeter
+#[inline]
 fn postfix_range_tag(prefix: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResult<'_> {
     move |input: Input<'_>| {
         input
@@ -666,6 +671,7 @@ fn any_keyword(input: Input<'_>) -> TokenizationResult<'_> {
 /// Matches a sequence of ASCII punctuation starting with `punct` (length ≥ 2).
 ///
 /// Used for `..` custom operator at expression-start/non-word positions.
+#[inline]
 fn punct_seq_tag(punct: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResult<'_> {
     move |input: Input<'_>| {
         if input.starts_with(punct) {
@@ -1150,6 +1156,7 @@ fn parse_string_inner(input: Input<'_>, quote_char: char) -> TokenizationResult<
 }
 
 /// Matches a literal string prefix without any continuation restrictions.
+#[inline]
 fn punctuation_tag(punct: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResult<'_> {
     move |input: Input<'_>| input.strip_prefix(punct).ok_or(NOT_FOUND)
 }
@@ -1167,6 +1174,7 @@ fn punctuation_tag(punct: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResult
 
 /// Matches a keyword that must be followed by whitespace (not end-of-input).
 /// Used for standalone keywords like `let`, `set`, `if`, `fn`, `match`.
+#[inline]
 fn space_followed_tag(keyword: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResult<'_> {
     move |input: Input<'_>| {
         input
@@ -1175,6 +1183,7 @@ fn space_followed_tag(keyword: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationR
             .ok_or(NOT_FOUND)
     }
 }
+#[inline]
 fn alpha_followed_tag(keyword: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResult<'_> {
     move |input: Input<'_>| {
         input
@@ -1183,6 +1192,7 @@ fn alpha_followed_tag(keyword: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationR
             .ok_or(NOT_FOUND)
     }
 }
+#[inline]
 fn space_brace_followed_tag(keyword: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResult<'_> {
     move |input: Input<'_>| {
         input
@@ -1198,6 +1208,7 @@ fn space_brace_followed_tag(keyword: &str) -> impl '_ + Fn(Input<'_>) -> Tokeniz
 
 /// Matches an operator that must NOT be followed by ASCII punctuation.
 /// Prevents single-char operators from merging into longer sequences (e.g. `+` vs `+=`).
+#[inline]
 fn operator_tag(keyword: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResult<'_> {
     move |input: Input<'_>| {
         input
@@ -1211,6 +1222,7 @@ fn operator_tag(keyword: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResult<
 
 /// Mathes whole word with a prefix
 /// similar with path_tag,but don't skip anything. eg `\ `
+#[inline]
 fn whole_word(prefix: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResult<'_> {
     move |input: Input<'_>| {
         if input.starts_with(prefix) {
@@ -1228,6 +1240,7 @@ fn whole_word(prefix: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResult<'_>
 
 /// Matches a token that must be followed by whitespace or punctuation (not letters).
 /// Used for `_` to distinguish standalone `_` value from `_` within a symbol like `foo_bar`.
+#[inline]
 fn space_punc_followed_tag(keyword: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResult<'_> {
     move |input: Input<'_>| {
         input
@@ -1242,6 +1255,7 @@ fn space_punc_followed_tag(keyword: &str) -> impl '_ + Fn(Input<'_>) -> Tokeniza
 
 /// Matches a prefix operator that must be followed by a value-start character.
 /// After stripping the prefix, checks the rest starts with alphanumeric, `(`, `[`, `{`, or `$`.
+#[inline]
 fn prefix_tag(keyword: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResult<'_> {
     move |input: Input<'_>| {
         input
@@ -1257,6 +1271,7 @@ fn prefix_tag(keyword: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResult<'_
 
 /// Matches a postfix operator that must be followed by whitespace or dilimeter or end-of-input.
 /// Used for postfix `!` and `^` to prevent merging with following characters.
+#[inline]
 fn postfix_break_tag(keyword: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResult<'_> {
     move |input: Input<'_>| {
         input
@@ -1268,6 +1283,7 @@ fn postfix_break_tag(keyword: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationRe
 /// Checks whether the character is allowed in a symbol.
 /// Symbol chars: alphanumeric, `_`, `~`, `?`, `&`, `#`, `$`, `-`, `/`, `\`
 /// Excluded (cause operator/punctuation parsing instead): `+`, `=`, `<`, `>`, `*`, `%`, `^`, `|`, `:`, `@`, `!`, `.`, `,`, `;`, `(`, `)`, `[`, `]`, `{`, `}`, `'`, `"`, backtick, whitespace
+#[inline]
 fn is_symbol_char(c: char) -> bool {
     if c.is_ascii_whitespace() {
         return false;
@@ -1278,6 +1294,7 @@ fn is_symbol_char(c: char) -> bool {
         'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '~' | '?' | '&' | '#' | '$' | '-' | '/' | '\\'
     )
 }
+#[inline]
 fn is_symbol_char_cfm(c: char, is_param_ctx: bool, is_cmd_ctx: bool) -> bool {
     if c.is_ascii_whitespace() {
         return false;

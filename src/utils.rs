@@ -2,7 +2,7 @@ use crate::{Environment, Expression, RuntimeError};
 use std::{borrow::Cow, path::PathBuf};
 
 // Helper functions
-
+#[inline]
 pub fn expand_home(path: &'_ str) -> Cow<'_, str> {
     if path.starts_with("~")
         && let Some(home_dir) = dirs::home_dir()
@@ -12,9 +12,11 @@ pub fn expand_home(path: &'_ str) -> Cow<'_, str> {
     Cow::Borrowed(path)
 }
 
+#[inline]
 pub fn get_std_cwd() -> PathBuf {
     std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
 }
+#[inline]
 pub fn get_current_path(env: &mut Environment) -> PathBuf {
     // for compaty of hot key binding, cwd was changed in another env
     // use slash cmd insteadof key binding
@@ -24,6 +26,7 @@ pub fn get_current_path(env: &mut Environment) -> PathBuf {
         s => PathBuf::from(s.to_string()),
     })
 }
+#[inline]
 pub fn get_current_path_string(env: &mut Environment) -> String {
     env.get("PWD").map_or(
         std::env::current_dir()
@@ -36,9 +39,11 @@ pub fn get_current_path_string(env: &mut Environment) -> String {
     )
 }
 
+#[inline]
 pub fn join_current_path(path: &str, env: &mut Environment) -> PathBuf {
     get_current_path(env).join(path)
 }
+#[inline]
 pub fn abs(path: &str, env: &mut Environment) -> PathBuf {
     if path.starts_with("~") {
         return PathBuf::from(expand_home(path).as_ref());
@@ -72,6 +77,7 @@ pub fn abs_check(path: &str, env: &mut Environment) -> Result<PathBuf, RuntimeEr
         0,
     ))
 }
+#[inline]
 pub fn canon(p: &str, env: &mut Environment) -> Result<PathBuf, RuntimeError> {
     let path = abs(p, env);
     dunce::canonicalize(&path).map_err(|e| {

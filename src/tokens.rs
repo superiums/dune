@@ -29,14 +29,17 @@ impl<'a> Input<'a> {
         Input { str, offset: 0 }
     }
 
+    #[inline]
     pub fn is_empty(self) -> bool {
         self.offset == self.str.len()
     }
 
+    #[inline]
     pub fn as_original_str(self) -> &'a str {
         self.str
     }
 
+    #[inline]
     pub fn as_str_slice(self) -> StrSlice {
         self.str.get(self.offset..)
     }
@@ -45,6 +48,7 @@ impl<'a> Input<'a> {
     //     self.str.get(self.offset..self.offset)
     // }
 
+    #[inline]
     pub fn split_at(self, n: usize) -> (Self, StrSlice) {
         let start = self.offset;
         let offset = start + n;
@@ -58,12 +62,14 @@ impl<'a> Input<'a> {
     //     self.split_at(n.min(self.len()))
     // }
 
+    #[inline]
     pub fn split_until(self, other: Input<'_>) -> (Self, StrSlice) {
         assert!(std::ptr::eq(self.str, other.str));
         let diff = self.len() - other.len();
         self.split_at(diff)
     }
 
+    #[inline]
     pub fn strip_prefix(self, prefix: &str) -> Option<(Self, StrSlice)> {
         if self.starts_with(prefix) {
             Some(self.split_at(prefix.len()))
@@ -103,10 +109,12 @@ pub struct Token {
 }
 
 impl Token {
+    #[inline]
     pub fn new(kind: TokenKind, range: StrSlice) -> Self {
         Token { kind, range }
     }
 
+    #[inline]
     pub fn text(self, tokens: Tokens<'_>) -> &str {
         self.range.to_str(tokens.str)
     }
@@ -186,11 +194,13 @@ impl InputTake for Tokens<'_> {
 }
 
 impl Tokens<'_> {
+    #[inline]
     pub fn skip_n(self, count: usize) -> Self {
         let slice = &self.slice[count..];
         Tokens { slice, ..self }
     }
 
+    #[inline]
     pub fn get_str_slice(self) -> StrSlice {
         match self.slice.first() {
             Some(t) => t.range,

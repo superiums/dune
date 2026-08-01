@@ -31,6 +31,7 @@ impl LazyModule {
             .insert(name.to_string(), Box::new(factory));
     }
 
+    #[inline]
     pub fn get_function(&self, name: &str) -> Option<Rc<BuiltinFunc>> {
         // 先检查缓存
         if let Some(cached) = self.cache.borrow().get(name) {

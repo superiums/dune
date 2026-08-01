@@ -704,6 +704,7 @@ impl Div for Expression {
 
 impl Neg for Expression {
     type Output = Expression;
+    #[inline]
     fn neg(self) -> Self::Output {
         match self {
             Self::Integer(n) => Self::Integer(-n),

@@ -125,6 +125,7 @@ fn no_lib_err(lib: &'static str, f: &str, ctx: &Expression) -> RuntimeError {
 }
 /// lazy load builtin.
 /// note: this always clone builtin
+#[inline]
 pub fn get_builtin_optimized(
     lib_name: &str,
     fn_name: &str,
@@ -239,14 +240,17 @@ pub fn get_builtin_optimized(
 //     tips
 // }
 
+#[inline]
 pub fn is_lib(name: &str) -> bool {
     LIBS_INFO.with(|h| h.contains_key(name))
 }
 
+#[inline]
 pub fn is_top_or_se(name: &str) -> bool {
     SE_LIB.with_borrow(|s| s.contains_key(name)) || TOP_LIB.with_borrow(|h| h.contains_key(name))
 }
 
+#[inline]
 pub fn get_lib_completions(prefix: &str) -> Option<Vec<&str>> {
     if prefix.is_empty() || !prefix.is_ascii() {
         return None;
@@ -284,6 +288,7 @@ pub fn get_lib_completions(prefix: &str) -> Option<Vec<&str>> {
 }
 
 /// 类型名称
+#[inline]
 fn get_belong_lib_name(exp: &Expression) -> Option<Cow<'static, str>> {
     match exp {
         Expression::List(_) | Expression::Range(..) => Some("list".into()),
@@ -302,6 +307,7 @@ fn get_belong_lib_name(exp: &Expression) -> Option<Cow<'static, str>> {
     }
 }
 
+#[inline]
 pub fn get_builtin_via_expr(
     expr: &Expression,
     fn_name: &str,
@@ -317,6 +323,7 @@ pub fn get_builtin_via_expr(
     }
 }
 
+#[inline]
 pub fn exec_self_expand_lib(
     fn_name: &str,
     args: &[Expression],

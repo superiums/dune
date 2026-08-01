@@ -79,6 +79,7 @@ struct OperatorInfo<'a> {
 //     Infix,
 // }
 impl<'a> OperatorInfo<'a> {
+    #[inline]
     fn new(symbol: &'a str, precedence: u8, right_associative: bool) -> Self {
         Self {
             symbol,
@@ -1408,6 +1409,7 @@ fn parse_string(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErro
     let r = unescape_str(cs);
     Ok((input, Expression::String(r)))
 }
+
 #[inline]
 fn parse_string_raw_inner(input: Tokens<'_>) -> IResult<Tokens<'_>, String, SyntaxErrorKind> {
     let (input, expr) = kind(TokenKind::StringRaw)(input)?;
@@ -1417,6 +1419,7 @@ fn parse_string_raw_inner(input: Tokens<'_>) -> IResult<Tokens<'_>, String, Synt
     let r = cs.replace("\\'", "'").replace("\\\\", "\\");
     Ok((input, r))
 }
+
 #[inline]
 fn parse_string_raw(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
     let (input, r) = parse_string_raw_inner(input)?;
@@ -1608,7 +1611,6 @@ fn split_template_segments(template: &str) -> Vec<Expression> {
     segments
 }
 
-#[inline]
 fn parse_string_template(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
     let (input, expr) = kind(TokenKind::StringTemplate)(input)?;
     let raw_str = expr.to_str(input.str);
@@ -1618,7 +1620,7 @@ fn parse_string_template(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, S
     Ok((input, Expression::StringTemplate(segments)))
 }
 // -- 字面量解析 --
-#[inline]
+
 fn parse_literal(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
     alt((
         parse_integer,
@@ -1680,7 +1682,6 @@ fn parse_set_inner<'a>(input: Tokens<'a>) -> IResult<Tokens<'a>, Vec<Expression>
     Ok((input, pairs))
 }
 
-#[inline]
 fn parse_map_inner<'a>(
     input: Tokens<'a>,
     tag: &'static str,
@@ -1830,7 +1831,6 @@ fn looks_like_map(input: Tokens<'_>) -> bool {
 }
 
 /// BtreeMap 映射解析
-#[inline]
 fn parse_map(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
     // 不能用cut，防止map识别失败时，影响后面的block解析。
     let (input, pairs) = parse_map_inner(input, "{")?;
@@ -1845,7 +1845,6 @@ fn parse_map(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKi
     Ok((input, Expression::from(map)))
 }
 
-#[inline]
 fn parse_bmap(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
     // 不能用cut，防止map识别失败时，影响后面的block解析。
     let (input, pairs) = parse_map_inner(input, "M{")?;
@@ -1861,7 +1860,6 @@ fn parse_bmap(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorK
 }
 
 /// HashMap
-#[inline]
 fn parse_hashmap(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
     let (input, pairs) = parse_map_inner(input, "H{")?;
 
@@ -1896,6 +1894,7 @@ fn parse_integer(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErr
     Ok((input, Expression::Integer(num)))
 }
 
+#[inline]
 fn parse_float(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
     let (input, num) = kind(TokenKind::FloatLiteral)(input)?;
     let num = num
@@ -2426,7 +2425,6 @@ fn parse_block_or_expr(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, Syn
     ))(input)
 }
 // 解析代码块（明确的隔离作用域）
-#[inline]
 fn parse_domain_block(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
     let (input, block) = delimited(
         terminated(text("%{"), opt(many0(kind(TokenKind::LineBreak)))),
@@ -2442,8 +2440,6 @@ fn parse_domain_block(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, Synt
     Ok((input, block))
 }
 // 解析代码块（作为独立作用域）
-// TODO with return?
-#[inline]
 fn parse_block(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
     let (input, block) = delimited(
         terminated(text("{"), opt(many0(kind(TokenKind::LineBreak)))),
@@ -2460,7 +2456,6 @@ fn parse_block(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError
 }
 
 /// 解析代码块（作为序列，非独立作用域）
-#[inline]
 fn parse_block_as_sequence(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
     let (input, block) = delimited(
         terminated(text("{"), opt(many0(kind(TokenKind::LineBreak)))),
@@ -2660,6 +2655,7 @@ fn parse_operator(input: Tokens<'_>) -> IResult<Tokens<'_>, String, SyntaxErrorK
         t.to_str(input.str).to_string()
     })(input)
 }
+#[inline]
 fn parse_custom_postfix_operator(
     input: Tokens<'_>,
 ) -> IResult<Tokens<'_>, String, SyntaxErrorKind> {
@@ -2713,6 +2709,7 @@ fn parse_num_range(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxE
     Ok((input, r))
 }
 // 自定义EOF解析器，返回StrSlice类型
+#[inline]
 fn eof_slice(input: Tokens<'_>) -> IResult<Tokens<'_>, StrSlice, SyntaxErrorKind> {
     if input.is_empty() {
         Ok((input, StrSlice::default()))

@@ -150,9 +150,11 @@ pub struct FileSize {
     unit: SizeUnit,
 }
 impl FileSize {
+    #[inline]
     pub fn new(size: u64, unit: SizeUnit) -> Self {
         Self { size, unit }
     }
+    #[inline]
     pub fn from(size: u64, unit_str: &str) -> Self {
         Self {
             size,
@@ -174,6 +176,7 @@ impl FileSize {
             unit: SizeUnit::B,
         }
     }
+    #[inline]
     pub fn from_bytes(size: u64) -> Self {
         Self {
             size,
@@ -181,6 +184,7 @@ impl FileSize {
         }
     }
 
+    #[inline]
     pub fn to_bytes(&self) -> u64 {
         let mut size = self.size;
         // 根据单位进行转换
