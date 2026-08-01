@@ -447,7 +447,7 @@ fn postfix_range_tag(prefix: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationRes
 fn circum_dispatch(input: Input<'_>, ctx: Ctx) -> TokenizationResult<'_, (Token, Diagnostic)> {
     match ctx {
         Ctx::Letter | Ctx::Word => alt((map_valid_token(
-            punctuation_tag("^"),
+            space_followed_tag("^"),
             TokenKind::OperatorPostfix,
         ),))(input), //for SymbolRaw
         Ctx::Start | Ctx::Space | Ctx::Open | Ctx::Number => {
@@ -606,7 +606,7 @@ fn colon_dispatch(input: Input<'_>, ctx: Ctx) -> TokenizationResult<'_, (Token, 
         Ctx::Letter => alt((
             map_valid_token(alpha_followed_tag("::"), TokenKind::OperatorInfix),
             map_valid_token(punctuation_tag(":="), TokenKind::Operator),
-            map_valid_token(operator_tag(":"), TokenKind::Operator), //{k:v} a?b:c
+            map_valid_token(punctuation_tag(":"), TokenKind::Operator), //{k:v} a?b:c
         ))(input),
         Ctx::Start => alt((
             map_valid_token(punctuation_tag(":="), TokenKind::Operator),
@@ -614,7 +614,7 @@ fn colon_dispatch(input: Input<'_>, ctx: Ctx) -> TokenizationResult<'_, (Token, 
         ))(input),
         _ => alt((
             map_valid_token(punctuation_tag(":="), TokenKind::Operator),
-            map_valid_token(operator_tag(":"), TokenKind::Operator),
+            map_valid_token(punctuation_tag(":"), TokenKind::Operator),
         ))(input),
     }
 }
@@ -1292,7 +1292,7 @@ fn is_symbol_char(c: char) -> bool {
     // allow `a-b` as symbo
     matches!(
         c,
-        'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '~' | '?' | '&' | '#' | '$' | '-' | '/' | '\\'
+        'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '~' | '?' | '&' | '#' | '$' | '@' | '-' | '/' | '\\'
     )
 }
 #[inline]
@@ -1307,7 +1307,7 @@ fn is_symbol_char_cfm(c: char, is_param_ctx: bool, is_cmd_ctx: bool) -> bool {
         // never eat `.` for bultin lib call
         return matches!(
             c,
-            'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '~' | '?' | '&' | '#' | '$' | '-' | '/' | '\\'
+            'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '~' | '?' | '&' | '#' | '$' | '@' | '-' | '/' | '\\'
         );
     }
     if is_param_ctx {
@@ -1317,13 +1317,13 @@ fn is_symbol_char_cfm(c: char, is_param_ctx: bool, is_cmd_ctx: bool) -> bool {
         // eat `=` for `dd if=/dev`
         return matches!(
             c,
-            'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '~' | '?' | '&' | '#' | '$' | '-' | '/' | '\\' | '=' | '+' | '.' | ':'
+            'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '~' | '?' | '&' | '#' | '$' | '@' | '-' | '/' | '\\' | '=' | '+' | '.' | ':'
         );
     }
     // other ? same to cfm off
     return matches!(
         c,
-        'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '~' | '?' | '&' | '#' | '$' | '-' | '/' | '\\'
+        'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '~' | '?' | '&' | '#' | '$' | '@' | '-' | '/' | '\\'
     );
 }
 
