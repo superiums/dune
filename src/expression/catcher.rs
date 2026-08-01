@@ -38,6 +38,7 @@ pub fn catch_error(
         },
         CatchType::Ignore => Ok(Expression::None),
         CatchType::ToBoolean => Ok(Expression::Boolean(false)),
+        CatchType::OnSuccess => Err(e), // 失败时原样透传，不拦截
         CatchType::PrintStd => {
             println!("{e:?}");
             Ok(Expression::None)

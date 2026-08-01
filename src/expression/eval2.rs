@@ -243,6 +243,11 @@ impl Expression {
                 match result {
                     Ok(result) => match typ {
                         CatchType::ToBoolean => Ok(Expression::Boolean(true)),
+                        CatchType::OnSuccess => match deeling {
+                            // 成功后执行右侧表达式，返回右侧结果（类似 bash a && b 的返回值）
+                            Some(next) => next.as_ref().eval_mut(state, env, depth + 1),
+                            None => Ok(result),
+                        },
                         _ => Ok(result),
                     },
                     Err(e) => catch_error(e, typ, deeling, state, env, depth + 1),

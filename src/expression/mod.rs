@@ -257,6 +257,7 @@ pub enum CatchType {
     Terminate,
     Deel,
     ToBoolean,
+    OnSuccess,
 }
 
 impl PartialOrd for Expression {
@@ -283,7 +284,17 @@ impl PartialOrd for Expression {
             (Self::Float(a), Self::Float(b)) => a.partial_cmp(b),
             (Self::Float(a), Self::Integer(b)) => a.partial_cmp(&(*b as f64)),
             (Self::Integer(a), Self::Float(b)) => (&(*a as f64)).partial_cmp(b),
-
+            (Self::Range(r, s), Self::Range(r2, s2)) => {
+                match (r.start.partial_cmp(&r2.start), r.end.partial_cmp(&r2.end)) {
+                    // 首尾相同，step越大的，越小
+                    (Some(Ordering::Equal), Some(Ordering::Equal)) => s2.partial_cmp(s),
+                    (Some(Ordering::Equal), other_end) => other_end,
+                    // 尾部相同，首部越大的，越小
+                    (other_start, Some(Ordering::Equal)) => other_start.map(|o| o.reverse()),
+                    // 首尾都不相同的，按首部比较
+                    (other_start, _) => other_start,
+                }
+            }
             // ===== 字符串与数字互比 =====
             (Self::String(a), Self::Integer(b)) => {
                 if let Ok(ai) = a.parse::<i64>() {

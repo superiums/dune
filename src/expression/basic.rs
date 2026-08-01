@@ -612,6 +612,15 @@ impl Expression {
                         }
                         Ok(())
                     }
+                    CatchType::OnSuccess => {
+                        write!(f, " ?& ")?;
+                        if let Some(handler) = deel {
+                            handler.fmt_display_indent(f, 0)?;
+                        } else {
+                            write!(f, "{{}}")?;
+                        }
+                        Ok(())
+                    }
                 }
             }
 

@@ -642,6 +642,7 @@ fn question_operator(input: Input<'_>) -> TokenizationResult<'_> {
         postfix_break_tag("?>"),
         postfix_break_tag("?!"),
         space_brace_followed_tag("?:"),
+        space_brace_followed_tag("?&"),
         postfix_break_tag("?~"),
     ))(input)
 }
