@@ -1,5 +1,5 @@
 use crate::tokens::{Input, Token, TokenKind};
-use crate::with_cfm_enabled;
+use crate::utils::is_cfm_mode;
 use detached_str::StrSlice;
 use nom::{IResult, branch::alt, error::ParseError};
 
@@ -1334,7 +1334,7 @@ pub(crate) fn parse_tokens(input: Input<'_>) -> (Vec<Token>, Vec<Diagnostic>) {
     // if is_cfm_mode(input) {
     //     return parse_command_tokens(input);
     // }
-    let is_cfm = is_cfm_mode(input);
+    let is_cfm = is_cfm_mode(input.as_original_str());
     let leading_char = if is_cfm { ">" } else { ":" };
 
     let mut tokens = Vec::new();
@@ -1376,12 +1376,4 @@ pub fn tokenize(input: &str) -> (Vec<Token>, Vec<Diagnostic>) {
     let str = input.into();
     let input = Input::new(&str);
     parse_tokens(input)
-}
-
-/// CFM: Command First Mode — shell-style parsing for single-line commands.
-/// Active when: input starts with `>`, OR (not multiline, not `:`-prefixed, and CFM enabled).
-fn is_cfm_mode(input: Input<'_>) -> bool {
-    with_cfm_enabled(|cfm_enabled| {
-        input.starts_with(">") || (cfm_enabled && !input.starts_with(":") && !input.contains('\n'))
-    })
 }

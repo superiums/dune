@@ -231,7 +231,7 @@ fn env_config(env: &mut Environment, aioff: bool) {
 
 fn set_cfm(cfm: bool, env: &mut Environment) {
     env.define("IS_CFM", Expression::Boolean(cfm));
-    set_cfm_enabled(cfm);
+    set_cfm_enabled(Some(cfm));
 }
 
 fn set_strict(strict: bool, env: &mut Environment) {

@@ -11,7 +11,7 @@ use crate::expression::alias::get_alias_completion;
 use crate::libs::{LIBS_INFO, is_lib};
 use crate::syntax::{get_ayu_dark_theme, get_dark_theme, get_light_theme, get_merged_theme};
 use crate::utils::get_current_path_string;
-use crate::{CFM_ENABLED, Expression, STRICT_ENABLED, childman};
+use crate::{CFM_CONFIG, Expression, STRICT_ENABLED, childman};
 use crate::{Environment, check, highlight, parse_and_eval, prompt::get_prompt_engine};
 use std::collections::HashMap;
 use std::path::{PathBuf, is_separator};
@@ -218,7 +218,7 @@ pub fn run_repl(env: &mut Environment) {
     if STRICT_ENABLED.with_borrow(|s| s == &true) {
         println!("\x1b[38;5;170m[Strict Mode]\x1b[0m")
     }
-    if CFM_ENABLED.with_borrow(|c| c == &true) {
+    if CFM_CONFIG.with_borrow(|c| c == &Some(true)) {
         println!("\x1b[38;5;141m[Cmd First Mode]\x1b[0m");
     }
 

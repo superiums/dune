@@ -42,6 +42,7 @@ if IS_INTERACTIVE {
     # ## syntax theme modify
     # LUME_THEME_CONFIG = {
     #    keyword: "\x1b[38;5;75m",
+    #    operator: COLOR.violet,
     #    ...
     # }
 
@@ -58,7 +59,7 @@ if IS_INTERACTIVE {
     # ## default strict mode
     # set LUME_STRICT = true
     # ## default cmd_frist_mode
-    # set LUME_CFM = true
+    # set LUME_CFM = none
 
     # ## history file
     # set LUME_HISTORY_FILE = '/tmp/lume_histroy'
@@ -67,7 +68,7 @@ if IS_INTERACTIVE {
     # set LUME_COMPLETION_DIR = '~/Library/Application Support/completions'
     set LUME_COMPLETION_CYCLE = false
 
-    # ## report compute result type and values. default True.
+    # ## report compute result type and values. default true.
     # set LUME_PRINT_DIRECT= false
 
 

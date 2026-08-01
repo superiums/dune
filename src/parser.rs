@@ -6,13 +6,10 @@ use std::{
 };
 
 use crate::{
-    CFM_ENABLED, Diagnostic, Expression, Int, MAX_SYNTAX_RECURSION, SyntaxErrorKind, Token,
-    TokenKind,
+    Diagnostic, Expression, Int, MAX_SYNTAX_RECURSION, SyntaxErrorKind, Token, TokenKind,
     expression::{CatchType, ChainCall, DestructurePattern, FileSize},
-    set_cfm_enabled,
     tokens::{Input, Tokens},
     utils::{unescape_bytes, unescape_str},
-    with_cfm_enabled,
 };
 use detached_str::StrSlice;
 use nom::{IResult, branch::alt, combinator::*, multi::*, sequence::*};
@@ -1499,21 +1496,11 @@ fn parse_brace_segment(template: &str, start: usize, prefix: &str) -> Option<(Ex
     let end = find_matching_brace(template, start)?;
     let inner = &template[start..end];
 
-    // shutdown cfm
-    let changed = if CFM_ENABLED.with_borrow(|cfm| cfm == &true) {
-        set_cfm_enabled(false);
-        true
-    } else {
-        false
-    };
     let expr = match parse_script(inner) {
         Ok(expr) => expr,
         Err(_) => Expression::String(format!("{prefix}{{{inner}}}")),
     };
-    // restore cfm
-    if changed {
-        set_cfm_enabled(true);
-    }
+
     Some((expr, end + 1)) // end + 1 跳过 '}'
 }
 /// 将模板字符串内容分解为表达式片段列表
@@ -2230,72 +2217,7 @@ fn parse_single_expr(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, Synta
     )(input)?;
     // if is_single_cmd && input.is_empty() {
 
-    with_cfm_enabled(|cfm_enabled| {
-        if cfm_enabled {
-            return match expr {
-                Expression::Symbol(s) => {
-                    // 验证符号不是数字或特殊字符
-                    if s.chars().any(|c| c.is_control() || c == '\0') {
-                        return Err(nom::Err::Error(SyntaxErrorKind::CustomError(
-                            "Invalid characters in command".to_string(),
-                            input.get_str_slice(),
-                        )));
-                    }
-                    Ok((
-                        input,
-                        Expression::Command(Rc::new(Expression::Symbol(s)), Rc::new(vec![])),
-                    ))
-                }
-                #[cfg(unix)]
-                Expression::String(s) if s.contains("/") => {
-                    if s.chars().any(|c| c.is_control() || c == '\0') {
-                        return Err(nom::Err::Error(SyntaxErrorKind::CustomError(
-                            "Invalid characters in command".to_string(),
-                            input.get_str_slice(),
-                        )));
-                    }
-                    // 验证路径格式
-                    if s.contains("..") && !s.starts_with("../") {
-                        return Err(nom::Err::Error(SyntaxErrorKind::CustomError(
-                            "Relative path must start with ./ or ../".to_string(),
-                            input.get_str_slice(),
-                        )));
-                    }
-                    Ok((
-                        input,
-                        Expression::Command(Rc::new(Expression::Symbol(s)), Rc::new(vec![])),
-                    ))
-                }
-                #[cfg(windows)]
-                Expression::String(s)
-                    if (s.contains(":\\")
-                        || s.contains(".\\")
-                        || s.contains(":/")
-                        || s.contains("./")) =>
-                {
-                    if s.chars().any(|c| c.is_control() || c == '\0') {
-                        return Err(nom::Err::Error(SyntaxErrorKind::CustomError(
-                            "Invalid characters in command".to_string(),
-                            input.get_str_slice(),
-                        )));
-                    }
-                    // 验证 Windows 路径格式
-                    if (s.contains(":\\") || s.contains(":/")) && s.len() < 3 {
-                        return Err(nom::Err::Error(SyntaxErrorKind::CustomError(
-                            "Invalid Windows path format".to_string(),
-                            input.get_str_slice(),
-                        )));
-                    }
-                    Ok((
-                        input,
-                        Expression::Command(Rc::new(Expression::Symbol(s)), Rc::new(vec![])),
-                    ))
-                }
-                _ => Ok((input, expr)),
-            };
-        }
-        Ok((input, expr))
-    })
+    Ok((input, expr))
 }
 
 // IF语句解析（支持else if链）

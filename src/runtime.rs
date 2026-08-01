@@ -1,7 +1,7 @@
 use crate::libs::pretty_printer;
-use crate::{CFM_ENABLED, set_cfm_enabled, set_print_direct};
+use crate::set_print_direct;
 
-use crate::utils::expand_home;
+use crate::utils::{expand_home, is_cfm_mode};
 use crate::with_print_direct;
 use crate::{Environment, Expression, MAX_RUNTIME_RECURSION, MAX_SYNTAX_RECURSION, SyntaxError};
 use crate::{SyntaxErrorKind, parse_script};
@@ -9,6 +9,7 @@ use std::collections::HashSet;
 use std::fs::{create_dir, read_to_string, write};
 use std::io::{self, Write};
 use std::path::PathBuf;
+use std::rc::Rc;
 
 pub fn run_file(pb: PathBuf, env: &mut Environment) -> bool {
     match read_to_string(pb.clone()) {
@@ -30,18 +31,74 @@ pub fn run_file(pb: PathBuf, env: &mut Environment) -> bool {
     }
 }
 
-pub fn parse_with_mode(text: &str) -> Result<Expression, SyntaxError> {
-    let temp_cfm = if text.starts_with(">") && CFM_ENABLED.with_borrow(|cfm| cfm == &false) {
-        set_cfm_enabled(true);
-        true
+pub fn parse_with_mode(input: &str) -> Result<Expression, SyntaxError> {
+    let cfm = is_cfm_mode(input);
+    let r = parse(input);
+    if cfm {
+        match r {
+            Ok(Expression::Symbol(s)) => {
+                // 验证符号不是数字或特殊字符
+                if s.chars().any(|c| c.is_control() || c == '\0') {
+                    return Err(SyntaxError {
+                        source: format!("{input}").into(),
+                        kind: SyntaxErrorKind::InvalidCmdSymbol(input.to_string()),
+                    });
+                }
+                Ok(Expression::Command(
+                    Rc::new(Expression::Symbol(s)),
+                    Rc::new(vec![]),
+                ))
+            }
+            #[cfg(unix)]
+            Ok(Expression::String(s)) if !s.ends_with("/") && s.contains("/") => {
+                if s.chars().any(|c| c.is_control() || c == '\0') {
+                    return Err(SyntaxError {
+                        source: format!("{input}").into(),
+                        kind: SyntaxErrorKind::InvalidCmdSymbol(input.to_string()),
+                    });
+                }
+                // 验证路径格式
+                if s.contains("..") && !s.starts_with("../") {
+                    return Err(SyntaxError {
+                        source: format!("{input}").into(),
+                        kind: SyntaxErrorKind::InvalidCmdSymbol(input.to_string()),
+                    });
+                }
+                Ok(Expression::Command(
+                    Rc::new(Expression::Symbol(s)),
+                    Rc::new(vec![]),
+                ))
+            }
+            #[cfg(windows)]
+            Ok(Expression::String(s))
+                if (s.contains(":\\")
+                    || s.contains(".\\")
+                    || s.contains(":/")
+                    || s.contains("./")) =>
+            {
+                if s.chars().any(|c| c.is_control() || c == '\0') {
+                    return Err(SyntaxError {
+                        source: format!("{input}").into(),
+                        kind: SyntaxErrorKind::InvalidCmdSymbol(input.to_string()),
+                    });
+                }
+                // 验证 Windows 路径格式
+                if (s.contains(":\\") || s.contains(":/")) && s.len() < 3 {
+                    return Err(SyntaxError {
+                        source: format!("{input}").into(),
+                        kind: SyntaxErrorKind::InvalidCmdSymbol(input.to_string()),
+                    });
+                }
+                Ok(Expression::Command(
+                    Rc::new(Expression::Symbol(s)),
+                    Rc::new(vec![]),
+                ))
+            }
+            other => other,
+        }
     } else {
-        false
-    };
-    let parsed = parse(text);
-    if temp_cfm {
-        set_cfm_enabled(false);
+        r
     }
-    parsed
 }
 pub fn parse(input: &str) -> Result<Expression, SyntaxError> {
     // dbg!(&input);

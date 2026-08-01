@@ -1,4 +1,4 @@
-use crate::{Environment, Expression, RuntimeError};
+use crate::{Environment, Expression, RuntimeError, with_cfm_config};
 use std::{borrow::Cow, path::PathBuf};
 
 // Helper functions
@@ -320,4 +320,21 @@ pub fn unescape_bytes(s: &str) -> Vec<u8> {
     }
 
     result
+}
+
+/// CFM: Command First Mode — shell-style parsing for single-line commands.
+#[inline]
+pub fn is_cfm_mode(input: &str) -> bool {
+    with_cfm_config(|cfm_config| {
+        if input.starts_with(">") {
+            true
+        } else if input.starts_with(":") {
+            false
+        } else {
+            match cfm_config {
+                Some(c) => c,
+                _ => !input.contains('\n'),
+            }
+        }
+    })
 }

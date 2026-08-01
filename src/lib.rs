@@ -74,7 +74,8 @@ use std::cell::RefCell;
 
 thread_local! {
     static PRINT_DIRECT: RefCell<bool> = const {RefCell::new(true)};
-    static CFM_ENABLED: RefCell<bool> = const {RefCell::new(false)};
+    // static CFM_ENABLED: RefCell<bool> = const {RefCell::new(false)};
+    static CFM_CONFIG: RefCell<Option<bool>> = const {RefCell::new(None)};
     static STRICT_ENABLED: RefCell<bool> = const {RefCell::new(false)};
     static MAX_RUNTIME_RECURSION: RefCell<usize> = const {RefCell::new(800)};
     static MAX_SYNTAX_RECURSION: RefCell<usize> = const {RefCell::new(100)};
@@ -90,13 +91,18 @@ pub fn set_print_direct(value: bool) {
     PRINT_DIRECT.with(|v| *v.borrow_mut() = value);
 }
 
-pub fn with_cfm_enabled<R>(f: impl FnOnce(bool) -> R) -> R {
-    CFM_ENABLED.with(|v| f(*v.borrow()))
+// pub fn with_cfm_enabled<R>(f: impl FnOnce(bool) -> R) -> R {
+//     CFM_ENABLED.with(|v| f(*v.borrow()))
+// }
+
+pub fn set_cfm_enabled(value: Option<bool>) {
+    CFM_CONFIG.with(|v| *v.borrow_mut() = value);
 }
 
-pub fn set_cfm_enabled(value: bool) {
-    CFM_ENABLED.with(|v| *v.borrow_mut() = value);
+pub fn with_cfm_config<R>(f: impl FnOnce(Option<bool>) -> R) -> R {
+    CFM_CONFIG.with(|v| f(*v.borrow()))
 }
+
 pub fn set_strict_enabled(value: bool) {
     STRICT_ENABLED.with(|v| *v.borrow_mut() = value);
 }

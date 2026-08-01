@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use common_macros::hash_map;
 
-use crate::{CFM_ENABLED, Environment, Expression, STRICT_ENABLED};
+use crate::{CFM_CONFIG, Environment, Expression, STRICT_ENABLED};
 
 // 提示符状态缓存
 #[derive(Clone)]
@@ -124,7 +124,7 @@ impl PromptEngine {
         if let Ok(cwd) = env::current_dir()
             && let Some(cwd_str) = cwd.to_str()
         {
-            let cfm = CFM_ENABLED.with_borrow(|cfm| cfm == &true);
+            let cfm = CFM_CONFIG.with_borrow(|cfm| cfm == &Some(true));
             let strict = STRICT_ENABLED.with_borrow(|s| s == &true);
             let ctx = Expression::from(hash_map! {
                 String::from("cfm") => Expression::from(cfm),
@@ -145,7 +145,7 @@ impl PromptEngine {
         let mut result = template
             .replace(
                 "$CFM_TAG",
-                if CFM_ENABLED.with_borrow(|cfm| cfm == &true) {
+                if CFM_CONFIG.with_borrow(|cfm| cfm == &Some(true)) {
                     "CFM"
                 } else {
                     "NM"

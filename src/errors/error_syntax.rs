@@ -32,6 +32,7 @@ pub enum SyntaxErrorKind {
         cause: Option<Box<SyntaxError>>,
     },
     InternalError(String),
+    InvalidCmdSymbol(String),
     CustomError(String, StrSlice),
     UnknownOperator(String, StrSlice),
     UnExpectedToken(String, StrSlice),
@@ -358,6 +359,9 @@ impl fmt::Display for SyntaxError {
             }
             SyntaxErrorKind::InternalError(s) => {
                 writeln!(f, "{RED_START}{BOLD}internal syntax error: {s}{RESET}")
+            }
+            SyntaxErrorKind::InvalidCmdSymbol(s) => {
+                writeln!(f, "{RED_START}{BOLD}invalid cmd symbo: {s}{RESET}")
             }
             SyntaxErrorKind::CustomError(s, at) => {
                 writeln!(f, "{RED_START}{BOLD}syntax error: {s}{RESET}")?;

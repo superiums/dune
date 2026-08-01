@@ -3,9 +3,9 @@ use common_macros::hash_map;
 use crate::libs::BuiltinInfo;
 use crate::libs::helper::{check_exact_args_len, get_integer_ref};
 use crate::{
-    CFM_ENABLED, Environment, Expression, Int, LmError, MAX_RUNTIME_RECURSION,
-    MAX_SYNTAX_RECURSION, MAX_USEMODE_RECURSION, PRINT_DIRECT, RuntimeError, STRICT_ENABLED,
-    set_cfm_enabled, set_print_direct, set_strict_enabled,
+    CFM_CONFIG, Environment, Expression, Int, LmError, MAX_RUNTIME_RECURSION, MAX_SYNTAX_RECURSION,
+    MAX_USEMODE_RECURSION, PRINT_DIRECT, RuntimeError, STRICT_ENABLED, set_cfm_enabled,
+    set_print_direct, set_strict_enabled,
 };
 use std::collections::BTreeMap;
 
@@ -45,7 +45,7 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         max_syntax => "get/set max syntax recursion depth", "[depth]"
         max_runtime => "get/set max runtime recursion depth", "[depth]"
         max_usemode => "get/set max use-mode recursion depth", "[depth]"
-        set_cfm => "enable/disable Cmd First Mode", "<boolean>"
+        set_cfm => "set Cmd First Mode", "<boolean|none>"
         set_pdm => "enable/disable print direct mode", "<boolean>"
         set_strict => "enable/disable strict mode", "<boolean>"
     })
@@ -101,9 +101,15 @@ fn modes(
     _ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
     Ok(Expression::from(hash_map! {
-        String::from("cfm") => CFM_ENABLED.with_borrow(|c|c==&true),
-        String::from("strict") => STRICT_ENABLED.with_borrow(|c|c==&true),
-        String::from("pdm") => PRINT_DIRECT.with_borrow(|c|c==&true),
+        String::from("cfm") => CFM_CONFIG.with_borrow(|c|format!("{}",
+            match c{
+                Some(true) => "ON",
+                Some(false)=>"OFF",
+                _=>"AUTO"
+            }
+        )),
+        String::from("strict") => STRICT_ENABLED.with_borrow(|c|format!("{}",c)),
+        String::from("pdm") => PRINT_DIRECT.with_borrow(|c|format!("{}",c)),
     }))
 }
 
@@ -229,14 +235,20 @@ fn set_cfm(
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
     check_exact_args_len("set_cfm", &args, 1, ctx)?;
-    let b = args[0].is_truthy();
-    env.define_in_root("IS_CFM", Expression::Boolean(b));
+    let b = match &args[0] {
+        Expression::None => None,
+        other => Some(other.is_truthy()),
+    };
     set_cfm_enabled(b);
-    if b {
-        println!("\x1b[38;5;141m[Cmd First Mode: ON]\x1b[0m");
-    } else {
-        println!("\x1b[38;5;209m[Cmd First Mode: OFF]\x1b[0m");
-    }
+    if let Some(bv) = b {
+        env.define_in_root("IS_CFM", Expression::Boolean(bv))
+    };
+    let tag = match b {
+        Some(true) => "ON",
+        Some(false) => "OFF",
+        _ => "AUTO",
+    };
+    println!("\x1b[38;5;141m[Cmd First Mode: {}]\x1b[0m", tag);
     Ok(Expression::None)
 }
 fn set_pdm(

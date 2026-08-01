@@ -37,6 +37,7 @@ if IS_INTERACTIVE {
     # ## syntax theme modify
     # LUME_THEME_CONFIG = {
     #    keyword: "\x1b[38;5;75m",
+    #    operator: COLOR.violet,
     #    ...
     # }
 
@@ -50,11 +51,11 @@ if IS_INTERACTIVE {
 
 
     # ## ---interactive---
-    # ## default repl mode
-    # LUME_VI_MODE = true
 
     # ## default strict mode
-    # set STRICT = true
+    # set LUME_STRICT = true
+    # ## default cmd_frist_mode
+    # set LUME_CFM = none
 
     # ## history file
     # set LUME_HISTORY_FILE = '~\AppData\lumesh\lume_histroy'
