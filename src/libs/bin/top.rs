@@ -10,10 +10,7 @@ use crate::{
     expression::table::TableData,
     libs::{
         BuiltinFunc, BuiltinInfo, LIBS_INFO,
-        bin::{
-            boolean_lib::not,
-            table_lib::{select, sort_by},
-        },
+        bin::{boolean_lib::not, table_lib::select},
         helper::{check_args_len, check_exact_args_len, get_string_ref},
         pretty_printer,
     },
@@ -25,7 +22,7 @@ pub fn regist_all() -> HashMap<&'static str, Rc<BuiltinFunc>> {
     reg_all!({
         exit, cd, cwd, symof,
         tap, print, pprint, println, eprint, eprintln, read,
-        dig, len, rev, flatten,  select, sort_by,
+        dig, len, rev, flatten,  select,
         not,
         eval, exec, eval_str, exec_str, include, import,
         help,
@@ -57,7 +54,6 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         rev => "reverse", "<string|list|table|bytes>"
         flatten => "flatten nested list/map to flat list", "<collection>"
         select => "select columns from table", "<table> <columns...>"
-        sort_by => "sort table by column", "<table> <col>"
         not => "logic not", "<boolean>..."
 
         // Execution control

@@ -136,14 +136,14 @@ impl TableData {
     }
 
     /// 按列排序
-    pub fn sort_by_column(&mut self, column: usize) {
-        let mut rows = self.rows.clone();
-        rows.sort_by(|a, b| match (a.get(column), b.get(column)) {
-            (Some(a_val), Some(b_val)) => a_val.cmp(b_val),
-            _ => std::cmp::Ordering::Equal,
-        });
-        let _ = self.set_rows(rows);
-    }
+    // pub fn sort_by_column(&mut self, column: usize) {
+    //     let mut rows = self.rows.clone();
+    //     rows.sort_by(|a, b| match (a.get(column), b.get(column)) {
+    //         (Some(a_val), Some(b_val)) => a_val.cmp(b_val),
+    //         _ => std::cmp::Ordering::Equal,
+    //     });
+    //     let _ = self.set_rows(rows);
+    // }
 
     /// 获取表头
     pub fn headers(&self) -> &[String] {

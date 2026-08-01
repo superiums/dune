@@ -18,7 +18,7 @@ pub fn regist_lazy() -> LazyModule {
         get_map, rows_map, first_map, last_map,
         rows, first, last, get,
         grep, position, rposition, filter,
-        sort, sort_by,
+        sort,
         push,
 
         is_empty,get_cell,slice,from_maps,
@@ -48,7 +48,7 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         rposition => "last row index matching cell/fn(row_map)->bool", "<table> <cell|fn> [start=0]"
         filter => "filter rows by cell/fn(row_map)->bool", "<table> <cell|fn>"
         sort => "sort, optional fn(a,b)->[-1/0/1]. e.g. sort table 'name'", "<list> [key_fn|±key...]"
-        sort_by => "simple sort by column", "<table> <col>"
+        // sort_by => "simple sort by column", "<table> <col>"
         push => "append a row", "<table> <list|set>"
 
         is_empty => "has no rows?", "<table>"
@@ -421,38 +421,38 @@ pub fn sort(
     })?;
     Ok(Expression::Table(t))
 }
-pub fn sort_by(
-    args: Vec<Expression>,
-    _env: &mut Environment,
-    ctx: &Expression,
-) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("sort_by", &args, 2, ctx)?;
-    let mut it = args.into_iter();
-    let list = it.next().unwrap();
-    let key = it.next().unwrap();
+// pub fn sort_by(
+//     args: Vec<Expression>,
+//     _env: &mut Environment,
+//     ctx: &Expression,
+// ) -> Result<Expression, RuntimeError> {
+//     check_exact_args_len("sort_by", &args, 2, ctx)?;
+//     let mut it = args.into_iter();
+//     let list = it.next().unwrap();
+//     let key = it.next().unwrap();
 
-    let mut t = get_table_arg(list, ctx)?;
+//     let mut t = get_table_arg(list, ctx)?;
 
-    let col = match key {
-        Expression::Integer(i) => i as usize,
-        Expression::String(s) | Expression::Symbol(s) => {
-            t.headers().iter().position(|x| x == &s).unwrap_or(0)
-        }
-        e => {
-            return Err(RuntimeError::new(
-                RuntimeErrorKind::TypeError {
-                    expected: "Integer/String as 2nd arg to sort a t".into(),
-                    found: e.type_name(),
-                    sym: e.to_string(),
-                },
-                ctx.clone(),
-                0,
-            ));
-        }
-    };
-    t.sort_by_column(col);
-    Ok(Expression::Table(t))
-}
+//     let col = match key {
+//         Expression::Integer(i) => i as usize,
+//         Expression::String(s) | Expression::Symbol(s) => {
+//             t.headers().iter().position(|x| x == &s).unwrap_or(0)
+//         }
+//         e => {
+//             return Err(RuntimeError::new(
+//                 RuntimeErrorKind::TypeError {
+//                     expected: "Integer/String as 2nd arg to sort a t".into(),
+//                     found: e.type_name(),
+//                     sym: e.to_string(),
+//                 },
+//                 ctx.clone(),
+//                 0,
+//             ));
+//         }
+//     };
+//     t.sort_by_column(col);
+//     Ok(Expression::Table(t))
+// }
 
 fn grep(
     args: Vec<Expression>,
