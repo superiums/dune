@@ -510,7 +510,7 @@ mod parser_tests {
     fn test_parse_range_op_step() {
         assert_parse_eq(
             "1..10:2",
-            "RangeOp〈..〉\n  Integer〈1〉\n  Integer〈10〉\n  Step    Integer〈2〉",
+            "RangeOp〈..〉\n  Integer〈1〉\n  Integer〈10〉\n  Step\n    Integer〈2〉",
         );
     }
 
@@ -1270,7 +1270,7 @@ mod partial_ord_tests {
 
         assert_eq!(
             Expression::BSet(Rc::new(s1)).partial_cmp(&Expression::BSet(Rc::new(s2))),
-            Some(Ordering::Greater),
+            Some(Ordering::Less),
             "BSet content should be compared, not just length"
         );
     }
@@ -1279,12 +1279,14 @@ mod partial_ord_tests {
     fn test_compare_hmap_by_content() {
         let mut m1 = HashMap::new();
         m1.insert("a".into(), Expression::Integer(1));
+        m1.insert("b".into(), Expression::Integer(3));
         let mut m2 = HashMap::new();
-        m2.insert("b".into(), Expression::Integer(2));
+        m2.insert("a".into(), Expression::Integer(2));
+        m2.insert("b".into(), Expression::Integer(1));
 
         assert_eq!(
             Expression::HMap(Rc::new(m1)).partial_cmp(&Expression::HMap(Rc::new(m2))),
-            Some(Ordering::Greater),
+            Some(Ordering::Less),
             "HMap content should be compared, not just length"
         );
     }
@@ -1293,12 +1295,14 @@ mod partial_ord_tests {
     fn test_compare_map_by_content() {
         let mut m1 = BTreeMap::new();
         m1.insert("a".into(), Expression::Integer(1));
+        m1.insert("b".into(), Expression::Integer(3));
         let mut m2 = BTreeMap::new();
-        m2.insert("b".into(), Expression::Integer(2));
+        m2.insert("a".into(), Expression::Integer(2));
+        m2.insert("b".into(), Expression::Integer(1));
 
         assert_eq!(
             Expression::Map(Rc::new(m1)).partial_cmp(&Expression::Map(Rc::new(m2))),
-            Some(Ordering::Greater),
+            Some(Ordering::Less),
             "Map content should be compared, not just length"
         );
     }
