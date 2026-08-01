@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.17.2]
+- add `cfm auto` mode
+- add `?&`
+`a ?& b ?: c` works same as `a && b || c` of bash
+- cmp `range`;
+- rm sort_by
+- fix println
+- update test
+- optimize inline tags
+
 ## [0.17.1]
 - optimize all tips for libs
 - allow expr in map value
