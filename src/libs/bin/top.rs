@@ -431,7 +431,7 @@ fn println(
     for x in args.iter() {
         let _ = match x {
             Expression::Bytes(b) => stdout.write_all(&b),
-            _ => write!(&mut stdout, "{x} "),
+            _ => writeln!(&mut stdout, "{x}"),
         };
     }
     // let _ = stdout.flush();
