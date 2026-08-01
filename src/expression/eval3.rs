@@ -1,7 +1,10 @@
+use glob::glob;
+
 use super::eval::State;
 use crate::expression::cmd_excutor::handle_command;
 use crate::expression::{ChainCall, alias};
 use crate::libs::{exec_self_expand_lib, get_builtin_via_expr, is_lib};
+use crate::utils::expand_home;
 use crate::{Environment, Expression, MAX_RUNTIME_RECURSION, RuntimeError, RuntimeErrorKind};
 
 // 需要延迟解析的特殊命令列表
@@ -49,6 +52,32 @@ pub fn prepare_args(
         match arg.eval_mut(state, env, depth) {
             //give up bank after eval, mean this is not a receiver but a blank cmd like `ls _`
             Ok(Expression::Blank) => {}
+            // expand wildcard *
+            Ok(Expression::Symbol(s)) => {
+                let s = expand_home(&s);
+                if s.contains('*') {
+                    let mut matched = false;
+                    if let Ok(g) = glob(&s) {
+                        for path in g.filter_map(Result::ok) {
+                            matched = true;
+                            args_eval.push(path.to_string_lossy().to_string().into());
+                        }
+                    }
+                    if !matched {
+                        return Err(RuntimeError {
+                            kind: RuntimeErrorKind::WildcardNotMatched(s.to_string()),
+                            context: arg.clone(),
+                            depth,
+                        });
+                        // cmd_args.push(s);
+                    }
+                } else {
+                    args_eval.push(s.to_string().into())
+                }
+            }
+            Ok(Expression::SymbolRaw(s)) => {
+                args_eval.push(s.into());
+            }
             Ok(a) => args_eval.push(a),
             Err(e) => return Err(e),
         }
