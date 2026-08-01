@@ -20,7 +20,7 @@ use crate::{
 
 pub fn regist_all() -> HashMap<&'static str, Rc<BuiltinFunc>> {
     reg_all!({
-        exit, cd, cwd, symof,
+        exit, cd, cwd,
         tap, print, pprint, println, eprint, eprintln, read,
         dig, len, rev, flatten,  select,
         not,
@@ -38,7 +38,6 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         cwd => "current dir", ""
 
         // I/O operations
-        symof => "type name of value", "<value>"
         tap => "print then return value(s)", "<args>..."
         print => "print, space-sep, no newline", "<args>..."
         pprint => "pretty print table/list/map", "<value>..."
@@ -362,16 +361,6 @@ fn cwd(
 ) -> Result<Expression, RuntimeError> {
     let path = get_current_path_string(env);
     Ok(Expression::String(path))
-}
-
-fn symof(
-    args: Vec<Expression>,
-    _env: &mut Environment,
-    ctx: &Expression,
-) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("symof", &args, 1, ctx)?;
-    let t = args[0].type_name();
-    Ok(Expression::from(t))
 }
 
 fn tap(

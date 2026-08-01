@@ -29,6 +29,7 @@ pub fn regist_se() -> HashMap<&'static str, SelfExpandFunc> {
     module.insert("when", when);
     module.insert("debug", debug);
     module.insert("ddebug", ddebug);
+    module.insert("symof", symof);
     module.insert("typeof", r#typeof);
     module.insert("set_root", set_root);
     module.insert("unset_root", unset_root);
@@ -46,7 +47,8 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
       assert => "throw if condition false", "<condition> [message]"
       debug => "eval & show expr,type,value(debug fmt)", "<args>..."
       ddebug => "eval & show expr,type,value(pretty fmt)", "<args>..."
-      typeof => "type name", "<value>"
+      symof => "type name before eval", "<value>"
+      typeof => "type name after eval", "<value>"
       quote => "quote expr, eval later", "<expr>"
 
       // Data manipulation
@@ -235,6 +237,17 @@ fn ddebug(
         results.push(Expression::from(map));
     }
     Ok(Expression::from(results))
+}
+
+fn symof(
+    args: &[Expression],
+    _env: &mut Environment,
+    _state: &mut State,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("symof", &args, 1, ctx)?;
+    let t = args[0].type_name();
+    Ok(Expression::from(t))
 }
 
 // arg lazy
