@@ -821,6 +821,7 @@ impl PrattParser {
                     },
                     // 处理无括号单参数
                     Expression::Symbol(name) => Ok(vec![name]),
+                    Expression::Blank => Ok(vec![]),
                     _ => {
                         return Err(SyntaxErrorKind::failure(
                             input.get_str_slice(),
