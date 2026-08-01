@@ -333,7 +333,7 @@ pub fn is_cfm_mode(input: &str) -> bool {
         } else {
             match cfm_config {
                 Some(c) => c,
-                _ => !input.contains('\n'),
+                _ => !input.contains('\n') && !input.starts_with("let "),
             }
         }
     })
