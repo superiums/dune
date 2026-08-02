@@ -364,7 +364,7 @@ fn minus_dispatch(
                                                                         // map_valid_token(symbol, TokenKind::Symbol),
         ))(input),
         Ctx::Start => alt((
-            map_valid_token(prefix_minus_tag, TokenKind::OperatorPrefix),
+            map_valid_token(prefix_tag("-"), TokenKind::OperatorPrefix),
             map_valid_token(punctuation_tag("-"), TokenKind::Symbol), //never useful
         ))(input),
         Ctx::Space if is_cfm => alt((
@@ -384,7 +384,7 @@ fn minus_dispatch(
             // `--flag` style: two dashes → argument symbol
             map_valid_token(whole_word("--"), TokenKind::StringRaw),
             // single `-` followed by literal/number/paren/letter → OperatorPrefix
-            map_valid_token(prefix_minus_tag, TokenKind::OperatorPrefix),
+            map_valid_token(prefix_tag("-"), TokenKind::OperatorPrefix),
             // bare `-` as operator (e.g. `- ` followed by space)
             map_valid_token(space_followed_tag("-"), TokenKind::Operator),
             // must after '- ' to exclude it
@@ -392,25 +392,11 @@ fn minus_dispatch(
             map_valid_token(punctuation_tag("-"), TokenKind::Symbol),      //never useful
         ))(input),
         Ctx::Open => alt((
-            map_valid_token(prefix_minus_tag, TokenKind::OperatorPrefix),
+            map_valid_token(prefix_tag("-"), TokenKind::OperatorPrefix),
             map_valid_token(space_followed_tag("-"), TokenKind::Operator), //not useful
             map_valid_token(punctuation_tag("-"), TokenKind::Symbol),      //never useful
         ))(input),
     }
-}
-
-/// Matches `-` as a prefix operator when followed by a literal/number/paren/identifier.
-/// This lets the parser decide: `-42` → negation, `-arg` → flag, `-(expr)` → grouped negation.
-#[inline]
-fn prefix_minus_tag(input: Input<'_>) -> TokenizationResult<'_> {
-    input
-        .strip_prefix("-")
-        .filter(|(rest, _)| {
-            rest.starts_with(|c: char| {
-                c.is_ascii_alphanumeric() || matches!(c, '(' | '[' | '{' | '.')
-            })
-        })
-        .ok_or(NOT_FOUND)
 }
 
 /// Maches range prefix, allow followed by literal/number/(_:]
@@ -1256,7 +1242,8 @@ fn space_punc_followed_tag(keyword: &str) -> impl '_ + Fn(Input<'_>) -> Tokeniza
 }
 
 /// Matches a prefix operator that must be followed by a value-start character.
-/// After stripping the prefix, checks the rest starts with alphanumeric, `(`, `[`, `{`, or `$`.
+/// After stripping the prefix, checks the rest starts with alphanumeric, `(`, `[`, `{`, or `$` `.`.
+/// This lets the parser decide: `-42` → negation, `-arg` → flag, `-(expr)` → grouped negation.
 #[inline]
 fn prefix_tag(keyword: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResult<'_> {
     move |input: Input<'_>| {
@@ -1264,7 +1251,7 @@ fn prefix_tag(keyword: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResult<'_
             .strip_prefix(keyword)
             .filter(|(rest, _)| {
                 rest.starts_with(|c: char| {
-                    c.is_ascii_alphanumeric() || matches!(&c, '(' | '[' | '{' | '$')
+                    c.is_ascii_alphanumeric() || matches!(&c, '(' | '[' | '{' | '$' | '.')
                 })
             })
             .ok_or(NOT_FOUND)
