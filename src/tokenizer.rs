@@ -262,7 +262,7 @@ fn and_dispatch(input: Input<'_>, ctx: Ctx) -> TokenizationResult<'_, (Token, Di
             alt((map_valid_token(punctuation_tag("&"), TokenKind::Symbol),))(input)
         } //NEVER USE
         Ctx::Space | Ctx::Open => alt((
-            space_brace_followed_tag("&:"), //onsuccess catch
+            map_valid_token(space_brace_followed_tag("&:"), TokenKind::Operator), //onsuccess catch
             map_valid_token(operator_tag("&&"), TokenKind::Operator),
             map_valid_token(postfix_break_tag("&+"), TokenKind::StringRaw),
             map_valid_token(postfix_break_tag("&-"), TokenKind::StringRaw),

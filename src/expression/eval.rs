@@ -1215,7 +1215,6 @@ impl Expression {
                         }
                         "<<" => {
                             // 输入重定向处理
-                            // handle_stdin_redirect(lhs, rhs, state, env, depth, true)
                             let path = rhs.eval_mut(state, env, depth + 1)?;
                             let cpath = canon(&path.to_string(), env)?;
                             let contents = match std::fs::read_to_string(&cpath) {
@@ -1235,8 +1234,11 @@ impl Expression {
 
                             state.pipe_in(contents);
 
-                            let left_func = lhs.ensure_fn_apply();
-                            let result = left_func.eval_mut(state, env, depth + 1)?;
+                            let result = lhs
+                                .ensure_fn_apply()
+                                .ensure_sym_as_cmd()
+                                .ensure_has_receiver()
+                                .eval_mut(state, env, depth + 1)?;
                             return Ok(result);
                         }
                         _ => unreachable!(),
