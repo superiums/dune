@@ -22,38 +22,38 @@ use nom::{IResult, branch::alt, combinator::*, multi::*, sequence::*};
 const PREC_ASSIGN: u8 = 1; // 赋值 =
 const PREC_REDIRECT: u8 = 2; // 重定向
 const PREC_PIPE: u8 = 2; // 管道
-const PREC_CATCH: u8 = 3;
+const PREC_CATCH: u8 = 5;
 
-const PREC_LAMBDA: u8 = 4; // lambda -> ~>
-const PREC_CONDITIONAL: u8 = 5; // 条件运算符 ?:
-const PREC_LOGICAL_OR: u8 = 6; // 逻辑或 ||
-const PREC_LOGICAL_AND: u8 = 7; // 逻辑与 &&
-const PREC_COMPARISON: u8 = 8; // 比较运算
+const PREC_LAMBDA: u8 = 6; // lambda -> ~>
+const PREC_CONDITIONAL: u8 = 7; // 条件运算符 ? :
+const PREC_LOGICAL_OR: u8 = 8; // 逻辑或 ||
+const PREC_LOGICAL_AND: u8 = 9; // 逻辑与 &&
+const PREC_COMPARISON: u8 = 10; // 比较运算
 
-const PREC_CMD_ARG: u8 = 9;
-const PREC_FUNC_ARG: u8 = 3;
+const PREC_CMD_ARG: u8 = 11;
+const PREC_FUNC_ARG: u8 = 4;
 
-const PREC_ADD_SUB: u8 = 11; // 加减
-const PREC_MUL_DIV: u8 = 12; // 乘除模 custom_op _*
-const PREC_POWER: u8 = 13; // 幂运算 ^
-const PREC_CUSTOM: u8 = 14; // 自定义
+const PREC_ADD_SUB: u8 = 15; // 加减
+const PREC_MUL_DIV: u8 = 16; // 乘除模 custom_op _*
+const PREC_POWER: u8 = 17; // 幂运算 ^
+const PREC_CUSTOM: u8 = 18; // 自定义
 // 其他
-const PREC_RANGE: u8 = 15; // range         ..
+const PREC_RANGE: u8 = 30; // range         ..
 // prefix
-const PREC_UNARY: u8 = 20; // 单目运算符     ! -
-// const PREC_PRIFIX: u8 = 21; // 单目运算符     ++ --
+const PREC_UNARY: u8 = 31; // 单目运算符     ! -
+// const PREC_PRIFIX: u8 = 31; // 单目运算符     ++ --
 // postfix
-// const PREC_POSTFIX: u8 = 22; //             ++ --
-// const PREC_CALL: u8 = 24; //                func()
+// const PREC_POSTFIX: u8 = 32; //             ++ --
+// const PREC_CALL: u8 = 34; //                func()
 // arry list
-// const PREC_LIST: u8 = 25; // 数组         [1,2]
-// const PREC_SLICE: u8 = 25; //               arry[]
-const PREC_INDEX: u8 = 25; // 索引运算符      @ .
+// const PREC_LIST: u8 = 35; // 数组         [1,2]
+// const PREC_SLICE: u8 = 35; //               arry[]
+const PREC_INDEX: u8 = 35; // 索引运算符      @ .
 // group
-const PREC_GROUP: u8 = 28; // 分组括号      ()
+const PREC_GROUP: u8 = 38; // 分组括号      ()
 
 // Literal
-const PREC_LITERAL: u8 = 29; //原始字面量     "x"
+const PREC_LITERAL: u8 = 39; //原始字面量     "x"
 // cmd
 // const PREC_CMD_NAME: u8 = 30;
 // const PREC_FUNC_NAME: u8 = 31;
