@@ -33,12 +33,12 @@ const PREC_COMPARISON: u8 = 8; // 比较运算
 const PREC_CMD_ARG: u8 = 9;
 const PREC_FUNC_ARG: u8 = 3;
 
-const PREC_RANGE: u8 = 10; // range         ..
 const PREC_ADD_SUB: u8 = 11; // 加减
 const PREC_MUL_DIV: u8 = 12; // 乘除模 custom_op _*
 const PREC_POWER: u8 = 13; // 幂运算 ^
 const PREC_CUSTOM: u8 = 14; // 自定义
 // 其他
+const PREC_RANGE: u8 = 15; // range         ..
 // prefix
 const PREC_UNARY: u8 = 20; // 单目运算符     ! -
 // const PREC_PRIFIX: u8 = 21; // 单目运算符     ++ --
@@ -2663,7 +2663,7 @@ fn parse_index(
 ) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
     let (input, expr) = delimited(
         text("["),
-        |inp| PrattParser::parse_expr_with_precedence(inp, PREC_RANGE, depth + 1),
+        |inp| PrattParser::parse_expr_with_precedence(inp, PREC_ADD_SUB, depth + 1),
         cut(text_close("]")),
     )(input)?;
 
