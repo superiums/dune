@@ -35,14 +35,6 @@ pub fn highlight(line: &str, theme: &HashMap<String, String>) -> String {
                 is_colored = true;
                 result.push_str(b);
             }
-            // (
-            //     TokenKind::Punctuation,
-            //     o @ ("@" | "\'" | "=" | "|" | ">>" | "<<" | ">!" | "->" | "~>"),
-            // ) => {
-            //     result.push_str(get_color("punctuation_special",theme,&default));
-            //     is_colored = true;
-            //     result.push_str(o);
-            // }
             (TokenKind::Punctuation, o) => {
                 result.push_str(get_color("punctuation", theme));
                 is_colored = true;

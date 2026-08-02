@@ -151,11 +151,6 @@ impl PrattParser {
                     // let (new_input, rhs) = Self::parse_prefix(input, PREC_INDEX,depth)?;
                     // input = new_input;
                     match operator {
-                        "@" => {
-                            input = input.skip_n(1);
-                            let (new_input, rhs) = Self::parse_prefix(input, PREC_INDEX,depth)?;
-                        input = new_input;
-                        lhs = Expression::Index(Rc::new(lhs), Rc::new(rhs))},
                         "::" =>  {
                             input = input.skip_n(1);
                             match lhs {
@@ -640,8 +635,6 @@ impl PrattParser {
             }
             // lambda
             "->" => Some(OperatorInfo::new(op, PREC_LAMBDA, true)),
-            // 索引符
-            // "@" | "." => Some(OperatorInfo::new(op, PREC_INDEX, false)),
             // range
             // ".." => Some(OperatorInfo::new("..", PREC_RANGE, false)),
 
@@ -714,9 +707,6 @@ impl PrattParser {
                 Rc::new(lhs),
                 Rc::new(rhs),
             )),
-            // "." | "@" => Ok(Expression::Index(
-            //     // op.symbol.into(),
-            //     Box::new(lhs),
             //     Box::new(rhs),
             // )),
             "&&" | "||" => Ok(Expression::BinaryOp(
