@@ -231,13 +231,13 @@ fn plus_dispatch(
     match ctx {
         Ctx::Space if is_cfm => alt((
             map_valid_token(punctuation_tag("+="), TokenKind::Operator),
-            map_valid_token(space_followed_tag("+"), TokenKind::Operator),
+            // map_valid_token(space_followed_tag("+"), TokenKind::Operator), //already contained in postfix_break_tag
             map_valid_token(postfix_break_tag("+"), TokenKind::Operator), // for not fail: `1 +`
             map_valid_token(whole_word("+"), TokenKind::Symbol),          //important for `chmod +x`
         ))(input),
         Ctx::Space => alt((
             map_valid_token(punctuation_tag("+="), TokenKind::Operator),
-            map_valid_token(space_followed_tag("+"), TokenKind::Operator),
+            // map_valid_token(space_followed_tag("+"), TokenKind::Operator),
             map_valid_token(postfix_break_tag("+"), TokenKind::Operator), // for not fail: `1 +`
             map_valid_token(operator_tag("+"), TokenKind::OperatorPrefix), //important for `chmod +x`
         ))(input),
@@ -335,7 +335,7 @@ fn dot_dispatch(input: Input<'_>, ctx: Ctx) -> TokenizationResult<'_, (Token, Di
             map_valid_token(prefix_range_tag("..="), TokenKind::OperatorPrefix), // ..=b range
             map_valid_token(prefix_range_tag(".."), TokenKind::OperatorPrefix),  // ..b range
             number_literal,                                                      //.5
-            map_valid_token(prefix_tag("."), TokenKind::OperatorPrefix),         //.pipemethod
+            map_valid_token(alpha_followed_tag("."), TokenKind::OperatorPrefix), //.pipemethod
             map_valid_token(path_tag("../", true), TokenKind::Symbol), //path as symbo, to match wildcard
             map_valid_token(path_tag("./", true), TokenKind::Symbol),
             // eager eat, must bellow others
@@ -433,10 +433,11 @@ fn postfix_range_tag(prefix: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationRes
 
 fn circum_dispatch(input: Input<'_>, ctx: Ctx) -> TokenizationResult<'_, (Token, Diagnostic)> {
     match ctx {
-        Ctx::Letter | Ctx::Word => alt((map_valid_token(
-            space_followed_tag("^"),
-            TokenKind::OperatorPostfix,
-        ),))(input), //for SymbolRaw
+        Ctx::Letter | Ctx::Word => alt((
+            // (map_valid_token(space_followed_tag("^"), TokenKind::OperatorPostfix)),
+            (map_valid_token(postfix_break_tag("^"), TokenKind::OperatorPostfix)), //for SymbolRaw
+            (map_valid_token(punctuation_tag("^"), TokenKind::Operator)),
+        ))(input),
         Ctx::Start | Ctx::Space | Ctx::Open | Ctx::Number => {
             map_valid_token(punctuation_tag("^"), TokenKind::Operator)(input)
         }
