@@ -691,7 +691,7 @@ impl PrattParser {
             //     false,
             //     OperatorKind::Prefix,
             // )),
-            "?." | "?+" | "??" | "?>" | "?!" | "?:" | "?~" | "?&" => {
+            "?." | "?+" | "??" | "?>" | "?!" | "?:" | "?~" | "&:" => {
                 Some(OperatorInfo::new(op, PREC_CATCH, false))
             }
 
@@ -927,7 +927,7 @@ impl PrattParser {
                 CatchType::Deel,
                 Some(Rc::new(rhs)),
             )),
-            "?&" => Ok(Expression::Catch(
+            "&:" => Ok(Expression::Catch(
                 Rc::new(lhs),
                 CatchType::OnSuccess,
                 Some(Rc::new(rhs)),
@@ -951,7 +951,7 @@ impl PrattParser {
             "?>" => Expression::Catch(Rc::new(lhs), CatchType::PrintOver, None),
             "?!" => Expression::Catch(Rc::new(lhs), CatchType::Terminate, None),
             "?~" => Expression::Catch(Rc::new(lhs), CatchType::ToBoolean, None),
-            "?&" => Expression::Catch(Rc::new(lhs), CatchType::OnSuccess, None),
+            "&:" => Expression::Catch(Rc::new(lhs), CatchType::OnSuccess, None),
             _ => unreachable!(),
         })
     }
@@ -1284,7 +1284,7 @@ fn parse_fn_declare(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, Syntax
         map(preceded(text("?:"), cut(parse_expr)), |e| {
             (CatchType::Deel, Some(Rc::new(e)))
         }),
-        map(preceded(text("?&"), cut(parse_expr)), |e| {
+        map(preceded(text("&:"), cut(parse_expr)), |e| {
             (CatchType::OnSuccess, Some(Rc::new(e)))
         }),
     )))(input)?;
