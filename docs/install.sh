@@ -91,7 +91,7 @@ ask_variant_type() {
     echo "1) Standard (default) - AI on HTTPS via system TLS on windows/macos; HTTP only on linux/freebsd"  
     echo "2) ai-https - AI on HTTPS via ureq on all platforms (larger binary)"  
     echo ""  
-    read -p "Enter choice (1-2) [1]: " variant_choice  
+    read -p "Enter choice (1-2) [1]: " variant_choice < /dev/tty 
     variant_choice=${variant_choice:-1}  
   
     case $variant_choice in  
@@ -116,7 +116,7 @@ ask_install_type() {
     echo "1) User installation (recommended) - installs to ~/.local/bin"
     echo "2) System installation - requires sudo, installs to /usr/local/bin"
     echo ""
-    read -p "Enter choice (1-2) [1]: " choice
+    read -p "Enter choice (1-2) [1]: " choice < /dev/tty
     choice=${choice:-1}
     case $choice in
         1)

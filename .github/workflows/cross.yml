@@ -81,6 +81,7 @@ jobs:
           cp docs/INS_README.md tmp/doc/
           cp docs/RULE.md tmp/doc/
           cp docs/install.sh tmp/install.sh
+          cp docs/install.ps1 tmp/install.ps1
 
       - name: Create compressed files
         run: |
@@ -96,6 +97,7 @@ jobs:
             data.tgz
             doc.tgz
             tmp/install.sh
+            tmp/install.ps1
 
   # ── lume (default: cli + ai-tls) ─────────────────────────────────────────────
   build:
