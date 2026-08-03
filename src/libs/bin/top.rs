@@ -1,3 +1,16 @@
+use crate::{
+    Environment, Expression, Int, RuntimeError, RuntimeErrorKind, VERSION,
+    expression::table::TableData,
+    jobman::{JobStatus, kill_job, list_jobs},
+    libs::{
+        BuiltinFunc, BuiltinInfo, LIBS_INFO,
+        bin::{boolean_lib::not, table_lib::select},
+        helper::{check_args_len, check_exact_args_len, get_integer_ref, get_string_ref},
+        pretty_printer,
+    },
+    parse_and_eval, reg_all, reg_info,
+    utils::{abs_script, canon, get_current_path_string},
+};
 use std::{
     collections::{BTreeMap, HashMap},
     io::Write,
@@ -5,22 +18,9 @@ use std::{
     rc::Rc,
 };
 
-use crate::{
-    Environment, Expression, Int, RuntimeError, RuntimeErrorKind, VERSION,
-    expression::table::TableData,
-    libs::{
-        BuiltinFunc, BuiltinInfo, LIBS_INFO,
-        bin::{boolean_lib::not, table_lib::select},
-        helper::{check_args_len, check_exact_args_len, get_string_ref},
-        pretty_printer,
-    },
-    parse_and_eval, reg_all, reg_info,
-    utils::{abs_script, canon, get_current_path_string},
-};
-
 pub fn regist_all() -> HashMap<&'static str, Rc<BuiltinFunc>> {
     reg_all!({
-        exit, cd, cwd,
+        jobs,exit, cd, cwd,
         tap, print, pprint, println, eprint, eprintln, read,
         dig, len, rev, flatten,  select,
         not,
@@ -33,6 +33,7 @@ pub fn regist_all() -> HashMap<&'static str, Rc<BuiltinFunc>> {
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
     reg_info!({
         // Shell control
+        jobs => "list/kill jobs", "[-k id]"
         exit => "exit shell", "[status=0]"
         cd => "change dir. '-' for previous", "[path=~]"
         cwd => "current dir", ""
@@ -361,6 +362,46 @@ fn cwd(
 ) -> Result<Expression, RuntimeError> {
     let path = get_current_path_string(env);
     Ok(Expression::String(path))
+}
+
+fn jobs(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    if args.is_empty() {
+        let mut t = TableData::with_header(vec![
+            "id".to_string(),
+            "pid".to_string(),
+            "cmd".to_string(),
+            "running".to_string(),
+        ]);
+        let rows = list_jobs()
+            .iter()
+            .map(|(id, pid, cmd, status)| {
+                vec![
+                    Expression::Integer(*id as i64),
+                    Expression::Integer(*pid as i64),
+                    Expression::String(cmd.to_string()),
+                    Expression::Boolean(status == &JobStatus::Running),
+                ]
+            })
+            .collect::<Vec<_>>();
+        t.set_rows(rows).map_err(|e| RuntimeError {
+            kind: e,
+            context: ctx.clone(),
+            depth: 0,
+        })?;
+        return Ok(Expression::from(t));
+    } else if args.len() == 2 {
+        let arg1 = get_string_ref(&args[0], ctx)?;
+        let arg2 = get_integer_ref(&args[1], ctx)?;
+        if arg1 == "-k" {
+            let r = kill_job(arg2 as u32);
+            return Ok(Expression::Boolean(r));
+        }
+    }
+    Ok(Expression::None)
 }
 
 fn tap(
