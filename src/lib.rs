@@ -56,6 +56,7 @@ pub mod utils;
 // pub use utils::abs;
 // pub use utils::canon;
 pub mod completion;
+pub mod jobman;
 pub mod modman;
 // pub mod excutor;
 pub mod libs;

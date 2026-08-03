@@ -354,12 +354,6 @@ pub fn run_repl(env: &mut Environment) {
     }
     env.undefine("LUME_EDITOR_THEME");
 
-    // Continuation prompt from config
-    if let Some(Expression::String(p)) = env.get("LUME_CONTINUATION_PROMPT") {
-        editor.set_cont_prompt(&p);
-    }
-    env.undefine("LUME_CONTINUATION_PROMPT");
-
     // Set up key bindings
     // Ctrl+J: accept full hint
     // editor.bind_sequence(KeyEvent::Ctrl('j'), Cmd::AcceptHint);
@@ -455,12 +449,9 @@ pub fn run_repl(env: &mut Environment) {
         .set_current_dir(get_current_path_string(&mut shared_env.lock().unwrap()));
 
     // =======prompt=======
-    let pe = get_prompt_engine(
-        env.get("LUME_PROMPT_SETTINGS"),
-        env.get("LUME_PROMPT_TEMPLATE"),
-    );
+    let pe = get_prompt_engine(env.get("LUME_PROMPT_SETTINGS"));
     env.undefine("LUME_PROMPT_SETTINGS");
-    env.undefine("LUME_PROMPT_TEMPLATE");
+    editor.set_cont_prompt(&pe.get_prompt_continuation());
 
     // --------slash bindings-------
     let slash_bindings = if let Some(Expression::Map(m)) = env.get("LUME_SLASH_BINDINGS") {
@@ -472,8 +463,10 @@ pub fn run_repl(env: &mut Environment) {
     env.undefine("LUME_SLASH_BINDINGS");
     env.undefine("LUME_SLASH_MENU");
     // =======main loop=======
+    let mut status = 0;
+    let mut duration = 0;
     loop {
-        let prompt = pe.get_prompt();
+        let prompt = pe.get_prompt(status, duration);
 
         let line = match editor.readline(&prompt) {
             Ok(line) => line,
@@ -617,7 +610,12 @@ pub fn run_repl(env: &mut Environment) {
             }
         } else {
             // normal
-            if parse_and_eval(&full_input, &mut shared_env.lock().unwrap()) {
+            let start = std::time::Instant::now();
+            let result = parse_and_eval(&full_input, &mut shared_env.lock().unwrap());
+            duration = start.elapsed().as_millis();
+
+            if result {
+                status = 0;
                 let changing = full_input.starts_with("cd ");
                 editor.history_mut().add(full_input);
                 // update current dir in history
@@ -625,6 +623,8 @@ pub fn run_repl(env: &mut Environment) {
                     let cwd = get_current_path_string(&mut shared_env.lock().unwrap());
                     editor.history_mut().set_current_dir(cwd);
                 }
+            } else {
+                status = 1;
             }
         }
 

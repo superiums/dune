@@ -128,6 +128,7 @@ pub struct Editor {
     terminal_width: u16,
     terminal_height: u16,
     prompt: String,
+    prompt_lines: u16, // prompt 内部换行数 + 1
     prompt_width: usize,
     current_hint: Option<String>,
     popup_rendered: Option<(u16, u16)>,
@@ -166,6 +167,7 @@ impl Editor {
             terminal_width: w,
             terminal_height: h,
             prompt: String::new(),
+            prompt_lines: 1,
             prompt_width: 0,
             current_hint: None,
             popup_rendered: None,
@@ -359,8 +361,14 @@ impl Editor {
         if let Ok((_col, row)) = crossterm::cursor::position() {
             self.prompt_row = row;
         }
+        // self.prompt = prompt.to_string();
+        // self.prompt_width = visible_width(&self.prompt);
+
         self.prompt = prompt.to_string();
-        self.prompt_width = visible_width(&self.prompt);
+        let prompt_parts: Vec<&str> = self.prompt.split('\n').collect();
+        self.prompt_lines = prompt_parts.len() as u16;
+        self.prompt_width = visible_width(prompt_parts.last().unwrap_or(&""));
+
         self.buffer = LineBuffer::new();
         self.mode = EditorMode::Normal;
         self.is_history_completion = false;
@@ -1249,8 +1257,11 @@ impl Editor {
     fn render(&mut self) -> Result<(), ReadlineError> {
         // ── 1. 补全弹窗空间检查 ──────────────────────────────────────────────
         if matches!(self.mode, EditorMode::CompletionSelect { .. }) {
-            let est_space =
-                (self.terminal_height as usize).saturating_sub(self.prompt_row as usize + 2);
+            let est_space = (self.terminal_height as usize)
+                .saturating_sub(self.prompt_row as usize + self.prompt_lines as usize + 1);
+
+            // let est_space =
+            //     (self.terminal_height as usize).saturating_sub(self.prompt_row as usize + 2);
             if est_space < 3 {
                 let scroll: u16 = 3;
                 let _ = crossterm::queue!(std::io::stdout(), ScrollUp(scroll));
@@ -1263,6 +1274,7 @@ impl Editor {
         let line = self.buffer.text();
         let cursor = self.buffer.cursor();
         let vis_width = self.terminal_width as usize;
+        let prompt_extra_rows = self.prompt_lines.saturating_sub(1);
 
         // ── 2. 清除上次渲染的补全弹窗 ────────────────────────────────────────
         if let Some((start, end)) = self.popup_rendered {
@@ -1276,7 +1288,6 @@ impl Editor {
         //   Bug4修正：不再依赖 \r\n 自动滚动，改为逐行 MoveTo，
         //   所以这里只需要计算总视觉行数用于滚动判断。
         let all_parts: Vec<&str> = line.split('\n').collect();
-
         // 计算每一逻辑行的视觉行数（含折行）
         let visual_rows_per_line: Vec<usize> = all_parts
             .iter()
@@ -1289,7 +1300,13 @@ impl Editor {
                 };
                 let w = prefix_w + visible_width(part);
                 // 至少占 1 行，超宽则折行
-                1 + w.saturating_sub(1) / vis_width
+                // 1 + w.saturating_sub(1) / vis_width
+                let base = 1 + w.saturating_sub(1) / vis_width;
+                if i == 0 {
+                    base + prompt_extra_rows as usize // ← 新增：加上 prompt 自身多占的行
+                } else {
+                    base
+                }
             })
             .collect();
 
@@ -1315,14 +1332,36 @@ impl Editor {
 
         // ── 4. 渲染输入内容（Bug4修正：用 MoveTo 逐行定位，避免 \r\n 漂移）──
         {
+            // let mut render_row = self.prompt_row;
+            // for (i, part) in all_parts.iter().enumerate() {
+            //     let prefix = if i == 0 {
+            //         &self.prompt
+            //     } else {
+            //         &self.cont_prompt
+            //     };
+            //     queue!(stdout, MoveTo(0, render_row), Print(prefix)).map_err(ReadlineError::Io)?;
+            //     if let Some(ref hl) = self.highlighter {
+            //         queue!(stdout, Print(&hl.highlight(part))).map_err(ReadlineError::Io)?;
+            //     } else {
+            //         queue!(stdout, Print(part)).map_err(ReadlineError::Io)?;
+            //     }
+            //     render_row += visual_rows_per_line[i] as u16;
+            // }
             let mut render_row = self.prompt_row;
             for (i, part) in all_parts.iter().enumerate() {
-                let prefix = if i == 0 {
-                    &self.prompt
+                if i == 0 {
+                    // 把多行 prompt 按 \n 拆开，逐行 MoveTo，不让 \n 字节进入 Stdout 缓冲区
+                    let prompt_lines: Vec<&str> = self.prompt.split('\n').collect();
+                    let mut prow = render_row;
+                    for pline in &prompt_lines {
+                        queue!(stdout, MoveTo(0, prow), Print(pline)).map_err(ReadlineError::Io)?;
+                        prow += 1;
+                    }
                 } else {
-                    &self.cont_prompt
-                };
-                queue!(stdout, MoveTo(0, render_row), Print(prefix)).map_err(ReadlineError::Io)?;
+                    queue!(stdout, MoveTo(0, render_row), Print(&self.cont_prompt))
+                        .map_err(ReadlineError::Io)?;
+                }
+
                 if let Some(ref hl) = self.highlighter {
                     queue!(stdout, Print(&hl.highlight(part))).map_err(ReadlineError::Io)?;
                 } else {
@@ -1350,13 +1389,12 @@ impl Editor {
                 self.cont_prompt_width
             };
             let line_visual_w = prefix_w + visible_width(part);
+            let extra = if i == 0 { prompt_extra_rows } else { 0 };
 
             if i + 1 < lines_before_cursor.len() {
-                // 不是光标所在段：整段（含折行）都要跳过
-                cursor_row += 1 + (line_visual_w.saturating_sub(1) / vis_width) as u16;
+                cursor_row += extra + (1 + (line_visual_w.saturating_sub(1) / vis_width) as u16);
             } else {
-                // 光标所在段：折行数加到行，列取余数
-                cursor_row += (line_visual_w / vis_width) as u16;
+                cursor_row += extra + (line_visual_w / vis_width) as u16;
                 cursor_col = (line_visual_w % vis_width) as u16;
             }
         }
@@ -1372,11 +1410,13 @@ impl Editor {
                 self.cont_prompt_width
             };
             let line_visual_w = prefix_w + visible_width(part);
+            let extra = if i == 0 { prompt_extra_rows } else { 0 };
+
             if i + 1 < all_parts.len() {
-                end_row += visual_rows_per_line[i] as u16;
+                end_row += extra + visual_rows_per_line[i] as u16;
                 end_col = 0;
             } else {
-                end_row += (line_visual_w / vis_width) as u16;
+                end_row += extra + (line_visual_w / vis_width) as u16;
                 end_col = line_visual_w % vis_width;
             }
         }

@@ -26,3 +26,10 @@ fn LUME_PROMPT_TEMPLATE(path, ctx) {
     let right_c = $right.zip($colors_r) |> x ->  $x[0].clr($x[1])
     '╭───['.green() + $left_c.join(']─['.green()) +']'.green() + $spaces.green() + $right_c.join('─'.green()) + "\n│\n╰─> ".green()
 } ?: e -> print $e
+
+set LUME_PROMPT_SETTINGS = {
+    starship: false,
+    ttl: 2,
+    prompt_continuation: "... ",
+    prompt_template: LUME_PROMPT_TEMPLATE
+}

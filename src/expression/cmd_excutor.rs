@@ -41,6 +41,7 @@ fn exec_single_cmd(
     let mut cmd = Command::new(cmdstr);
 
     let ar = args.unwrap_or_default();
+    let ar_display = ar.join(" ");
 
     cmd.args(ar)
         .envs(env.get_root().get_bindings_string())
@@ -122,8 +123,10 @@ fn exec_single_cmd(
     // 中断信号处理：SIGINT 由全局 handler 捕获（在 repl.rs 中安装），
     // 仅设置标志位，不会杀死 lume 自身。
     // 子进程会收到终端发送的 SIGINT 并退出，wait 随后返回。
-    childman::set_child(child.id());
-
+    // 仅前台任务
+    if mode & 8 == 0 {
+        childman::set_child(child.id());
+    }
     // 获取输出
     if pipe_out {
         // 管道捕获
@@ -176,7 +179,9 @@ fn exec_single_cmd(
             Ok(None)
         }
     } else if mode & 8 != 0 {
-        // 后台运行
+        // 后台运行：注册进任务表
+        let cmdline = format!("{cmdstr} {}", ar_display); // ar_display 需要在函数前面保留一份参数拼接文本
+        crate::jobman::add_job(child, cmdline);
         Ok(None)
     } else {
         // 正常模式

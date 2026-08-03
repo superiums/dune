@@ -19,14 +19,15 @@ struct PromptCache {
 
 #[derive(Clone)]
 struct PromptEngine {
-    mode: u8,
+    starship: bool,
     custom_template: Option<String>,
     template_func: Option<Expression>,
+    template_continuation: Option<String>,
     cache: Arc<Mutex<PromptCache>>,
 }
 pub trait PromptEngineCommon {
-    fn get_prompt(&self) -> String;
-    fn get_incomplete_prompt(&self) -> String;
+    fn get_prompt(&self, status: i32, duration: u128) -> String;
+    fn get_prompt_continuation(&self) -> String;
 }
 // struct MyPrompt {}
 
@@ -45,57 +46,49 @@ pub trait PromptEngineCommon {
 // }
 impl PromptEngineCommon for PromptEngine {
     // 核心提示符生成方法
-    fn get_prompt(&self) -> String {
+    fn get_prompt(&self, status: i32, duration: u128) -> String {
         // dbg!("getting prompt");
-        // 1. 检查缓存有效性
-        if let Ok(cache) = self.cache.lock()
-            && cache.last_update.elapsed() < cache.ttl
-        {
-            return cache.content.clone();
-        }
 
         // 2. 生成新提示符
-        let prompt = match self.mode {
-            1 => {
-                if let Some(func) = &self.template_func {
-                    self.render_from_func(func)
+        match self.starship {
+            false => {
+                // 1. 检查缓存有效性
+                if let Ok(cache) = self.cache.lock()
+                    && cache.last_update.elapsed() < cache.ttl
+                {
+                    return cache.content.clone();
+                }
+
+                // 2. 渲染
+                let prompt = if let Some(func) = &self.template_func {
+                    self.render_from_func(func, status, duration)
                 } else if let Some(template) = &self.custom_template {
-                    self.render_template(template)
+                    self.render_template(template, status, duration)
                 } else {
                     self.default_prompt()
+                };
+
+                // 3. 更新缓存
+                if let Ok(mut cache) = self.cache.lock() {
+                    *cache = PromptCache {
+                        last_update: Instant::now(),
+                        content: prompt.clone(),
+                        ttl: cache.ttl,
+                    };
                 }
+
+                prompt
             }
-            2 => self
-                .get_starship_prompt()
+            true => self
+                .get_starship_prompt(status, duration)
                 .unwrap_or_else(|| self.default_prompt()),
-            _ => self.default_prompt(),
-        };
-        // // dbg!("rendering prompt");
-        // let prompt = if let Some(func) = &self.template_func {
-        //     self.render_from_func(func)
-        // } else if let Some(template) = &self.custom_template {
-        //     // dbg!("rendering template");
-        //     self.render_template(template)
-        // } else if self.starship_enabled {
-        //     self.get_starship_prompt()
-        //         .unwrap_or_else(|| "> ".to_string())
-        // } else {
-        //     self.default_prompt()
-        // };
-
-        // 3. 更新缓存
-        if let Ok(mut cache) = self.cache.lock() {
-            *cache = PromptCache {
-                last_update: Instant::now(),
-                content: prompt.clone(),
-                ttl: cache.ttl,
-            };
         }
-
-        prompt
     }
-    fn get_incomplete_prompt(&self) -> String {
-        "... ".into()
+    fn get_prompt_continuation(&self) -> String {
+        match self.starship {
+            true => self.get_starship_continue().unwrap_or("... ".into()),
+            _ => self.template_continuation.clone().unwrap_or("... ".into()),
+        }
     }
 }
 impl PromptEngine {
@@ -119,16 +112,20 @@ impl PromptEngine {
     // pub fn set_template(&mut self, template: String) {
     //     self.custom_template = Some(template);
     // }
-    fn render_from_func(&self, func: &Expression) -> String {
+    fn render_from_func(&self, func: &Expression, status: i32, duration: u128) -> String {
         // dbg!(&func.type_name());
         if let Ok(cwd) = env::current_dir()
             && let Some(cwd_str) = cwd.to_str()
         {
             let cfm = CFM_CONFIG.with_borrow(|cfm| cfm == &Some(true));
             let strict = STRICT_ENABLED.with_borrow(|s| s == &true);
+            let jobs = crate::jobman::running_count();
             let ctx = Expression::from(hash_map! {
                 String::from("cfm") => Expression::from(cfm),
                 String::from("strict") => Expression::from(strict),
+                String::from("status") => Expression::from(status as i64),
+                String::from("duration") => Expression::from(duration as i64),
+                String::from("jobs") => Expression::from(jobs as i64),
             });
             let r = func
                 .apply(vec![Expression::String(cwd_str.to_string()), ctx])
@@ -140,12 +137,19 @@ impl PromptEngine {
         }
         self.default_prompt()
     }
-    fn render_template(&self, template: &str) -> String {
+    fn render_template(&self, template: &str, status: i32, duration: u128) -> String {
         // 实现简单的占位符替换
+        let jobs = crate::jobman::running_count();
+
         let mut result = template
+            .replace("$STATUS", if status == 0 { "OK" } else { "FAIL" })
+            .replace("$DURATION", &duration.to_string())
+            .replace("$JOBS", &jobs.to_string())
             .replace(
                 "$CFM_TAG",
-                if CFM_CONFIG.with_borrow(|cfm| cfm == &Some(true)) {
+                if CFM_CONFIG.with_borrow(|cfm| cfm.is_none()) {
+                    "AUTO"
+                } else if CFM_CONFIG.with_borrow(|cfm| cfm == &Some(true)) {
                     "CFM"
                 } else {
                     "NM"
@@ -182,20 +186,39 @@ impl PromptEngine {
         result
     }
 
-    fn get_starship_prompt(&self) -> Option<String> {
+    fn get_starship_prompt(&self, status: i32, duration: u128) -> Option<String> {
+        let (width, _) = crossterm::terminal::size().unwrap_or((80, 157));
+        let dir = env::current_dir().ok()?;
+        let jobs = crate::jobman::running_count();
+
         // 异步调用 starship prompt 子进程
         let output = Command::new("starship")
             .arg("prompt")
-            .env_clear()
-            .envs(env::vars().filter(|(k, _)| {
-                // 只传递 starship 需要的环境变量
-                k.starts_with("STARSHIP_") || k == "TERM" || k == "PWD" || k == "HOME"
-            }))
+            .arg(format!("--terminal-width={width}"))
+            .arg(format!("--status={status}"))
+            .arg(format!("--cmd-duration={duration}"))
+            .arg(format!("--jobs={jobs}"))
+            .arg(format!("--logical-path={}", dir.display()))
+            .envs(env::vars())
+            .env("STARSHIP_SHELL", "lume")
+            .current_dir(dir)
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .output()
             .ok()?;
+        String::from_utf8(output.stdout).ok()
+    }
 
+    fn get_starship_continue(&self) -> Option<String> {
+        let output = Command::new("starship")
+            .arg("--continuation")
+            .envs(env::vars())
+            .env("STARSHIP_SHELL", "lume")
+            // .current_dir(dir)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .output()
+            .ok()?;
         String::from_utf8(output.stdout).ok()
     }
 
@@ -270,41 +293,37 @@ fn get_short_path(path: &Path) -> String {
     format!("{}...{}{}", first_two.join(""), sep, last_two.join(sep))
 }
 
-pub fn get_prompt_engine(
-    settings: Option<Expression>,
-    template: Option<Expression>,
-) -> Box<dyn PromptEngineCommon> {
-    let (mode, ttl) = match settings {
+pub fn get_prompt_engine(settings: Option<Expression>) -> Box<dyn PromptEngineCommon> {
+    let (starship, ttl, template, template_continuation) = match settings {
         Some(Expression::Map(sets)) => {
             let ttl = sets
-                .get("TTL_SECS")
+                .get("ttl")
                 .map(|t| match t {
                     Expression::Integer(ttl) => *ttl as u64,
                     _ => 2,
                 })
                 .unwrap_or(2);
-            let mode = sets
-                .get("MODE")
-                .map(|s| match s {
-                    Expression::Integer(m) => *m as u8,
-                    _ => 0,
-                })
-                .unwrap_or(0);
-            (mode, ttl)
+            let starship = sets
+                .get("starship")
+                .is_some_and(|st| st.to_string() == "true" || st.is_truthy());
+            let template = sets.get("prompt_template").cloned();
+            let template_continuation = sets.get("prompt_continuation").map(|tc| tc.to_string());
+            (starship, ttl, template, template_continuation)
         }
 
-        _ => (0, 2),
+        _ => (false, 2, None, None),
     };
 
     Box::new(PromptEngine {
-        mode,
+        starship,
+        template_continuation,
         template_func: template.clone().and_then(|f| match f {
             Expression::Lambda(..) => Some(f),
             Expression::Function(..) => Some(f),
             _ => None,
         }),
         custom_template: template.and_then(|t| match t {
-            Expression::String(p) => Some(p),
+            Expression::String(p) => Some(p.clone()),
             _ => None,
         }),
         cache: Arc::new(Mutex::new(PromptCache {

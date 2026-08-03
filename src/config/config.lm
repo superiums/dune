@@ -24,23 +24,23 @@ if IS_INTERACTIVE {
     # set LUME_WELCOME= 'Welcome to Lumesh!'
 
     # ## prompt
-    # MODE: 1=use template; 2=use starship; 0=use default.
-    set LUME_PROMPT_SETTINGS = {
-        MODE: 1,
-        TTL_SECS: 2
-    }
     # template could be normal expression or func.
-    # avaluable tmplate var: $CWD, $CWD_SHORT, $CFM_TAG, $STRICT_TAG
-    set LUME_PROMPT_TEMPLATE = string.blue('$CWD_SHORT') + '|' + string.green('$CFM_TAG') + '|' + string.blue('$STRICT_TAG') + '❯  '.bold().yellow()
+    # avaluable tmplate var: $CWD, $CWD_SHORT, $CFM_TAG, $STRICT_TAG, $STATUS, $DURATION, $JOBS
     # if template is lambda/func, it will be evaluated everytime.
-    # set LUME_PROMPT_TEMPLATE = (dir,ctx) -> {
+    # avaluable fields in ctx: cfm,strict,status,duration,jobs
+    set LUME_PROMPT_SETTINGS = {
+        starship: 0,
+        ttl: 2,
+        prompt_continuation: "... ",
+        prompt_template: string.blue('$CWD_SHORT') + '|' + string.green('$CFM_TAG') + '|' + string.blue('$STRICT_TAG') + '❯  '.bold().yellow(),
+    #   prompt_template: (dir,ctx) -> {
     #     string.blue($dir) + ' |'.green().bold() \
     #     + ($ctx.cfm ? 'CFM'.green() + '|' : '') \
     #     + ($ctx.strict ? 'S'.yellow() + '| ' : '' ) \
     #     + (if (fs.exists '.git') {git branch --show-current | .cyan()} else '') \
     #     + '> '.green().bold()
     # }
-    # include prompt_ka.lm
+    }
 
     # ## base theme for syntax: 'one_dark', 'ayu_dark', 'light'
     LUME_THEME = 'ayu_dark'
