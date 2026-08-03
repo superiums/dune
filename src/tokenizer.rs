@@ -495,10 +495,12 @@ fn question_dispatch(input: Input<'_>, _ctx: Ctx) -> TokenizationResult<'_, (Tok
 fn underscore_dispatch(input: Input<'_>, ctx: Ctx) -> TokenizationResult<'_, (Token, Diagnostic)> {
     match ctx {
         Ctx::Letter | Ctx::Word | Ctx::Number => alt((
-            map_valid_token(punct_seq_tag("__"), TokenKind::OperatorPostfix), //custom op use
+            // custom unary op __+ as OperatorPostfix: 'xx'__+
+            // map_valid_token(punct_seq_tag("__"), TokenKind::OperatorPostfix), //custom op use
             map_valid_token(punctuation_tag("_"), TokenKind::Symbol),
         ))(input),
         _ => alt((
+            // custom unary op __+ as Operator: a __+
             map_valid_token(punct_seq_tag("__"), TokenKind::Operator), //custom op define
             //`ls _` `[0.._]` `[_..9]` `a[.._:2]
             map_valid_token(

@@ -234,6 +234,10 @@ impl PrattParser {
                             // dbg!("--->try catch ast:");
                             lhs = Self::build_catch_ast(op_info, lhs)?
                         }
+                        // custom unary op __+ as Operator: a __+
+                        opx if opx.starts_with("__") => {
+                            lhs = Expression::UnaryOp(opx.into(), Rc::new(lhs), false);
+                        }
                         _ => {
                             if input.is_empty() {
                                 //dbg!("---break2---");
@@ -594,14 +598,15 @@ impl PrattParser {
             //         Expression::UnaryOp(op, Rc::new(lhs), false),
             //     ))
             // }
-            opx if opx.starts_with("__") => {
-                // 后置自定义
-                // dbg!(&opx, &lhs);
-                Ok((
-                    input.skip_n(1),
-                    Expression::UnaryOp(opx.into(), Rc::new(lhs), false),
-                ))
-            }
+            // custom unary op __+ as OperatorPostfix: 'xx'__+
+            // opx if opx.starts_with("__") => {
+            //     // 后置自定义
+            //     // dbg!(&opx, &lhs);
+            //     Ok((
+            //         input.skip_n(1),
+            //         Expression::UnaryOp(opx.into(), Rc::new(lhs), false),
+            //     ))
+            // }
             "K" | "M" | "G" | "T" | "P" | "B" => {
                 let fs = match lhs {
                     Expression::Integer(s) => FileSize::from(s as u64, &op),
@@ -691,6 +696,7 @@ impl PrattParser {
             opa if opa.starts_with("..+") => Some(OperatorInfo::new(opa, PREC_ADD_SUB, false)),
             ops if ops.starts_with("..*") => Some(OperatorInfo::new(ops, PREC_MUL_DIV, false)),
             opo if opo.starts_with("..") => Some(OperatorInfo::new(opo, PREC_CUSTOM, false)),
+            opo if opo.starts_with("__") => Some(OperatorInfo::new(opo, PREC_CUSTOM, false)),
             _ => None,
         }
     }
@@ -909,9 +915,6 @@ impl PrattParser {
                 Rc::new(lhs),
                 Rc::new(rhs),
             )),
-            opx if opx.starts_with("..") => {
-                Ok(Expression::BinaryOp(opx.into(), Rc::new(lhs), Rc::new(rhs)))
-            }
             "?:" => Ok(Expression::Catch(
                 Rc::new(lhs),
                 CatchType::Deel,
@@ -922,7 +925,9 @@ impl PrattParser {
                 CatchType::OnSuccess,
                 Some(Rc::new(rhs)),
             )),
-
+            opx if opx.starts_with("..") => {
+                Ok(Expression::BinaryOp(opx.into(), Rc::new(lhs), Rc::new(rhs)))
+            }
             _ => {
                 unreachable!()
             }
