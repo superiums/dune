@@ -1,9 +1,33 @@
 # Changelog
 
+## [0.17.3]
+- add `jobs` to control background jobs
+- integrate with starship
+- unary custom op to operater insteadof postfix
+- update install
+- improve prec
+- improve tokenizer for `.` `^` `+`
+- remove index `@`
+- optimize tokenizer: unify - ! prefix tag
+- improve `<<`
+- change `?&` to `&:`
+- range PREC to 15
+- allow `_` as lambda arg
+- nocfm on let
+this protect the `let a=1` fail in CFM
+because we need to keep `dd if=/dev/sda` in CFM
+
+- optimize space recognize in `^` and `:`
+- fix symof
+`assert(symof(1+2)=='BinaryOp')`
+
+- add files support for fs.ls: `fs.ls file(s)`;
+- expand wildcard for builtin libs
+
 ## [0.17.2]
 - add `cfm auto` mode
-- add `?&`
-`a ?& b ?: c` works same as `a && b || c` of bash
+- add `&:`
+`a &: b ?: c` works same as `a && b || c` of bash
 - cmp `range`;
 - rm sort_by
 - fix println
