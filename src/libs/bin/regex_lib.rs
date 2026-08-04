@@ -30,7 +30,7 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         // 捕获组操作
         capture => "first match's groups [full,g1,g2,...]", "<pattern> <text>"
         captures => "all matches' groups [[full,g1,...],...]", "<pattern> <text>"
-        named_captures => "named groups as map. e.g. r'(?<y>\\d+)'", "<pattern> <text>"
+        named_captures => "named groups as map. e.g. g'(?<y>\\d+)'", "<pattern> <text>"
 
         // 文本处理
         split => "split by pattern", "<pattern> <text>"

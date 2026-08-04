@@ -114,7 +114,7 @@ if IS_INTERACTIVE {
     # ### functions for slash bindings
     let select_cmdmark = (b) -> { fs.read ~/.cache/lumesh/cmdmark ?! | .lines() | ui.pick('select cmdmark:') | eval_str() }
     let select_dirmark = (b) -> { fs.read ~/.cache/lumesh/dirmark ?! | .lines() | ui.pick('select dirmark:') | cd _ }
-    let fuzzy_go = (b) -> {let base = $b ~: r'~|/' ? $b : './'; let max = $b == '/' ? 2 : 5; fd -t d --max-depth $max . $base | ui.pick('Fuzzy Go:') ?! | cd _}
+    let fuzzy_go = (b) -> {let base = $b ~: g'~|/' ? $b : './'; let max = $b == '/' ? 2 : 5; fd -t d --max-depth $max . $base | ui.pick('Fuzzy Go:') ?! | cd _}
     let open_file = (b) -> {fd -t file | ui.pick('select file:') ?! |start 'edit' _}
     let edit_file = (b) -> {let e = sys.has('EDITOR') ? $EDITOR : 'notepad'; fd -t file | ui.pick('edit file:') | $e _}
     let search_content = (b) -> {

@@ -91,7 +91,7 @@ fn main() {
         "$",
         r"'hello world'",
         r"`template ${x}`",
-        r"r'/pattern/'",
+        r"g'/pattern/'",
         r"t'2024-01-01'",
         "a+b-c*d/e",
         "x[0][1]",

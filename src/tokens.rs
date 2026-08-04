@@ -106,17 +106,44 @@ impl nom::InputLength for Input<'_> {
 pub struct Token {
     pub kind: TokenKind,
     pub range: StrSlice,
+    pub open_len: u8,  // 开定界符长度，例如 r#' 是 3
+    pub close_len: u8, // 闭定界符长度，例如 '# 是 2
 }
 
 impl Token {
+    /// 普通场景：无引号/无需裁剪的 token（Symbol/Operator 等）
     #[inline]
     pub fn new(kind: TokenKind, range: StrSlice) -> Self {
-        Token { kind, range }
+        Token {
+            kind,
+            range,
+            open_len: 0,
+            close_len: 0,
+        }
+    }
+
+    /// 字符串类 token：显式指定开闭定界符长度
+    #[inline]
+    pub fn new_quoted(kind: TokenKind, range: StrSlice, open_len: u8, close_len: u8) -> Self {
+        Token {
+            kind,
+            range,
+            open_len,
+            close_len,
+        }
     }
 
     #[inline]
     pub fn text(self, tokens: Tokens<'_>) -> &str {
         self.range.to_str(tokens.str)
+    }
+
+    /// 去掉首尾定界符后的内容
+    #[inline]
+    pub fn text_inner<'b>(&self, tokens: Tokens<'b>) -> &'b str {
+        let start = self.range.start() + self.open_len as usize;
+        let end = self.range.end() - self.close_len as usize;
+        &tokens.str[start..end]
     }
 }
 

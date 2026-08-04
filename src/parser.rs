@@ -1404,22 +1404,47 @@ fn parse_variable(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxEr
 
 #[inline]
 fn parse_string(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
-    let (input, expr) = kind(TokenKind::StringLiteral)(input)?;
-    let raw_str = expr.to_str(input.str);
-    let s = raw_str.strip_prefix('"').unwrap_or(raw_str);
-    let cs = s.strip_suffix('"').unwrap_or(s);
+    let token = input
+        .first()
+        .filter(|t| t.kind == TokenKind::StringLiteral)
+        .ok_or(nom::Err::Error(SyntaxErrorKind::CustomError(
+            format!("expect token kind: StringLiteral"),
+            input.get_str_slice(),
+        )))?;
+
+    let cs = token.text_inner(input);
+
     let r = unescape_str(cs);
-    Ok((input, Expression::String(r)))
+    Ok((input.skip_n(1), Expression::String(r)))
 }
 
 #[inline]
+fn parse_strings_via_kind(
+    input: Tokens<'_>,
+    kind: TokenKind,
+) -> IResult<Tokens<'_>, String, SyntaxErrorKind> {
+    let token = input
+        .first()
+        .filter(|t| t.kind == kind)
+        .ok_or(nom::Err::Error(SyntaxErrorKind::CustomError(
+            format!("expect token kind: StringLiteral"),
+            input.get_str_slice(),
+        )))?;
+
+    let cs = token.text_inner(input);
+
+    let r = if token.open_len > 1 {
+        // 对'...'进行简单转义
+        cs.replace("\\'", "'").replace("\\\\", "\\")
+    } else {
+        // r#'...' 无需转义
+        cs.to_string()
+    };
+    Ok((input.skip_n(1), r))
+}
+#[inline]
 fn parse_string_raw_inner(input: Tokens<'_>) -> IResult<Tokens<'_>, String, SyntaxErrorKind> {
-    let (input, expr) = kind(TokenKind::StringRaw)(input)?;
-    let raw_str = expr.to_str(input.str);
-    let s = raw_str.strip_prefix('\'').unwrap_or(raw_str);
-    let cs = s.strip_suffix('\'').unwrap_or(s);
-    let r = cs.replace("\\'", "'").replace("\\\\", "\\");
-    Ok((input, r))
+    parse_strings_via_kind(input, TokenKind::StringRaw)
 }
 
 #[inline]
@@ -1429,35 +1454,20 @@ fn parse_string_raw(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, Syntax
 }
 
 fn parse_regex(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
-    let (input, expr) = kind(TokenKind::Regex)(input)?;
-    let raw_str = expr.to_str(input.str);
-    let s = raw_str.strip_prefix("r'").unwrap_or(raw_str);
-    let cs = s.strip_suffix('\'').unwrap_or(s);
-    let r = cs.replace("\\'", "'").replace("\\\\", "\\");
+    let (input, r) = parse_strings_via_kind(input, TokenKind::Regex)?;
     Ok((input, Expression::RegexDef(r)))
 }
 fn parse_time(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
-    let (input, expr) = kind(TokenKind::Time)(input)?;
-    let raw_str = expr.to_str(input.str);
-    let s = raw_str.strip_prefix("t'").unwrap_or(raw_str);
-    let cs = s.strip_suffix('\'').unwrap_or(s);
-    let r = cs.replace("\\'", "'").replace("\\\\", "\\");
+    let (input, r) = parse_strings_via_kind(input, TokenKind::Time)?;
     Ok((input, Expression::TimeDef(r)))
 }
 fn parse_string_safe(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
-    let (input, expr) = kind(TokenKind::StringSafe)(input)?;
-    let raw_str = expr.to_str(input.str);
-    let s = raw_str.strip_prefix("s'").unwrap_or(raw_str);
-    let cs = s.strip_suffix('\'').unwrap_or(s);
-    let r = cs.replace("\\'", "'").replace("\\\\", "\\");
+    let (input, r) = parse_strings_via_kind(input, TokenKind::StringSafe)?;
     Ok((input, Expression::StringSafe(r)))
 }
 fn parse_bytes(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
-    let (input, expr) = kind(TokenKind::Bytes)(input)?;
-    let raw_str = expr.to_str(input.str);
-    let s = raw_str.strip_prefix("b'").unwrap_or(raw_str);
-    let cs = s.strip_suffix('\'').unwrap_or(s);
-    let r = unescape_bytes(cs);
+    let (input, r) = parse_strings_via_kind(input, TokenKind::Bytes)?;
+    let r = unescape_bytes(&r);
     Ok((input, Expression::Bytes(r)))
 }
 

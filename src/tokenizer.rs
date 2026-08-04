@@ -536,58 +536,169 @@ fn alpha_dispatch(
             TokenKind::OperatorPostfix,
         )(input);
     }
+    match input.chars().nth(1) {
+        Some(second) => {
+            // HMap/Map/Set
+            if second == '{'
+                && matches!(ctx, Ctx::Space | Ctx::Start)
+                && matches!(&first, 'H' | 'M' | 'S')
+            {
+                return map_valid_token(
+                    punctuation_tag(&format!("{first}{{")),
+                    TokenKind::Punctuation,
+                )(input);
+            }
 
-    // H{ M{ S{ map/set literals
-    if matches!(ctx, Ctx::Space | Ctx::Start) && matches!(&first, 'H' | 'M' | 'S') {
-        return try_map_or_symbol(input, ctx, last_ctx, first, is_cfm);
-    }
+            if second == '\'' {
+                return match first {
+                    'r' => hashed_literal(&'r')(input), //this not deel with '\'
+                    'g' => parse_prefixed_string(input, "g'", TokenKind::Regex),
+                    't' => parse_prefixed_string(input, "t'", TokenKind::Time),
+                    's' => parse_prefixed_string(input, "s'", TokenKind::StringSafe),
+                    'b' => parse_prefixed_string(input, "b'", TokenKind::Bytes),
+                    _ => Err(NOT_FOUND),
+                };
+            }
 
-    #[cfg(windows)]
-    if let Ok(r) = map_valid_token(win_abpath_tag, TokenKind::StringRaw)(input) {
-        return Ok(r);
-    }
+            if second == '#' {
+                if matches!(first, 'r' | 'g' | 't' | 's' | 'b') {
+                    let result = hashed_literal(&first)(input);
+                    if let Ok(hs) = result {
+                        return Ok(hs);
+                    }
+                }
+            }
 
-    // keyword should only in ctx::Start/Space, not in ctx::Open, like `regex.match`
-    if ctx == Ctx::Start || ctx == Ctx::Space {
-        if let Ok(r) = map_valid_token(any_keyword, TokenKind::Keyword)(input) {
-            return Ok(r);
+            #[cfg(windows)]
+            if let Ok(r) = map_valid_token(win_abpath_tag, TokenKind::StringRaw)(input) {
+                return Ok(r);
+            }
+
+            // keyword should only in ctx::Start/Space, not in ctx::Open, like `regex.match`
+            if ctx == Ctx::Start || ctx == Ctx::Space {
+                if let Ok(r) = map_valid_token(any_keyword, TokenKind::Keyword)(input) {
+                    return Ok(r);
+                }
+            }
+
+            // try others
+            alt((
+                map_valid_token(value_symbol, TokenKind::ValueSymbol),
+                map_valid_token(protocols, TokenKind::StringRaw),
+                symbol_literal(ctx, last_ctx, is_cfm),
+            ))(input)
+        }
+        None => {
+            // symbol with one char
+            return symbol_literal(ctx, last_ctx, is_cfm)(input);
         }
     }
-    alt((
-        map_valid_token(value_symbol, TokenKind::ValueSymbol),
-        regex_literal,
-        time_literal,
-        stringsafe_literal,
-        bytes_literal,
-        map_valid_token(protocols, TokenKind::StringRaw),
-        map_valid_token(
-            |input| symbol(input, is_cfm, ctx, last_ctx),
-            TokenKind::Symbol,
-        ),
-    ))(input)
 }
 
-fn try_map_or_symbol(
-    input: Input<'_>,
+/// 扫描 `#`*N + quote 的开定界符，返回 (hash 数量, 引号字符, 消耗的字节数)
+fn hash_quote_prefix(input: Input<'_>) -> Option<(usize, char)> {
+    let hashes = input.chars().take_while(|&c| c == '#').count();
+    let quote = input.chars().nth(hashes)?;
+    matches!(quote, '\'' | '"' | '`').then_some((hashes, quote))
+}
+
+fn hashed_literal(
+    prefix: &char,
+) -> impl FnMut(Input<'_>) -> TokenizationResult<'_, (Token, Diagnostic)> {
+    move |input: Input<'_>| {
+        if let Some((after_r, _)) = input.strip_prefix(&prefix.to_string()) {
+            if let Some((hashes, quote)) = hash_quote_prefix(after_r) {
+                let kind = match (prefix, quote) {
+                    ('r', '\'') => TokenKind::StringRaw,
+                    ('r', '"') => TokenKind::StringLiteral,
+                    ('r', '`') => TokenKind::StringTemplate,
+                    ('g', _) => TokenKind::Regex,
+                    ('t', _) => TokenKind::Time,
+                    ('s', _) => TokenKind::StringSafe,
+                    ('b', _) => TokenKind::Bytes,
+                    _ => return Err(NOT_FOUND),
+                };
+                return parse_hashed_string(input, hashes, quote, kind);
+            }
+        }
+        Err(NOT_FOUND)
+    }
+}
+
+fn parse_hashed_string<'a>(
+    input: Input<'a>,
+    // open_len: usize, // "r" + hashes + quote 的总长度
+    hashes: usize,
+    quote: char,
+    kind: TokenKind,
+) -> TokenizationResult<'a, (Token, Diagnostic)> {
+    let open_len = 1 + hashes + 1;
+    let close_delim: String = std::iter::once(quote)
+        .chain(std::iter::repeat('#').take(hashes))
+        .collect();
+
+    let src = input.as_ref();
+    match src[open_len..].find(close_delim.as_str()) {
+        Some(pos) => {
+            let total_len = open_len + pos + close_delim.len();
+            let (input, full_range) = input.split_at(total_len);
+            Ok((
+                input,
+                (
+                    Token::new_quoted(kind, full_range, open_len as u8, close_delim.len() as u8),
+                    Diagnostic::Valid,
+                ),
+            ))
+        }
+        None => {
+            // 找不到收定界符 -> UnterminatedString，range 取到输入末尾
+            let (input, full_range) = input.split_at(input.len());
+
+            Ok((
+                input,
+                (
+                    Token::new_quoted(kind, full_range, open_len as u8, 0),
+                    Diagnostic::UnterminatedString(full_range),
+                ),
+            ))
+        }
+    }
+}
+
+fn symbol_literal(
     ctx: Ctx,
     last_ctx: Ctx,
-    first: char,
     is_cfm: bool,
-) -> TokenizationResult<'_, (Token, Diagnostic)> {
-    // H{, M{, S{ — check if followed by {
-    let bytes = input.as_ref().as_bytes();
-    if bytes.len() > 1 && bytes[1] == b'{' {
-        map_valid_token(
-            punctuation_tag(&format!("{first}{{")),
-            TokenKind::Punctuation,
-        )(input)
-    } else {
+) -> impl FnMut(Input<'_>) -> TokenizationResult<'_, (Token, Diagnostic)> {
+    move |input: Input<'_>| {
         map_valid_token(
             |input| symbol(input, is_cfm, ctx, last_ctx),
             TokenKind::Symbol,
         )(input)
     }
 }
+
+// fn try_map_or_symbol(
+//     input: Input<'_>,
+//     ctx: Ctx,
+//     last_ctx: Ctx,
+//     first: char,
+//     is_cfm: bool,
+// ) -> TokenizationResult<'_, (Token, Diagnostic)> {
+//     // H{, M{, S{ — check if followed by {
+//     let bytes = input.as_ref().as_bytes();
+//     if bytes.len() > 1 && bytes[1] == b'{' {
+//         map_valid_token(
+//             punctuation_tag(&format!("{first}{{")),
+//             TokenKind::Punctuation,
+//         )(input)
+//     } else {
+//         map_valid_token(
+//             |input| symbol(input, is_cfm, ctx, last_ctx),
+//             TokenKind::Symbol,
+//         )(input)
+//     }
+// }
 
 /// `::` module call infix operator (e.g. `mod::func`).
 /// Requires Word context (preceded by identifier) and followed by identifier.
@@ -800,38 +911,6 @@ fn string_literal(input: Input<'_>) -> TokenizationResult<'_, (Token, Diagnostic
     }
 }
 
-fn regex_literal(input: Input<'_>) -> TokenizationResult<'_, (Token, Diagnostic)> {
-    if input.as_ref().starts_with("r'") {
-        parse_prefixed_string(input, "r'", TokenKind::Regex)
-    } else {
-        Err(NOT_FOUND)
-    }
-}
-
-fn time_literal(input: Input<'_>) -> TokenizationResult<'_, (Token, Diagnostic)> {
-    if input.as_ref().starts_with("t'") {
-        parse_prefixed_string(input, "t'", TokenKind::Time)
-    } else {
-        Err(NOT_FOUND)
-    }
-}
-
-fn stringsafe_literal(input: Input<'_>) -> TokenizationResult<'_, (Token, Diagnostic)> {
-    if input.as_ref().starts_with("s'") {
-        parse_prefixed_string(input, "s'", TokenKind::StringSafe)
-    } else {
-        Err(NOT_FOUND)
-    }
-}
-
-fn bytes_literal(input: Input<'_>) -> TokenizationResult<'_, (Token, Diagnostic)> {
-    if input.as_ref().starts_with("b'") {
-        parse_prefixed_string(input, "b'", TokenKind::Bytes)
-    } else {
-        Err(NOT_FOUND)
-    }
-}
-
 /// Core string parser: scan for matching close quote, return (rest, (token, diagnostic)).
 fn parse_string(
     input: Input<'_>,
@@ -845,7 +924,7 @@ fn parse_string(
 
     let (rest, content) = finish_string(input, rest_after_content, quote);
 
-    let token = Token::new(kind, content);
+    let token = Token::new_quoted(kind, content, 1, 1);
     Ok((rest, (token, diagnostic)))
 }
 
@@ -860,7 +939,7 @@ fn parse_prefixed_string<'a>(
 
     let (rest, content) = finish_string(input, rest_after_content, quote);
 
-    let token = Token::new(kind, content);
+    let token = Token::new_quoted(kind, content, prefix.len() as u8, 1);
     Ok((rest, (token, diagnostic)))
 }
 

@@ -1,81 +1,81 @@
-#!/usr/bin/env lumesh  
-  
-# Expression显示样式完整测试脚本  
-# 测试所有表达式类型的Debug 
-  
-println("🎨 Lumesh Expression 显示样式测试")  
-println("=" * 50)  
-  
-# 基础类型测试  
-println("\n📋 基础类型测试")  
-let a := symbol_name; debug a  
+#!/usr/bin/env lumesh
+
+# Expression显示样式完整测试脚本
+# 测试所有表达式类型的Debug
+
+println("🎨 Lumesh Expression 显示样式测试")
+println("=" * 50)
+
+# 基础类型测试
+println("\n📋 基础类型测试")
+let a := symbol_name; debug a
 let var = 'a var is here'
-let a := $var; debug a  
-let a := 42; debug a  
-let a := 3.14159; debug a  
-let a := "Hello, World!"; debug a  
-let a := 'Raw string\nwith escapes'; debug a  
-let a := `Template string with {expression}`; debug a  
-let a := true; debug a  
-let a := none; debug a  
-let a := _; debug a  
-  
-# 集合类型测试  
-println("\n📦 集合类型测试")  
-let a := [1, 2, 3, "four", true]; debug a  
-let a := [1, [2, 3], [4, [5, 6]]]; debug a  
-let a := {name: "Alice", age: 25, active: true}; debug a  
-let a := {  
-    user: {name: "Bob", profile: {age: 30, city: "NYC"}},  
-    settings: {theme: "dark", notifications: true}  
-}; debug a  
-  
-# 控制流测试  
-println("\n🔄 控制流测试")  
-let a := if true { "yes" } else { "no" }; debug a  
-let a := while false { "loop" }; debug a  
-let a := for x in [1, 2, 3] { x * 2 }; debug a  
-let a := match 5 { 1 => "one"; 2 => "two"; 5 => "five"; _ => "other" }; debug a  
-  
-# 函数定义测试  
-println("\n⚡ 函数定义测试")  
-let a := x -> x * 2; debug a  
-let a := (x, y) -> x + y; debug a  
-let a := x -> y -> x + y; debug a  
-fn a(x, y = 10) { x + y }; debug a  
-  
-# 操作符测试  
-println("\n➕ 操作符测试")  
-let a := 1 + 2 * 3; debug a  
-let a := 5 > 3 && 2 < 4; debug a  
-let a := -42; debug a  
-let a := 1..10; debug a  
-let a := [1, 2, 3] | list.map(x -> x * 2); debug a  
-  
-# 复杂嵌套测试  
-println("\n🌊 复杂嵌套测试")  
-let a := {  
-    level1: {  
-        level2: {  
-            level3: [1, 2, {nested: "deep"}]  
-        }  
-    }  
-}; debug a  
-  
-# 高级特性测试  
-println("\n🚀 高级特性测试")  
-let a := "hello world".split(" ").join("-").to_upper(); debug a  
-let a := {users: [{name: "Alice"}, {name: "Bob"}]}.users[0].name; debug a  
-let a := risky_operation() ?: "default"; debug a  
-let a := r'(\w+)\s+(\d+)'; debug a  
-let a := 1MB; debug a  
-  
-# 代码块测试  
-println("\n📝 代码块测试")  
-let a := {  
-    let x = 10  
-    let y = 20  
-    x + y  
-}; debug a  
-  
+let a := $var; debug a
+let a := 42; debug a
+let a := 3.14159; debug a
+let a := "Hello, World!"; debug a
+let a := 'Raw string\nwith escapes'; debug a
+let a := `Template string with {expression}`; debug a
+let a := true; debug a
+let a := none; debug a
+let a := _; debug a
+
+# 集合类型测试
+println("\n📦 集合类型测试")
+let a := [1, 2, 3, "four", true]; debug a
+let a := [1, [2, 3], [4, [5, 6]]]; debug a
+let a := {name: "Alice", age: 25, active: true}; debug a
+let a := {
+    user: {name: "Bob", profile: {age: 30, city: "NYC"}},
+    settings: {theme: "dark", notifications: true}
+}; debug a
+
+# 控制流测试
+println("\n🔄 控制流测试")
+let a := if true { "yes" } else { "no" }; debug a
+let a := while false { "loop" }; debug a
+let a := for x in [1, 2, 3] { x * 2 }; debug a
+let a := match 5 { 1 => "one"; 2 => "two"; 5 => "five"; _ => "other" }; debug a
+
+# 函数定义测试
+println("\n⚡ 函数定义测试")
+let a := x -> x * 2; debug a
+let a := (x, y) -> x + y; debug a
+let a := x -> y -> x + y; debug a
+fn a(x, y = 10) { x + y }; debug a
+
+# 操作符测试
+println("\n➕ 操作符测试")
+let a := 1 + 2 * 3; debug a
+let a := 5 > 3 && 2 < 4; debug a
+let a := -42; debug a
+let a := 1..10; debug a
+let a := [1, 2, 3] | list.map(x -> x * 2); debug a
+
+# 复杂嵌套测试
+println("\n🌊 复杂嵌套测试")
+let a := {
+    level1: {
+        level2: {
+            level3: [1, 2, {nested: "deep"}]
+        }
+    }
+}; debug a
+
+# 高级特性测试
+println("\n🚀 高级特性测试")
+let a := "hello world".split(" ").join("-").to_upper(); debug a
+let a := {users: [{name: "Alice"}, {name: "Bob"}]}.users[0].name; debug a
+let a := risky_operation() ?: "default"; debug a
+let a := g'(\w+)\s+(\d+)'; debug a
+let a := 1MB; debug a
+
+# 代码块测试
+println("\n📝 代码块测试")
+let a := {
+    let x = 10
+    let y = 20
+    x + y
+}; debug a
+
 println("\n✅ 测试完成！")
