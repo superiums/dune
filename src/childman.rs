@@ -9,6 +9,12 @@ static CHILD_PID_FOR_SIGNAL: AtomicI32 = AtomicI32::new(-1);
 
 /// 是否收到过 SIGINT 信号（全局标志，由 signal_handler 设置）
 static SIGINT_RECEIVED: AtomicBool = AtomicBool::new(false);
+// SIGTSTP 标志位
+static SIGTSTP_RECEIVED: AtomicBool = AtomicBool::new(false);
+
+pub fn check_and_clear_sigtstp() -> bool {
+    SIGTSTP_RECEIVED.swap(false, Ordering::SeqCst)
+}
 
 /// 设置当前运行的子进程ID
 pub fn set_child(pid: u32) {
@@ -75,6 +81,12 @@ pub fn install_sigint_handler() {
                 }
             }
         }
+
+        // SIGTSTP handler，只打标志位，不发信号给子进程
+        extern "C" fn handle_sigtstp(_: i32) {
+            SIGTSTP_RECEIVED.store(true, Ordering::SeqCst);
+        }
+
         let action = SigAction::new(
             SigHandler::Handler(handle_sigint),
             SaFlags::SA_RESTART,
@@ -82,6 +94,16 @@ pub fn install_sigint_handler() {
         );
         unsafe {
             let _ = signal::sigaction(signal::Signal::SIGINT, &action);
+        }
+
+        // SIGTSTP action
+        let tstp_action = SigAction::new(
+            SigHandler::Handler(handle_sigtstp),
+            SaFlags::SA_RESTART,
+            SigSet::empty(),
+        );
+        unsafe {
+            let _ = signal::sigaction(signal::Signal::SIGTSTP, &tstp_action);
         }
     }
     #[cfg(windows)]

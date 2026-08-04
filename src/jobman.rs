@@ -32,6 +32,11 @@ pub fn add_job(child: Child, cmdline: String) -> u32 {
             status: JobStatus::Running,
         });
     }
+    // for ctrl+z job, need signal continue
+    #[cfg(unix)]
+    unsafe {
+        libc::kill(pid as i32, libc::SIGCONT);
+    }
     id
 }
 

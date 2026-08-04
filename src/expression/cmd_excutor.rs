@@ -185,14 +185,31 @@ fn exec_single_cmd(
         Ok(None)
     } else {
         // 正常模式
-        let status = child.wait().map_err(|e| {
-            RuntimeError::from_io_error(
-                e,
-                format!("wait cmd `{cmdstr}`").into(),
-                job.clone(),
-                depth,
-            )
-        })?;
+        // 正常模式：轮询等待，允许被 SIGTSTP 打断转入后台
+        let status = loop {
+            if childman::check_and_clear_sigtstp() {
+                childman::clear_child();
+                let cmdline = format!("{cmdstr} {ar_display}");
+                let id = crate::jobman::add_job(child, cmdline);
+                println!("\n[{id}] job turned to background");
+                return Ok(None);
+            }
+            match child.try_wait() {
+                Ok(Some(status)) => break status,
+                Ok(None) => {
+                    std::thread::sleep(std::time::Duration::from_millis(20));
+                    continue;
+                }
+                Err(e) => {
+                    return Err(RuntimeError::from_io_error(
+                        e,
+                        format!("wait cmd `{cmdstr}`").into(),
+                        job.clone(),
+                        depth,
+                    ));
+                }
+            }
+        };
         childman::clear_child();
 
         if status.success() {
