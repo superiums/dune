@@ -10,7 +10,82 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
 
-// 使用 RAII 守卫确保终端模式恢复，同时保存/恢复 SIGINT 处理器
+// ---- 新增：集中的 PTY 交互行为配置 ----
+#[cfg(unix)]
+const PTY_CMDS: &[&str] = &[
+    "lume", "bash", "sh", "fish", "top", "btop", "vi", "passwd", "ssh", "script", "expect",
+    "telnet", "screen", "tmux", "ftp", "sftp",
+];
+#[cfg(windows)]
+const PTY_CMDS: &[&str] = &[
+    "lume",
+    "fish",
+    "ssh",
+    "telnet",
+    "screen",
+    "tmux",
+    "cmd.exe",
+    "PowerShell",
+    "Cygwin",
+    "WinPTY",
+    "ConPTY",
+];
+
+pub fn needs_pty(cmdstr: &str) -> bool {
+    PTY_CMDS.contains(&cmdstr)
+}
+
+/// 描述某个命令在 PTY 模式下的交互行为，
+/// 替代原来分散的 `is_vi`/`is_shell` 硬编码判断。
+#[derive(Clone, Copy)]
+pub struct PtyProfile {
+    /// 输出转发是否使用低延迟逐块 read 循环（全屏/交互式程序，如 shell 本身、vi、top）。
+    /// 关闭时使用简单的 `io::copy` 阻塞转发，性能更好但延迟稍高，适合非全屏程序。
+    pub low_latency_output: bool,
+    /// 进入"输入模式"时需要预先发送的按键序列（目前仅 vi 系需要先按 `i` 进入 insert mode）
+    pub enter_insert: Option<&'static [u8]>,
+    /// 写完初始输入后需要发送的收尾按键序列（vi 系需要 Esc 退出 insert mode）
+    pub exit_insert: Option<&'static [u8]>,
+}
+
+const DEFAULT_PROFILE: PtyProfile = PtyProfile {
+    low_latency_output: false,
+    enter_insert: None,
+    exit_insert: None,
+};
+
+/// 需要 vi 风格“先进插入模式再写入初始输入”的命令
+const VI_LIKE: &[&str] = &["vi", "vim", "nvim"];
+
+/// 需要低延迟输出转发的全屏/交互式命令（shell 自身 + vi 系 + 其它 TUI 程序）
+/// 注：这里应与 cmd_excutor.rs 里判断是否需要 mode=16(PTY) 的命令列表保持同源，
+/// 建议后续把两处列表合并为一个 pub 常量，避免重复维护（见下方 cmd_excutor.rs 修改说明）。
+const LOW_LATENCY_SHELLS: &[&str] = &[
+    "bash", "lume", "sh", "fish", "zsh", "ssh", "scp", "sftp", "top", "btop",
+];
+
+/// 根据命令名查询它的 PTY 交互配置。
+/// 新增一个需要特殊处理的交互程序时，只需要在这里加一条，
+/// 不需要改动 exec_in_pty 内部的任何分支逻辑。
+fn pty_profile(cmdstr: &str) -> PtyProfile {
+    if VI_LIKE.contains(&cmdstr) {
+        return PtyProfile {
+            low_latency_output: true,
+            enter_insert: Some(b"i"),
+            exit_insert: Some(&[27u8]), // ESC
+        };
+    }
+    if LOW_LATENCY_SHELLS.contains(&cmdstr) {
+        return PtyProfile {
+            low_latency_output: true,
+            enter_insert: None,
+            exit_insert: None,
+        };
+    }
+    DEFAULT_PROFILE
+}
+
+// 使用 RAII 守卫确保终端模式恢复
 struct TerminalGuard {
     terminal: Box<dyn TerminalOps>,
     #[cfg(unix)]
@@ -80,9 +155,9 @@ pub fn exec_in_pty(
     // Guard
     let _terminal_guard = TerminalGuard::new(terminal)?;
 
-    let is_vi = cmdstr == "vi";
-    let is_shell =
-        ["bash", "lume", "sh", "fish", "zsh", "ssh", "scp", "sftp"].contains(&cmdstr.as_str());
+    // 替代原来的 is_vi / is_shell 两个散落布尔量
+    let profile = pty_profile(cmdstr.as_str());
+
     // pty
     let pty_system = native_pty_system();
     let pair = pty_system
@@ -94,10 +169,12 @@ pub fn exec_in_pty(
         })
         .map_err(|e| RuntimeErrorKind::CustomError(e.to_string().into()))?;
 
+    let pair_master_fd = pair.master.as_raw_fd();
+
     // Unix 特定的终端设置
     #[cfg(unix)]
     {
-        if let Some(master_fd) = pair.master.as_raw_fd() {
+        if let Some(master_fd) = pair_master_fd {
             unsafe {
                 let mut termios = std::mem::zeroed();
                 if libc::tcgetattr(master_fd, &mut termios) == 0 {
@@ -165,10 +242,9 @@ pub fn exec_in_pty(
         .take_writer()
         .map_err(|e| RuntimeErrorKind::CustomError(e.to_string().into()))?;
 
-    // 输出转发线程
-
-    let _output_thread = if is_shell || is_vi {
-        // drop(_terminal_guard);
+    // 输出转发线程：低延迟逐块 vs 简单 io::copy，由 profile 决定
+    let use_low_latency = profile.low_latency_output;
+    let _output_thread = if use_low_latency {
         thread::spawn(move || {
             loop {
                 if running_clone2.load(Ordering::SeqCst) {
@@ -181,7 +257,6 @@ pub fn exec_in_pty(
                     Ok(_) => io::stdout().write_all(&buffer).unwrap(),
                     Err(_) => break,
                 }
-                // thread::sleep(Duration::from_millis(20));
                 let _ = io::stdout().flush();
                 thread::yield_now();
             }
@@ -192,10 +267,27 @@ pub fn exec_in_pty(
         })
     };
 
+    let enter_insert = profile.enter_insert;
+    let exit_insert = profile.exit_insert;
     let input_thread = thread::spawn(move || {
         if let Some(last_input) = input {
-            if is_vi {
-                let _ = master_writer.write_all("i".as_bytes());
+            if let Some(seq) = enter_insert {
+                #[cfg(unix)]
+                unsafe {
+                    // master_fd 需要在外部提前从 pair.master.as_raw_fd() 拿到
+                    for _ in 0..100 {
+                        // 最多等待约 1 秒
+                        let mut termios: libc::termios = std::mem::zeroed();
+                        if let Some(master_fd) = pair_master_fd
+                            && libc::tcgetattr(master_fd, &mut termios) == 0
+                            && termios.c_lflag & libc::ECHO == 0
+                        {
+                            break; // vi 已经切到自己的 raw/noecho 模式，安全注入
+                        }
+                        thread::sleep(Duration::from_millis(10));
+                    }
+                }
+                let _ = master_writer.write_all(seq);
             }
             if let Err(e) = master_writer.write_all(&last_input) {
                 eprintln!("Failed to write to master: {e}");
@@ -203,13 +295,11 @@ pub fn exec_in_pty(
             if let Err(e) = master_writer.flush() {
                 eprintln!("Failed to flush master: {e}");
             }
-            if is_vi {
+            if let Some(seq) = exit_insert {
                 let _ = master_writer.write_all(b"\n");
-                let esc_char = [27u8];
-                let _ = master_writer.write_all(&esc_char);
+                let _ = master_writer.write_all(seq);
                 thread::sleep(Duration::from_millis(50));
                 let _ = master_writer.flush();
-                // thread::yield_now();
             }
         }
 
@@ -224,17 +314,15 @@ pub fn exec_in_pty(
                 }
                 Err(_) => break,
             }
-            // thread::sleep(Duration::from_millis(80));
             let _ = master_writer.flush();
             thread::yield_now();
         }
     });
 
     child.wait()?;
-    childman::clear_child();
     running.store(true, Ordering::SeqCst);
     let _ = input_thread.join();
-    if is_shell || is_vi {
+    if use_low_latency {
         let _ = _output_thread.join();
     }
 

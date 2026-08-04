@@ -327,54 +327,36 @@ pub fn handle_command(
         state.clear(State::IN_ASSIGN);
     }
 
-    #[cfg(unix)]
-    let pty_cmds = [
-        "lume", "bash", "sh", "fish", "top", "btop", "vi", "passwd", "ssh", "script", "expect",
-        "telnet", "screen", "tmux", "ftp", "sftp",
-    ];
-    #[cfg(windows)]
-    let pty_cmds = [
-        "lume",
-        "fish",
-        "ssh",
-        "telnet",
-        "screen",
-        "tmux",
-        "cmd.exe",
-        "PowerShell",
-        "Cygwin",
-        "WinPTY",
-        "ConPTY",
-    ];
-    let cmd_mode: u8 = match state.contains(State::PTY_MODE) || pty_cmds.contains(&cmd.as_str()) {
-        true => 16,
-        false => match cmd_args.last() {
-            Some(s) => match s.as_str() {
-                "&" => {
-                    cmd_args.pop();
-                    11
-                }
-                "&-" => {
-                    cmd_args.pop();
-                    1
-                }
-                "&?" => {
-                    cmd_args.pop();
-                    2
-                }
-                "&." => {
-                    cmd_args.pop();
-                    3
-                }
-                "&+" => {
-                    cmd_args.pop();
-                    4
-                }
+    let cmd_mode: u8 =
+        match state.contains(State::PTY_MODE) || crate::expression::pty::needs_pty(cmd.as_str()) {
+            true => 16,
+            false => match cmd_args.last() {
+                Some(s) => match s.as_str() {
+                    "&" => {
+                        cmd_args.pop();
+                        11
+                    }
+                    "&-" => {
+                        cmd_args.pop();
+                        1
+                    }
+                    "&?" => {
+                        cmd_args.pop();
+                        2
+                    }
+                    "&." => {
+                        cmd_args.pop();
+                        3
+                    }
+                    "&+" => {
+                        cmd_args.pop();
+                        4
+                    }
+                    _ => 0,
+                },
                 _ => 0,
             },
-            _ => 0,
-        },
-    };
+        };
     // dbg!(args, &cmd_args);
     let last_input = state.pipe_out();
     let pipe_input = to_bytes(last_input);
