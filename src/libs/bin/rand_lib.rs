@@ -76,8 +76,8 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         alphanum => "random alphanumeric char(s)", "[len=1]"
 
         // 数值随机
-        int => "random integer. no args: any i64; 1 arg: [0,max]; 2 args: [min,max)", "[min] [max]"
-        float => "random float. no args: [0,1); 2 args: [min,max)", "[min] [max]"
+        int => "random integer. no args: any i64; 1 arg: [0,max]; 2 args: [min,max]", "[min] [max]"
+        float => "random float. no args: [0,1); 2 args: [min,max]", "[min] [max]"
 
         // 集合操作
         choose => "pick random item", "<list>"
@@ -241,7 +241,7 @@ fn int(
         }
         2 => match (&args[0], &args[1]) {
             (Expression::Integer(l), Expression::Integer(h)) => {
-                let n = with_rng(|rng| rng.random_range(*l..*h));
+                let n = with_rng(|rng| rng.random_range(*l..=*h));
                 Ok(Expression::Integer(n))
             }
             (l, h) => Err(RuntimeError::common(
@@ -278,7 +278,7 @@ fn float(
                     0,
                 ));
             }
-            let f = with_rng(|rng| rng.random_range(lo..hi));
+            let f = with_rng(|rng| rng.random_range(lo..=hi));
             Ok(Expression::Float(f))
         }
         _ => Err(RuntimeError::common(

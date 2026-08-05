@@ -110,7 +110,7 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         exp2 => "2^x", "<x>"
         sqrt => "square root", "<number>"
         cbrt => "cube root", "<number>"
-        log => "log base b of x", "<base> <x>"
+        log => "log base of number", "<number> <base>"
         log2 => "log base 2", "<number>"
         log10 => "log base 10", "<number>"
         ln => "natural log", "<number>"
@@ -854,7 +854,7 @@ fn log(
 ) -> Result<Expression, RuntimeError> {
     check_exact_args_len("log", &args, 2, ctx)?;
     let floats = eval_to_f64(args, env, "log", ctx)?;
-    Ok(floats[1].log(floats[0]).into())
+    Ok(floats[0].log(floats[1]).into())
 }
 
 fn log2(

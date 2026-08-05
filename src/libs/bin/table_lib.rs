@@ -118,22 +118,23 @@ fn get_column(
     Ok(t.get_column(idx).map_or(Expression::None, Expression::from))
 }
 pub fn select(
-    mut args: Vec<Expression>,
+    args: Vec<Expression>,
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
     check_args_len("select", &args, 2.., ctx)?;
-    let headers: Vec<String> = match args.split_off(1) {
-        s if s.len() == 1 => match s.first().unwrap() {
+    let mut it = args.into_iter();
+    let data_expr = it.next().unwrap();
+    let data = get_table_arg(data_expr, ctx)?;
+
+    let headers: Vec<String> = match it {
+        mut s if s.len() == 1 => match s.next().unwrap() {
             Expression::List(list) => list.as_ref().iter().map(|x| x.to_string()).collect(),
             Expression::BSet(list) => list.as_ref().iter().map(|x| x.to_string()).collect(),
-            _ => s.iter().map(|x| x.to_string()).collect(),
+            _ => s.map(|x| x.to_string()).collect(),
         },
-        s => s.iter().map(|x| x.to_string()).collect(),
+        s => s.map(|x| x.to_string()).collect(),
     };
-    // let data = get_list_ref(&args[0], ctx)?;
-    let data_expr = args.into_iter().next().unwrap();
-    let data = get_table_arg(data_expr, ctx)?;
 
     match data.columns(&data.column_indexes(&headers)) {
         Some(rows) => Ok(Expression::Table(TableData::new(headers, rows))),

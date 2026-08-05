@@ -398,6 +398,7 @@ fn cursor_show(
 
 // Key mapping constants shared between read_key and keys
 const SPECIAL_KEY_MAPPINGS: &[(&str, KeyCode)] = &[
+    ("space", KeyCode::Char(' ')),
     ("enter", KeyCode::Enter),
     ("backspace", KeyCode::Backspace),
     ("delete", KeyCode::Delete),

@@ -150,8 +150,8 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         white => "white fg", "<string>"
 
         // 高级颜色
-        clr => "256-color fg, code 0-255", "<string> <color_code>"
-        clr_bg => "256-color bg, code 0-255", "<string> <color_code>"
+        clr => "256-color fg, code 0-255", "<string> <0..256>"
+        clr_bg => "256-color bg, code 0-255", "<string> <0..256>"
         color => "true color fg. e.g. #ff0000, red, 255,0,0", "<string> <#hex|name|r,g,b>"
         color_bg => "true color bg. e.g. #ff0000, red, 255,0,0", "<string> <#hex|name|r,g,b>"
         colors => "list color names, or with swatches", "[swatches?]"
