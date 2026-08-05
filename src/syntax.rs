@@ -91,7 +91,7 @@ pub fn highlight(line: &str, theme: &HashMap<String, String>) -> String {
                     result.push_str(s);
                 }
             }
-            (TokenKind::Radix, s) => {
+            (TokenKind::Radix2, s) | (TokenKind::Radix8, s) | (TokenKind::Radix16, s) => {
                 if let Diagnostic::InvalidNumber(e) = diagnostic {
                     result.push_str(get_color("number_error", theme));
                     result.push_str(e.to_str(line));

@@ -462,7 +462,11 @@ impl PrattParser {
             TokenKind::Bytes if PREC_LITERAL >= min_prec => parse_bytes(input),
             TokenKind::IntegerLiteral if PREC_LITERAL >= min_prec => parse_integer(input),
             TokenKind::FloatLiteral if PREC_LITERAL >= min_prec => parse_float(input),
-            TokenKind::Radix if PREC_LITERAL >= min_prec => parse_radix(input),
+            TokenKind::Radix2 | TokenKind::Radix8 | TokenKind::Radix16
+                if PREC_LITERAL >= min_prec =>
+            {
+                parse_radix(first.kind)(input)
+            }
             TokenKind::ValueSymbol if PREC_LITERAL >= min_prec => parse_value_symbol(input),
             TokenKind::Regex if PREC_LITERAL >= min_prec => parse_regex(input),
             TokenKind::Time if PREC_LITERAL >= min_prec => parse_time(input),
@@ -1402,23 +1406,35 @@ fn parse_variable(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxEr
     preceded(text("$"), map(parse_symbol_string, Expression::Variable))(input)
 }
 
-#[inline]
-fn parse_string(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
+fn parse_string_literal_inner(
+    input: Tokens<'_>,
+    kind: TokenKind,
+) -> IResult<Tokens<'_>, String, SyntaxErrorKind> {
     let token = input
         .first()
-        .filter(|t| t.kind == TokenKind::StringLiteral)
+        .filter(|t| t.kind == kind)
         .ok_or(nom::Err::Error(SyntaxErrorKind::CustomError(
-            format!("expect token kind: StringLiteral"),
+            format!("expect token kind: {:?}", kind),
             input.get_str_slice(),
         )))?;
 
     let cs = token.text_inner(input);
 
-    let r = unescape_str(cs);
-    Ok((input.skip_n(1), Expression::String(r)))
+    let r = if token.open_len > 2 {
+        // raw 模式，跳过引号转义
+        unescape_str(cs, true)
+    } else {
+        // " "  ` ` 模式，转义所有
+        unescape_str(cs, false)
+    };
+    Ok((input.skip_n(1), r))
 }
 
-#[inline]
+fn parse_string(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
+    let (input, r) = parse_string_literal_inner(input, TokenKind::StringLiteral)?;
+    Ok((input, Expression::String(r)))
+}
+
 fn parse_strings_via_kind(
     input: Tokens<'_>,
     kind: TokenKind,
@@ -1427,27 +1443,28 @@ fn parse_strings_via_kind(
         .first()
         .filter(|t| t.kind == kind)
         .ok_or(nom::Err::Error(SyntaxErrorKind::CustomError(
-            format!("expect token kind: StringLiteral"),
+            format!("expect token kind: {:?}", kind),
             input.get_str_slice(),
         )))?;
 
     let cs = token.text_inner(input);
 
-    let r = if token.open_len > 1 {
-        // 对'...'进行简单转义
-        cs.replace("\\'", "'").replace("\\\\", "\\")
-    } else {
+    let r = if token.open_len > 2 {
         // r#'...' 无需转义
         cs.to_string()
+    } else {
+        // 对'...'进行简单转义
+        cs.replace("\\'", "'")
+            .replace("\\\"", "\"")
+            .replace("\\\\", "\\")
     };
     Ok((input.skip_n(1), r))
 }
-#[inline]
+
 fn parse_string_raw_inner(input: Tokens<'_>) -> IResult<Tokens<'_>, String, SyntaxErrorKind> {
     parse_strings_via_kind(input, TokenKind::StringRaw)
 }
 
-#[inline]
 fn parse_string_raw(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
     let (input, r) = parse_string_raw_inner(input)?;
     Ok((input, Expression::String(r)))
@@ -1614,10 +1631,7 @@ fn split_template_segments(template: &str) -> Vec<Expression> {
 }
 
 fn parse_string_template(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
-    let (input, expr) = kind(TokenKind::StringTemplate)(input)?;
-    let raw_str = expr.to_str(input.str);
-    let cs = raw_str.trim_start_matches('`').trim_end_matches('`');
-    let r = unescape_str(cs);
+    let (input, r) = parse_string_literal_inner(input, TokenKind::StringTemplate)?;
     let segments = split_template_segments(&r);
     Ok((input, Expression::StringTemplate(segments)))
 }
@@ -1633,7 +1647,9 @@ fn parse_literal(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErr
         parse_value_symbol,
         parse_regex,
         parse_time,
-        parse_radix,
+        parse_radix(TokenKind::Radix2),
+        parse_radix(TokenKind::Radix8),
+        parse_radix(TokenKind::Radix16),
     ))(input)
 }
 
@@ -1914,29 +1930,36 @@ fn parse_float(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError
     Ok((input, Expression::Float(num)))
 }
 
-fn parse_radix(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
-    let (input, num) = kind(TokenKind::Radix)(input)?;
-    let raw = num.to_str(input.str);
-
-    let parsed: Result<Int, _> =
-        if let Some(hex) = raw.strip_prefix("0x").or(raw.strip_prefix("0X")) {
-            Int::from_str_radix(&hex.replace('_', ""), 16)
-        } else if let Some(oct) = raw.strip_prefix("0o").or(raw.strip_prefix("0O")) {
-            Int::from_str_radix(&oct.replace('_', ""), 8)
-        } else if let Some(bin) = raw.strip_prefix("0b").or(raw.strip_prefix("0B")) {
-            Int::from_str_radix(&bin.replace('_', ""), 2)
-        } else {
-            return Err(nom::Err::Failure(SyntaxErrorKind::CustomError(
-                "invalid radix prefix".to_string(),
+fn parse_radix(
+    kind: TokenKind,
+) -> impl Fn(Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
+    move |input: Tokens<'_>| {
+        let token = input
+            .first()
+            .filter(|t| t.kind == kind)
+            .ok_or(nom::Err::Error(SyntaxErrorKind::CustomError(
+                format!("expect token kind: {:?}", kind),
                 input.get_str_slice(),
-            )));
+            )))?;
+        let cs = token.text_inner(input).replace("_", "");
+        let parsed = match kind {
+            TokenKind::Radix2 => Int::from_str_radix(&cs, 2),
+            TokenKind::Radix8 => Int::from_str_radix(&cs, 8),
+            TokenKind::Radix16 => Int::from_str_radix(&cs, 16),
+            _ => unreachable!(),
         };
 
-    let value = parsed.map_err(|e| {
-        SyntaxErrorKind::failure(num, "Radix Integer", Some(format!("error: {e}")), None)
-    })?;
+        let value = parsed.map_err(|e| {
+            SyntaxErrorKind::failure(
+                input.get_str_slice(),
+                "Radix Integer",
+                Some(format!("error: {e}")),
+                None,
+            )
+        })?;
 
-    Ok((input, Expression::Integer(value)))
+        Ok((input.skip_n(1), Expression::Integer(value)))
+    }
 }
 
 #[inline]
