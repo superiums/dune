@@ -320,7 +320,7 @@ is_odd <integer>
 lcm <int1> <int2>
 le <a> <b>
 ln <number>
-log <base> <x>
+log <number> <base>
 log10 <number>
 log2 <number>
 lt <a> <b>
@@ -396,8 +396,8 @@ blue <string>
 bold <string>
 center <string> <length> [pad_char=' ']
 chars <string>
-clr <string> <color_code>
-clr_bg <string> <color_code>
+clr <string> <0..256>
+clr_bg <string> <0..256>
 color <string> <#hex|name|r,g,b>
 color_bg <string> <#hex|name|r,g,b>
 colors [swatches?]

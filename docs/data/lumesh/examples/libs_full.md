@@ -77,10 +77,9 @@
 - unset_root <var>
 	undefine var in root env
 - when <condition> <execute>
-	if cond then execute
+	conditional execute
 - where <table> <condition>
 	filter table rows. NR/<col_name> injected. e.g. where t (NR>1 and col>0)
-- just use them directly anywhere!
 
 ### about
 - bin 
@@ -619,8 +618,8 @@
 	a <= b?
 - ln <number>
 	natural log
-- log <base> <x>
-	log base b of x
+- log <number> <base>
+	log base of number
 - log10 <number>
 	log base 10
 - log2 <number>
@@ -676,9 +675,9 @@
 - choose <list>
 	pick random item
 - float [min] [max]
-	random float. no args: [0,1); 2 args: [min,max)
+	random float. no args: [0,1); 2 args: [min,max]
 - int [min] [max]
-	random integer. no args: any i64; 1 arg: [0,max]; 2 args: [min,max)
+	random integer. no args: any i64; 1 arg: [0,max]; 2 args: [min,max]
 - ratio <num> <den>
 	random bool with probability num/den
 - sample <list> <n>
@@ -771,9 +770,9 @@
 	pad both ends
 - chars <string>
 	to char list
-- clr <string> <color_code>
+- clr <string> <0..256>
 	256-color fg, code 0-255
-- clr_bg <string> <color_code>
+- clr_bg <string> <0..256>
 	256-color bg, code 0-255
 - color <string> <#hex|name|r,g,b>
 	true color fg. e.g. #ff0000, red, 255,0,0
