@@ -27,7 +27,6 @@ impl Environment {
         }
     }
 
-    #[inline]
     pub fn get(&self, name: &str) -> Option<Expression> {
         match self.bindings.get(name) {
             Some(expr) => Some(expr.clone()),
@@ -40,7 +39,6 @@ impl Environment {
         self.bindings.contains_key(name)
     }
 
-    #[inline]
     pub fn is_defined(&self, name: &str) -> bool {
         self.bindings.contains_key(name) || self.parent.as_ref().is_some_and(|p| p.is_defined(name))
     }
@@ -97,7 +95,6 @@ impl Environment {
             .collect()
     }
 
-    #[inline]
     pub fn get_root(&self) -> &Self {
         match self.parent.as_ref() {
             Some(p) => p.get_root(),

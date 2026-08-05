@@ -71,7 +71,6 @@ macro_rules! reg_info {
     };
 }
 
-#[inline]
 pub fn check_args_len(
     name: impl ToString,
     args: &[Expression],
@@ -95,7 +94,7 @@ pub fn check_args_len(
         ))
     }
 }
-#[inline]
+
 fn get_bounds(b: std::ops::Bound<&usize>) -> String {
     match b {
         std::ops::Bound::Excluded(&n) => n.to_string(),
@@ -103,7 +102,7 @@ fn get_bounds(b: std::ops::Bound<&usize>) -> String {
         std::ops::Bound::Unbounded => "_".to_string(),
     }
 }
-#[inline]
+
 pub fn check_exact_args_len(
     name: impl ToString,
     args: &[Expression],
@@ -155,7 +154,7 @@ pub fn check_exact_args_len(
 //         )),
 //     }
 // }
-#[inline]
+
 pub fn get_string_arg(expr: Expression, ctx: &Expression) -> Result<String, RuntimeError> {
     match expr {
         Expression::Symbol(s) | Expression::String(s) => Ok(s),
@@ -170,7 +169,7 @@ pub fn get_string_arg(expr: Expression, ctx: &Expression) -> Result<String, Runt
         )),
     }
 }
-#[inline]
+
 pub fn get_string_ref<'a>(
     expr: &'a Expression,
     ctx: &Expression,
@@ -199,7 +198,6 @@ pub fn get_string_ref<'a>(
 //         .collect()
 // }
 
-#[inline]
 pub fn get_integer_arg(expr: Expression, ctx: &Expression) -> Result<i64, RuntimeError> {
     match expr {
         Expression::Integer(i) => Ok(i),
@@ -214,7 +212,7 @@ pub fn get_integer_arg(expr: Expression, ctx: &Expression) -> Result<i64, Runtim
         )),
     }
 }
-#[inline]
+
 pub fn get_integer_ref(expr: &Expression, ctx: &Expression) -> Result<i64, RuntimeError> {
     match expr {
         Expression::Integer(i) => Ok(*i),
@@ -230,7 +228,6 @@ pub fn get_integer_ref(expr: &Expression, ctx: &Expression) -> Result<i64, Runti
     }
 }
 
-#[inline]
 pub fn get_map_ref<'a>(
     expr: &'a Expression,
     ctx: &Expression,
@@ -249,7 +246,6 @@ pub fn get_map_ref<'a>(
     }
 }
 
-#[inline]
 pub fn get_hmap_ref<'a>(
     expr: &'a Expression,
     ctx: &Expression,
@@ -268,7 +264,6 @@ pub fn get_hmap_ref<'a>(
     }
 }
 
-#[inline]
 pub fn get_map_arg(
     expr: Expression,
     ctx: &Expression,
@@ -287,7 +282,6 @@ pub fn get_map_arg(
     }
 }
 
-#[inline]
 pub fn get_hmap_arg(
     expr: Expression,
     ctx: &Expression,
@@ -306,7 +300,6 @@ pub fn get_hmap_arg(
     }
 }
 
-#[inline]
 pub fn check_fn_arg(
     fn_arg: &Expression,
     size: usize,
@@ -363,7 +356,6 @@ pub fn convert_list_map_to_table(list: &[Expression]) -> TableData {
     TableData::new(headers, rows)
 }
 
-#[inline]
 pub fn get_table_arg(expr: Expression, ctx: &Expression) -> Result<TableData, RuntimeError> {
     match expr {
         Expression::List(list) => Ok(convert_list_map_to_table(&list)),

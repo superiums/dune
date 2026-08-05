@@ -15,7 +15,6 @@ use crate::{Environment, Expression, MAX_RUNTIME_RECURSION, RuntimeError, Runtim
 /// always eval position receiver
 // the resean to excute it here, is for local vars in loop,
 // only current env knows the state.
-#[inline]
 pub fn prepare_args(
     // cmd: &str,
     args: &[Expression],
@@ -749,7 +748,6 @@ impl Expression {
 ///
 /// # 返回值
 /// 返回元组: (剩余未绑定的形式参数)
-#[inline]
 pub fn bind_arguments(
     params: &[String],
     args: &[Expression],

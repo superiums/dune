@@ -136,7 +136,6 @@ impl History {
     // ── 复合评分（用于多结果排序）────────────────────────────────
 
     /// 本目录专属命令获得 1_000_000 加权，使其排在全局命令之前。
-    #[inline]
     fn dir_score(&self, entry: &HistoryEntry) -> u64 {
         let local_boost = if !entry.is_multi_dir && entry.last_path == self.current_dir {
             1_000_000u64
@@ -203,7 +202,6 @@ impl History {
 
     // ── Hint（两阶段：本目录专属优先，再全局）───────────────────
 
-    #[inline]
     pub fn search_hint(&self, current_line: &str) -> Option<String> {
         if current_line.is_empty() {
             return None;
@@ -699,7 +697,6 @@ fn escape_field(s: &str) -> String {
         .replace('\t', "\\t")
 }
 
-#[inline]
 fn unescape_field(s: &str) -> String {
     let mut result = String::with_capacity(s.len());
     let mut chars = s.chars();

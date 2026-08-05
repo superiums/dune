@@ -1189,7 +1189,6 @@ impl Expression {
     //     }
     // }
     /// please make sure only use with Apply/Command
-    #[inline]
     pub fn append_args(&self, args: &[Expression]) -> Expression {
         match self {
             Expression::Apply(f, existing_args) => {
@@ -1273,7 +1272,6 @@ impl Expression {
     // }
     /// used in right of pipe.
     /// this ensure symbo as a cmd with blank receiver.
-    #[inline]
     pub fn ensure_sym_as_cmd<'a>(&'a self) -> Cow<'a, Expression> {
         match self {
             // Expression::Function(..) | Expression::Lambda(..) => Cow::Owned(self.apply(vec![arg])),

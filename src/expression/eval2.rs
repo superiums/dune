@@ -819,7 +819,6 @@ impl Expression {
     }
 }
 
-#[inline]
 pub fn glob_expand(s: &str) -> Vec<String> {
     let mut elist = vec![];
     if let Ok(g) = glob(s) {
