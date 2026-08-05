@@ -22,6 +22,7 @@ NOTE:
 ### Data Structures
 
 - String: `'raw'`,`"escaped\n"`,`` `templated, ${age>18 ? "Mr.":"Dear"} $name !` ``
+also support: `r#'raw'#` `r#"escape except quote"#`
 Note: use '' insteadof "" if no escape needed.
 
 - List: `[1, 2, [3,4]]` or `1...5`
@@ -29,11 +30,12 @@ Note: use '' insteadof "" if no escape needed.
 - Range: `1..11` or `1..=10`, `_` for unclosed: `1.._` `_..10`
 - BtreeMap: `{key: value, name: 'Alice'}` or `M{ ... }`
 - HashMap: `H{ ... }`
-- Regex: `r'\w+\d`
+- Regex: `g'\w+\d` `g#'\w+'#`
 - DateTime: `t'2025-8-20'`
 - FileSize: `B` `K` `M` `G` `T` `P` after number: `2.5M`
 - Integer: `3`
 - Float: `0.5` `0.5%`
+- Radix: `0b1` `0o7` `0xf`
 - Blank: `_` used for blank arg in cmd, unclosed range, end slice, and arg placeholder in pipe
 - Boolean: `true` `false`
 - None: `none`
@@ -101,7 +103,7 @@ fn my_func() { ... }`
   `match v {
     1 => "number"
     xx => "symbol/string"
-    r'\w' => "regex"
+    g'\w' => "regex"
     _ => "default"
 }`
 
