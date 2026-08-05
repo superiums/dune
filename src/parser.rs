@@ -727,22 +727,7 @@ impl PrattParser {
             "=" => {
                 // 确保左侧是符号
                 match lhs.to_symbol() {
-                    Ok(name) => {
-                        // 如果是命令, 则包装为字符串，命令应当明确用()包裹
-                        // let last = match rhs {
-                        //     Expression::Command(s, v) => Expression::Symbol(
-                        //         s.to_string()
-                        //             + " "
-                        //             + v.iter()
-                        //                 .map(|e| e.to_string())
-                        //                 .collect::<Vec<String>>()
-                        //                 .join(" ")
-                        //                 .as_str(),
-                        //     ),
-                        //     other => other,
-                        // };
-                        Ok(Expression::Assign(name.to_string(), Rc::new(rhs)))
-                    }
+                    Ok(name) => Ok(Expression::Assign(name.to_string(), Rc::new(rhs))),
                     _ => {
                         // eprintln!("invalid left-hand-side: {:?}", lhs);
                         Err(SyntaxErrorKind::failure(
@@ -872,19 +857,10 @@ impl PrattParser {
             ":=" => {
                 // 确保左侧是符号
                 match lhs.to_symbol() {
-                    Ok(name) => {
-                        // 如果是单独的symbol，则包装为命令
-                        // let last = match rhs {
-                        //     Expression::Symbol(s) => {
-                        //         Expression::Command(Rc::new(Expression::Symbol(s)), Rc::new(vec![]))
-                        //     }
-                        //     other => other,
-                        // };
-                        Ok(Expression::Assign(
-                            name.to_string(),
-                            Rc::new(Expression::Quote(Rc::new(rhs))),
-                        ))
-                    }
+                    Ok(name) => Ok(Expression::Assign(
+                        name.to_string(),
+                        Rc::new(Expression::Quote(Rc::new(rhs))),
+                    )),
                     _ => {
                         // eprintln!("invalid left-hide-side {:?}", lhs);
                         Err(SyntaxErrorKind::failure(

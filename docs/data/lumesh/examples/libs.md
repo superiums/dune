@@ -10,11 +10,52 @@ NOTE:
 - NEVER use lib name as var name.
 - fuctions in top never need `top.` prefix, e.g. `cd -`
 
+### Top level
+assert <expr> [expr] [message]
+cd [path=~]
+cwd 
+ddebug <args>...
+debug <args>...
+dig <map|list|set|range|table> <path>
+eprint <args>...
+eprintln <args>...
+eval <expr>
+eval_str <string>
+exec <expr>
+exec_str <string>
+exit [status=0]
+flatten <collection>
+format <template> <args>...
+get_env <var>
+get_local <var>
+get_var <var>
+help [libs|tops|doc|<lib>|<lib>.<func>|<top_func>]
+import <path>
+include <path>
+jobs [-k id]
+len <list|set|map|table|range|string|bytes>
+not <boolean>...
+pprint <value>...
+print <args>...
+println <args>...
+quote <expr>
+read [-p prompt] [-n max_chars] [-s silent] [-t timeout_secs]
+repeat <expr> <n>
+rev <string|list|table|bytes>
+select <table> <columns...>
+set_root <var> <val>
+symof <value>
+tap <args>...
+throw <msg>
+typeof <value>
+unset_root <var>
+when <condition> <execute>
+where <table> <condition>
 ### about
-bin
-history
-info
-prelude
+bin 
+history 
+info 
+prelude 
 version 
 ### boolean
 and <boolean1>...
@@ -45,29 +86,29 @@ to_list <bytes>
 to_string <bytes>
 ### console
 alt_screen <bool>
-bell
-clear
+bell 
+clear 
 cursor_down <n>
-cursor_hide
+cursor_hide 
 cursor_left <n>
-cursor_restore
+cursor_restore 
 cursor_right <n>
-cursor_save
-cursor_show
+cursor_save 
+cursor_show 
 cursor_to <x> <y>
 cursor_up <n>
 discard <args>...
-flush
-height
-keys
+flush 
+height 
+keys 
 line_wrap <bool>
 print_tty <text>
 raw_mode [bool]
-read_key
+read_key 
 read_line [prompt]
 read_password [prompt]
 title <string>
-width
+width 
 write <text> <x> <y>
 ### filesize
 b <filesize>
@@ -211,7 +252,7 @@ windows <list> <size>
 zip <list1> <list2>
 ### log
 debug <msg>
-disable
+disable 
 echo <msg>
 enable [int]
 error <msg>
@@ -428,17 +469,17 @@ wrap <string> <width>
 yellow <string>
 ### sys
 defined <var>
-dirs
-ecodes_lm
-ecodes_rt
+dirs 
+ecodes_lm 
+ecodes_rt 
 env [var]
 has <var>
-info
+info 
 max_runtime [depth]
 max_syntax [depth]
 max_usemode [depth]
-modes
-set_cfm <boolean>
+modes 
+set_cfm <boolean|none>
 set_pdm <boolean>
 set_strict <boolean>
 vars 
@@ -466,7 +507,6 @@ rposition <table> <cell|fn> [start=0]
 select <table> <cols...>
 slice <table> <start> <end>
 sort <list> [key_fn|±key...]
-sort_by <table> <col>
 to_csv <table>
 ### time
 add [datetime] <duration>
@@ -489,33 +529,7 @@ timezone [datetime] <offset_hours> [format_string]
 to_string <datetime> [format_string]
 weekday [datetime]
 year [datetime]
-### Top level >5}' 3 -> 00003
-get_env <var>
-get_local <var>
-get_var <var>
-help [libs|tops|doc|<lib>|<lib>.<func>|<top_func>]
-import <path>
-include <path>
-len <list|set|map|table|range|string|bytes>
-not <boolean>...
-pprint <value>...
-print <args>...
-println <args>...
-quote <expr>
-read [-p prompt] [-n max_chars] [-s silent] [-t timeout_secs]
-repeat <expr> <n>
-rev <string|list|table|bytes>
-select <table> <columns...>
-set_root <var> <val>
-sort_by <table> <col>
-symof <value>
-tap <args>...
-throw <msg>
-typeof <value>
-unset_root <var>
-when <condition> <execute>
-where <table> <condition>
-just use them directly anywhere!### ui
+### ui
 confirm <msg>
 date_pick [msg|cfg_map]
 editor [msg|cfg_map]
@@ -529,4 +543,3 @@ password <msg> [confirm=false]
 pick <options> [msg|cfg_map]
 text <msg> [init_value]
 widget <content> <title> [width] [height]
-

@@ -43,8 +43,8 @@ pub fn regist_se() -> HashMap<&'static str, SelfExpandFunc> {
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
     reg_info!({
       // debug
-      when => "if cond then execute", "<condition> <execute>"
-      assert => "throw if condition false", "<condition> [message]"
+      when => "conditional execute", "<condition> <execute>"
+      assert => "throw if not equal/truthy", "<expr> [expr] [message]"
       debug => "eval & show expr,type,value(debug fmt)", "<args>..."
       ddebug => "eval & show expr,type,value(pretty fmt)", "<args>..."
       symof => "type name before eval", "<value>"
@@ -52,7 +52,7 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
       quote => "quote expr, eval later", "<expr>"
 
       // Data manipulation
-      format => "fmt string. {name}/{} for named/positional, :spec for align.\ne.g. format '{:0>5}' 3 -> 00003", "<template> <args>..."
+      format => "fmt string. {name}/{} for named/positional, :spec for align.\n\te.g. format '{:0>5}' 3 -> 00003", "<template> <args>..."
       where => "filter table rows. NR/<col_name> injected. e.g. where t (NR>1 and col>0)", "<table> <condition>"
 
       // Execution control
@@ -140,14 +140,21 @@ fn assert(
     state: &mut State,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_args_len("assert", &args, 1..=2, ctx)?;
+    check_args_len("assert", &args, 1..=3, ctx)?;
 
-    let condition = args[0].eval_with_assign(state, env)?;
-    let is_true = condition.is_truthy();
+    let a1 = args[0].eval_with_assign(state, env)?;
+    let fail = {
+        if args.len() > 1 {
+            let a2 = args[1].eval_with_assign(state, env)?;
+            a1 != a2
+        } else {
+            !a1.is_truthy()
+        }
+    };
 
-    if !is_true {
-        let message = if args.len() > 1 {
-            args[1].eval_with_assign(state, env)?.to_string()
+    if fail {
+        let message = if args.len() > 2 {
+            args[2].eval_with_assign(state, env)?.to_string()
         } else {
             "assertion failed".to_string()
         };
@@ -318,6 +325,7 @@ fn apply_align(s: &str, pad_ch: char, align: char, width: usize) -> String {
 /// format need template to be first arg,
 /// but pipe alwasy takes 1st place.
 /// so we need to adjust it auto.
+/// format need _ to self expand
 fn format(
     args: &[Expression],
     env: &mut Environment,

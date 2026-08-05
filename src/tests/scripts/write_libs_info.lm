@@ -1,5 +1,14 @@
-let libs = [about, boolean, bytes, console, filesize, from, fs, hmap, into, list, log, map, math, rand, regex, set, string, sys, table, time, tops, ui]
+let libs = [tops, about, boolean, bytes, console, filesize, from, fs, hmap, into, list, log, map, math, rand, regex, set, string, sys, table, time, ui]
+fs.rm /tmp/libs_full.md ?.
+fs.rm /tmp/libs.md ?.
 for lib in libs {
-	help $lib | .strip_ansi() | .replace(`{lib}.`,'') | '### ' + _ >> /tmp/libs_full.md
-	help $lib | .strip_ansi() | .replace(`{lib}.`,'') | .lines() | .filter(x -> !x.starts_with("\t")) | .join("\n") | '### ' + _ >> /tmp/libs.md
+    let txt = help $lib | .strip_ansi() | .replace('Builtin Functions for Lib: ','') | .replace("\n\n","\n")
+	txt | .replace(`{lib}.`,'') | .lines() | .filter(x -> !x.starts_with("\t")) | .join("\n") | "\n### " + _ >> /tmp/libs.md
+    if lib == tops {
+        txt = regex.replace_all($txt,g'(?m)^(\w)','- $1')
+        println txt
+        txt | .replace(`{lib}.`,'- ') | "\n### " + _ >> /tmp/libs_full.md
+    }else{
+        txt | .replace(`{lib}.`,'- ') | "\n### " + _ >> /tmp/libs_full.md
+    }
 }

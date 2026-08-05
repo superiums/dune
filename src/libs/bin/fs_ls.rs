@@ -24,6 +24,7 @@ pub struct LsOptions {
     pub show_mode: bool,
     pub show_path: bool,
     pub list_dir_itself: bool,
+    pub help: bool,
 }
 
 pub fn parse_ls_args(
@@ -32,6 +33,8 @@ pub fn parse_ls_args(
     ctx: &Expression,
 ) -> Result<(Vec<PathBuf>, LsOptions), RuntimeError> {
     let mut options = LsOptions::default();
+    options.detailed = true; //default
+
     let mut paths = Vec::new();
     for arg in args {
         if let Expression::Symbol(s) | Expression::String(s) = arg {
@@ -39,7 +42,8 @@ pub fn parse_ls_args(
                 Some(opt) => {
                     for char in opt.chars() {
                         match char {
-                            'l' => options.detailed = true,
+                            'l' => {}
+                            's' => options.detailed = false,
                             'a' => options.show_hidden = true,
                             'h' => options.human_readable = true,
                             't' => options.unix_time = true,
@@ -50,7 +54,7 @@ pub fn parse_ls_args(
                             'm' => options.show_mode = true,
                             'p' => options.show_path = true,
                             'd' => options.list_dir_itself = true, // 新增：像 ls -d 一样列目录本身
-                            '?' => { /* help ... */ }
+                            '?' => options.help = true,
                             other => {
                                 return Err(RuntimeError::common(
                                     format!("unkown option for fs.ls: `{}`", other).into(),
@@ -77,6 +81,22 @@ pub fn ls(
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
     let (paths, options) = parse_ls_args(args, env, ctx)?;
+    if options.help {
+        println!(
+            r"-l: detailed
+-s: shorted
+-a: show hidden
+-h: human readable
+-t: unix time
+-L: follow links
+-c: show create time
+-u: show user
+-g: show group
+-m: show mode
+-p: show path"
+        );
+        return Ok(Expression::None);
+    }
 
     let mut headers = vec!["name".to_string()];
     if options.detailed {

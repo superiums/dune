@@ -647,7 +647,7 @@ impl Expression {
             }
 
             Self::RegexDef(s) => write!(f, "{}r'{s}'", idt(i)),
-            Self::Regex(r) => write!(f, "{}r'{}'", idt(i), r.regex.as_str()),
+            Self::Regex(r) => write!(f, "{}g'{}'", idt(i), r.regex.as_str()),
             Self::TimeDef(t) => write!(f, "{}t'{t}'", idt(i)),
             Self::Blank => write!(f, "{}_", idt(i)),
             Self::Table(t) => write!(f, "{}{t:?}", idt(i)),
