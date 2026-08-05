@@ -1,4 +1,101 @@
-## lumesh Recent Updates (0.14.x → 0.16.x)
+# lumesh Recent Release Update (0.16.13 → 0.17.5)
+
+---
+
+Following up on the previous report (0.14.x–0.16.12: editor rewrite, tokenizer refactor, History/Slash Commands, AI integration), this release shifts focus to the core language layer — a **deep refactor of the string/quoting system**, the **introduction of the `Bytes` type**, the **establishment of a background job management system**, and a series of performance refinements throughout.
+
+---
+
+### Strings and Quote Semantics: The Core Change of This Release
+
+This is the heaviest-weight set of changes in this release, spanning three versions (0.16.13 → 0.17.0 → 0.17.5) of continuous evolution, ultimately converging into a complete and self-consistent escaping semantics system:
+
+- **0.16.13**: `rewrite unescape for all string` — rewrote the unescaping logic for all string types, paving the way for the subsequent fine-grained differentiation of quote semantics.
+- **0.17.0**: **Introduced `StringSafe`** (`s'...'`), purpose-built for command-concatenation scenarios, eliminating injection risk at the language level:
+  ```bash
+  let s = s'(rm -rf /)'
+  let s2 = into.safe 'mkfs /dev/sda'
+  eval_str(`echo $s $s2`)  # never unsafe eval
+  ```
+  In the same release, **`SymbolRaw` was introduced**, extending the applicability of the `^` escape character from command position to argument position as well.
+- **0.17.5**: **Introduced hashed raw quotes** (the `#`-delimited syntax), formally establishing a multi-tier escaping gradient:
+  ```rust
+  r#'....'#        // fully unescaped
+  r##'....'##      // supports any number of #'s (for content that itself contains #)
+
+  r#"...."#        // quotes are not escaped, but ansi and unicode sequences are
+  t#"...."#        // no escaping for the g/t/s/b prefixes
+  ```
+  **Breaking change**: `r'....'` no longer serves as the regex prefix — it is now narrowed to a purely **raw string** semantic; the former **regex prefix has been officially renamed to `g'....'`**.
+
+  This design cleverly uses the `#` delimiter to resolve the inherent conflict between "boundary character vs. quote characters appearing in content," while decoupling "whether to escape ANSI/unicode" from "whether to escape quotes" into two independent, composable dimensions — ultimately producing a clean semantic gradient: from `"..."` (fully escaped), through `r#"..."#` (partially escaped — quotes left raw, ANSI/unicode still escaped), to `r#'...'#` (fully unescaped), each with a clearly defined role.
+
+---
+
+### `Bytes` Type Introduced (0.17.0)
+
+- Literal support: `b'\x41'`
+- Supports slicing, comparison, and operator overloading
+- Supports printing, piping, and use as command arguments
+- **0.17.5**: Syntax further expanded with `b"..."` (double-quote form) and `b#"..."#` (`#`-delimited form), keeping the writing style consistent with the escaping semantics of the string system.
+
+---
+
+### Numeric Literal Enhancements (0.17.0)
+
+- Introduced **radix numbers**: `0b100_100`, `0o170`, `0xff`
+- All numeric types now uniformly support `_` separators: `999_999`, `999_999.999_999`
+- **0.17.5**: Further optimized radix number parsing performance.
+
+---
+
+### Background Jobs and Terminal Integration (from 0.17.3)
+
+- **0.17.3**: Added the `jobs` command for unified management of background tasks.
+- **0.17.5**:
+  - Performance and stability improvements related to PTY (pseudo-terminal)
+  - Fixed leftover screen artifacts when piping output to `vi`
+  - Added `Ctrl+Z` support for non-PTY scenarios
+
+---
+
+### Syntax/Tokenizer Refinements (0.17.3)
+
+- Adjusted the categorization of custom unary operators
+- Improved tokenization precision for `.`, `^`, `+`
+- Removed the index operator `@`
+- Unified tokenization logic for `-`/`!` prefixes
+- Improved `<<`, adding byte-stream support
+- **`?&` renamed to `&:`**, continuing the short-circuit logic writing style introduced in 0.16.2
+- **`let` disables CFM by default**: prevents statements like `let a=1` from being misparsed as commands under CFM, while preserving genuine CFM usage such as `dd if=/dev/sda`
+- Improved whitespace recognition around `^` and `:`
+- Fixed `symof`: `assert(symof(1+2), 'BinaryOp')`
+
+---
+
+### Standard Library Enhancements (0.17.3)
+
+- `fs.ls` supports specifying files directly (`fs.ls file(s)`)
+- Built-in libraries now support wildcard expansion
+
+### Prompt Integration (0.17.3)
+- Integrated with starship, improving shell prompt customizability
+
+---
+
+### Release Cadence Summary
+
+| Phase | Core Focus |
+|------|----------|
+| 0.16.13 | Full rewrite of string escaping logic; CFM/custom operator fixes |
+| 0.17.0 | `Bytes` type, `StringSafe`/`SymbolRaw`, radix numbers, function renames (Breaking Change) |
+| 0.17.1–0.17.2 | Library function/hint optimizations, `cfm auto` mode, `&:` short-circuit syntax |
+| 0.17.3 | `jobs` background task management, starship integration, tokenizer refinements (Breaking Change: `?&` → `&:`) |
+| 0.17.5 | **Hashed raw quote system landed** (`r#'..'#`/`r#"..."#`/`g#'..'#`, etc.), PTY/signal handling optimizations (**Breaking Change: `r'..'` narrowed to raw string; regex prefix changed to `g'..'`**) |
+
+---
+
+# lumesh Recent Updates (0.14.x → 0.16.x)
 
 ### Complete Editor Rewrite (0.15.0)
 

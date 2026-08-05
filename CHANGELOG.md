@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.17.5]
+- optimize radix
+- optimize pty
+- optimize inline
+- fix shadow display while pipe to `vi`
+- support `ctrl+z` for non pty
+- update `assert`, more flexable
+- update `fs.ls`, default detailed
+- introduce hashed raw quote
+
+```rust
+r#'....'#        // no escaped
+r##'....'##      // any number of #
+
+r#"...."#        // no quote escaped,but escape ansi and unicode
+t#"...."#        // no escape for 'g'/`t`/`s`/`b`
+```
+
+**Break Changes**
+as `r'....'` used as **raw string**, **regex** now changes to `g'....'`
+
 ## [0.17.3]
 - add `jobs` to control background jobs
 - integrate with starship
