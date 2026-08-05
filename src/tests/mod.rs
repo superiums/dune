@@ -252,7 +252,7 @@ mod tokenizer_tests {
 
     #[test]
     fn test_regex_literal() {
-        let (tokens, diags) = tokenize("r'[a-z]+'");
+        let (tokens, diags) = tokenize("g'[a-z]+'");
         let valid: Vec<&Diagnostic> = diags.iter().filter(|d| d != &&Diagnostic::Valid).collect();
         assert!(valid.is_empty(), "Got {valid:?}");
         assert_eq!(tokens.len(), 1);
@@ -266,6 +266,24 @@ mod tokenizer_tests {
         assert!(valid.is_empty(), "Got {valid:?}");
         assert_eq!(tokens.len(), 1);
         assert_eq!(tokens[0].kind, crate::TokenKind::Time);
+    }
+
+    #[test]
+    fn test_hased_quote() {
+        let (tokens, diags) = tokenize(r###"r#"a"b\nc"#"###);
+        let valid: Vec<&Diagnostic> = diags.iter().filter(|d| d != &&Diagnostic::Valid).collect();
+        assert!(valid.is_empty(), "Got {valid:?}");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].kind, crate::TokenKind::StringLiteral);
+    }
+
+    #[test]
+    fn test_radix_tokenize() {
+        let (tokens, diags) = tokenize("0b101");
+        let valid: Vec<&Diagnostic> = diags.iter().filter(|d| d != &&Diagnostic::Valid).collect();
+        assert!(valid.is_empty(), "Got {valid:?}");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].kind, crate::TokenKind::Radix2);
     }
 
     #[test]
