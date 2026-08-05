@@ -88,7 +88,7 @@ pub fn canon(p: &str, env: &mut Environment) -> Result<PathBuf, RuntimeError> {
 /// 自定义转义处理器，替换 snailquote::unescape
 /// 输入为去掉外层引号后的裸字符串内容
 /// 对于无法识别的转义序列，保留 \X 原样（宽容模式）
-pub fn unescape_str(s: &str) -> String {
+pub fn unescape_str(s: &str, skip_quote: bool) -> String {
     let mut result = String::with_capacity(s.len());
     let mut chars = s.chars().peekable();
 
@@ -97,8 +97,25 @@ pub fn unescape_str(s: &str) -> String {
             result.push(c);
             continue;
         }
+        let nextc = chars.next();
 
-        match chars.next() {
+        if skip_quote {
+            match nextc {
+                None => {
+                    // 末尾孤立的反斜杠，保留
+                    result.push('\\');
+                    break;
+                }
+                Some(next) => {
+                    if matches!(next, '\'' | '"' | '`' | '\\') {
+                        result.push('\\');
+                        result.push(next);
+                        continue;
+                    }
+                }
+            }
+        }
+        match nextc {
             None => {
                 // 末尾孤立的反斜杠，保留
                 result.push('\\');

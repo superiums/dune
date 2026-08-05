@@ -549,13 +549,13 @@ fn alpha_dispatch(
                 )(input);
             }
 
-            if second == '\'' {
+            if matches!(second, '\'' | '"') {
                 return match first {
-                    'r' => hashed_literal(&'r')(input), //this not deel with '\'
-                    'g' => parse_prefixed_string(input, "g'", TokenKind::Regex),
-                    't' => parse_prefixed_string(input, "t'", TokenKind::Time),
-                    's' => parse_prefixed_string(input, "s'", TokenKind::StringSafe),
-                    'b' => parse_prefixed_string(input, "b'", TokenKind::Bytes),
+                    'r' => hashed_literal(&'r')(input),
+                    'g' => parse_prefixed_string(input, first, second, TokenKind::Regex),
+                    't' => parse_prefixed_string(input, first, second, TokenKind::Time),
+                    's' => parse_prefixed_string(input, first, second, TokenKind::StringSafe),
+                    'b' => parse_prefixed_string(input, first, second, TokenKind::Bytes),
                     _ => Err(NOT_FOUND),
                 };
             }
@@ -930,16 +930,20 @@ fn parse_string(
 
 fn parse_prefixed_string<'a>(
     input: Input<'a>,
-    prefix: &str,
+    leading: char,
+    quote: char,
     kind: TokenKind,
 ) -> TokenizationResult<'a, (Token, Diagnostic)> {
-    let (inner, _prefix) = input.strip_prefix(prefix).ok_or(NOT_FOUND)?;
-    let quote = prefix.as_bytes().last().copied().unwrap_or(b'\'') as char;
+    let mut prefix = String::with_capacity(2);
+    prefix.push(leading);
+    prefix.push(quote);
+
+    let (inner, _prefix) = input.strip_prefix(&prefix).ok_or(NOT_FOUND)?;
     let (rest_after_content, diagnostic) = parse_string_inner(inner, quote)?;
 
     let (rest, content) = finish_string(input, rest_after_content, quote);
 
-    let token = Token::new_quoted(kind, content, prefix.len() as u8, 1);
+    let token = Token::new_quoted(kind, content, 2, 1);
     Ok((rest, (token, diagnostic)))
 }
 
@@ -997,13 +1001,13 @@ fn ip_literal(input: Input<'_>) -> TokenizationResult<'_, (Token, Diagnostic)> {
 }
 
 fn radix_literal(input: Input<'_>) -> TokenizationResult<'_, (Token, Diagnostic)> {
-    let radix_specs: [(&str, fn(char) -> bool); 3] = [
-        ("0b", |c: char| c == '0' || c == '1'),
-        ("0o", |c: char| c.is_digit(8)),
-        ("0x", |c: char| c.is_ascii_hexdigit()),
+    let radix_specs: [(&str, TokenKind, fn(char) -> bool); 3] = [
+        ("0b", TokenKind::Radix2, |c: char| c == '0' || c == '1'),
+        ("0o", TokenKind::Radix8, |c: char| c.is_digit(8)),
+        ("0x", TokenKind::Radix16, |c: char| c.is_ascii_hexdigit()),
     ];
 
-    for (prefix, is_digit) in radix_specs {
+    for (prefix, kind, is_digit) in radix_specs {
         if let Some((after_prefix, _)) = input.strip_prefix(prefix) {
             let places = after_prefix
                 .chars()
@@ -1018,7 +1022,7 @@ fn radix_literal(input: Input<'_>) -> TokenizationResult<'_, (Token, Diagnostic)
                 return Ok((
                     remain,
                     (
-                        Token::new(TokenKind::Radix, number),
+                        Token::new_quoted(kind, number, 2, 0),
                         Diagnostic::InvalidNumber(number),
                     ),
                 ));
@@ -1027,7 +1031,7 @@ fn radix_literal(input: Input<'_>) -> TokenizationResult<'_, (Token, Diagnostic)
             return Ok((
                 remain,
                 (
-                    Token::new(TokenKind::Radix, number), // 整体 token 含 "0x..","0b..","0o.."
+                    Token::new_quoted(kind, number, 2, 0), // 整体 token 含 "0x..","0b..","0o.."
                     Diagnostic::Valid,
                 ),
             ));

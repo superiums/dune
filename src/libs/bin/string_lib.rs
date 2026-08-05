@@ -1233,7 +1233,7 @@ fn unescape(
 ) -> Result<Expression, RuntimeError> {
     check_exact_args_len("unescape", &args, 1, ctx)?;
     let text = get_string_ref(&args[0], ctx)?;
-    Ok(Expression::String(unescape_str(text)))
+    Ok(Expression::String(unescape_str(text, false)))
 }
 
 // 转义：将真实的控制字符/特殊字符转成可打印的 \n \t \\ 等序列
