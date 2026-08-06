@@ -139,12 +139,8 @@ pub fn table(
         s => (s.iter().map(|x| x.to_string()).collect(), None),
     };
 
+    // 尾行清理逻辑
     if lines.len() > 2 {
-        let first_line_cols = split_line(lines[0], &splitter);
-        let second_line_cols = split_line(lines[1], &splitter);
-        if first_line_cols.len() < second_line_cols.len() {
-            lines.remove(0);
-        }
         let last_line_cols = split_line(lines.last().unwrap(), &splitter);
         let second_last_line_cols = split_line(lines[lines.len() - 2], &splitter);
         if last_line_cols.len() < second_last_line_cols.len() {
@@ -154,13 +150,26 @@ pub fn table(
 
     let (data_lines, detected_headers) = if headers.is_empty() {
         let maybe_header = lines[0];
-        let first_line_cols = split_line(maybe_header, &splitter);
-        let looks_like_header = first_line_cols
+        let mut maybe_header_cols = split_line(maybe_header, &splitter);
+
+        // 先判断是否像表头
+        let looks_like_header = maybe_header_cols
             .iter()
             .all(|s| s.chars().any(|c| c.is_uppercase() || !c.is_ascii()));
 
+        // 首行清理逻辑
+        // 只有第一行"不像表头"时，才走剔除逻辑（应对 ls -l 的"总计 180"）
+        if !looks_like_header && lines.len() > 2 {
+            let second_line_cols = split_line(lines[1], &splitter);
+            // 差异大于50%时才剔除
+            if maybe_header_cols.len() + maybe_header_cols.len() < second_line_cols.len() {
+                lines.remove(0);
+                maybe_header_cols = split_line(lines[0], &splitter);
+            }
+        }
+
         if looks_like_header {
-            let detected = first_line_cols
+            let detected = maybe_header_cols
                 .iter()
                 .map(|s| {
                     s.replace(":", "_")
@@ -173,7 +182,7 @@ pub fn table(
                 .collect();
             (lines.split_off(1), detected)
         } else {
-            let cols = first_line_cols
+            let cols = maybe_header_cols
                 .iter()
                 .enumerate()
                 .map(|(i, _)| format!("C{i}"))
@@ -184,20 +193,20 @@ pub fn table(
         (lines, headers)
     };
 
-    let mut rows = Vec::with_capacity(data_lines.len());
+    let max_col = detected_headers.len();
+
+    let mut rows = Vec::with_capacity(max_col);
     for line in data_lines {
         if line.trim().is_empty() {
             continue;
         }
-        let slist: Vec<&str> = split_line(line, &splitter);
-        let mut row = Vec::with_capacity(detected_headers.len());
-        for (i, _header) in detected_headers.iter().enumerate() {
-            if let Some(value) = slist.get(i) {
-                row.push(Expression::String(value.to_string()));
-            } else {
-                row.push(Expression::None);
-            }
+        let slist = split_line_limited(line, &splitter, max_col);
+        let mut row = Vec::with_capacity(max_col);
+
+        for cell in slist {
+            row.push(Expression::String(cell));
         }
+
         if !row.is_empty() {
             rows.push(row);
         }
@@ -210,6 +219,30 @@ fn split_line<'a>(line: &'a str, regex: &Option<Regex>) -> Vec<&'a str> {
     match regex {
         Some(re) => re.split(line).collect(),
         None => line.split_whitespace().collect(),
+    }
+}
+
+fn split_line_limited<'a>(line: &'a str, regex: &Option<Regex>, max_cols: usize) -> Vec<String> {
+    match regex {
+        Some(re) => re.splitn(line, max_cols).map(|x| x.to_string()).collect(),
+        None => {
+            let mut out = Vec::new();
+            let mut iter = line.split_whitespace();
+
+            for _ in 0..max_cols.saturating_sub(1) {
+                if let Some(v) = iter.next() {
+                    out.push(v.to_string());
+                }
+            }
+
+            // 剩余部分整体作为最后一个
+            let rest: String = iter.collect::<Vec<_>>().join(" ");
+            if !rest.is_empty() {
+                out.push(rest);
+            }
+
+            out
+        }
     }
 }
 
