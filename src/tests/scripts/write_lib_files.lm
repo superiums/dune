@@ -1,5 +1,5 @@
 
-let libs = [ about,boolean,bytes, console,filesize,from, fs,hmap,into, list,log,map, math,rand,regex, set,string,sys, table,time,ui,]
+let libs = [tops, about,boolean,bytes, console,filesize,from, fs,hmap,into, list,log,map, math,rand,regex, set,string,sys, table,time,ui,]
 fs.rm /tmp/full/ ?.
 fs.mkdir /tmp/full
 # fs.mkdir /tmp/lite
@@ -10,6 +10,10 @@ title: 内置库 {lib}
 date: {time.now()}
 ---
 	`
+	if lib == tops {
+			help $lib | .strip_ansi() | regex.replace_all(g'(?m)^([a-z])','- $1') | `{head}\n## ` + _ >> `/tmp/full/{lib}.md`
+			continue
+	}
 
 	help $lib | .strip_ansi() | .replace(`{lib}.`,'- ') | `{head}\n## ` + _ >> `/tmp/full/{lib}.md`
 	# help $lib | .strip_ansi() | .replace(`{lib}.`,'') | .lines() | .filter(x -> !x.starts_with("\t")) | .join("\n") | `{head}\n## ` + _ >> `/tmp/lite/{lib}.md`

@@ -1,3 +1,5 @@
+use common_macros::b_tree_map;
+
 use crate::{Environment, Expression};
 
 use crate::libs::BuiltinInfo;
@@ -11,7 +13,7 @@ use std::sync::{LazyLock, RwLock};
 pub fn regist_lazy() -> LazyModule {
     reg_lazy!({
         // 日志级别控制
-        enable, level , disable , is_enabled ,
+        levels, enable, level , disable , is_enabled ,
         // 日志记录函数
         info , warn , debug , error , trace ,
         // 原始输出
@@ -20,9 +22,9 @@ pub fn regist_lazy() -> LazyModule {
 }
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
     reg_info!({
-        // level =>
 
         // 日志级别控制
+        levels => "view all levels", ""
         level => "get/set the log level", "[int]"
         enable => "enable all log, or level", "[int]"
         disable => "disable all log", ""
@@ -67,6 +69,20 @@ fn enable(
         *LOG_LEVEL.write().unwrap() = TRACE;
     }
     Ok(Expression::None)
+}
+fn levels(
+    _args: Vec<Expression>,
+    _env: &mut Environment,
+    _ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    return Ok(Expression::from(b_tree_map! {
+        String::from("none") => NONE,
+         String::from("error") => ERROR,
+         String::from("warn") => WARN,
+         String::from("info") => INFO,
+         String::from("debug") => DEBUG,
+         String::from("trace") => TRACE
+    }));
 }
 fn level(
     args: Vec<Expression>,
