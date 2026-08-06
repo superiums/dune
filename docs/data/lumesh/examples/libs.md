@@ -511,7 +511,7 @@ to_csv <table>
 ### time
 add [datetime] <duration>
 day [datetime]
-diff <datetime1> <datetime2> [unit]
+diff <datetime1> [datetime2] <unit>
 display [datetime]
 fmt [datetime] <format_string>
 hour [datetime]

@@ -1000,8 +1000,8 @@
 	add a signed duration string (e.g. '1d2h30m', '-1h') or integer seconds to a datetime (defaults to now)
 - day [datetime]
 	get day of month (1-31)
-- diff <datetime1> <datetime2> [unit]
-	calculate difference between two datetimes in given unit (defaults to seconds)
+- diff <datetime1> [datetime2] <unit>
+	calculate difference between two datetimes in given unit
 - display [datetime]
 	get preformatted datetime as map with time/date/datetime/etc.
 - fmt [datetime] <format_string>
