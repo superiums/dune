@@ -476,7 +476,8 @@ fn widget(
         ));
     }
 
-    let mut left_border_half = "─".repeat(((text_width - title_len) as f64 / 2.0).round() as usize);
+    let mut left_border_half =
+        "─".repeat(((text_width.saturating_sub(title_len)) as f64 / 2.0).round() as usize);
     let right_border_half = left_border_half.clone();
     let left_len = left_border_half.chars().count();
     if (left_len * 2 + title_len + 2) > text_width + 2 {
@@ -496,7 +497,7 @@ fn widget(
 
         if ch == '\n' {
             lines += 1;
-            result += &" ".repeat(width - i);
+            result += &" ".repeat(width.saturating_sub(i));
             i = width;
         } else {
             result.push(ch);
@@ -514,7 +515,7 @@ fn widget(
         }
     }
 
-    result += &" ".repeat(width - i);
+    result += &" ".repeat(width.saturating_sub(i));
 
     while result.lines().count() < widget_height - 1 {
         result += "\n";
@@ -634,7 +635,11 @@ fn joiny(
             .map(|line| {
                 let line_width = line.chars().count();
                 if line_width < max_width {
-                    format!("{}{}", line, " ".repeat(max_width - line_width))
+                    format!(
+                        "{}{}",
+                        line,
+                        " ".repeat(max_width.saturating_sub(line_width))
+                    )
                 } else {
                     line.to_string()
                 }

@@ -1097,7 +1097,7 @@ fn colors(
         let mut stdout = std::io::stdout().lock();
 
         for (i, (text, (r, g, b))) in COLOR_MAP.iter().enumerate() {
-            let pad_len = 20 - text.len();
+            let pad_len = (20 as usize).saturating_sub(text.len());
             let padding: String = std::iter::repeat_n(" ", pad_len).collect();
             write!(
                 &mut stdout,
@@ -1116,7 +1116,7 @@ fn pad_start_impl(len: usize, pad_ch: char, s: String) -> Result<Expression, Run
     if s.len() >= len {
         return Ok(Expression::String(s));
     }
-    let pad_len = len - s.len();
+    let pad_len = len.saturating_sub(s.len());
     let padding: String = std::iter::repeat_n(pad_ch, pad_len).collect();
     Ok(Expression::String(format!("{padding}{s}")))
 }
@@ -1125,15 +1125,15 @@ fn pad_end_impl(len: usize, pad_ch: char, s: String) -> Result<Expression, Runti
     if s.len() >= len {
         return Ok(Expression::String(s));
     }
-    let pad_len = len - s.len();
+    let pad_len = len.saturating_sub(s.len());
     let padding: String = std::iter::repeat_n(pad_ch, pad_len).collect();
     Ok(Expression::String(format!("{s}{padding}")))
 }
 
 fn center_impl(len: usize, pad_ch: char, s: String) -> Result<Expression, RuntimeError> {
-    let total_pad = len - s.len();
+    let total_pad = len.saturating_sub(s.len());
     let left_pad = total_pad / 2;
-    let right_pad = total_pad - left_pad;
+    let right_pad = total_pad.saturating_sub(left_pad);
     let left: String = std::iter::repeat_n(pad_ch, left_pad).collect();
     let right: String = std::iter::repeat_n(pad_ch, right_pad).collect();
     Ok(Expression::String(format!("{left}{s}{right}")))
