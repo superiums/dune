@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.17.6]
+- allow `time.diff` without dt2
+- fix pipe data write lock
+- add `log.levels`
+- optimize `into.table`
+optimize tips line remove rule;
+optimize multi fields include in last line like `ps`
+- improve select/rand/clr/log/space
+- update lib info
+
 ## [0.17.5]
 - optimize radix
 - optimize pty
