@@ -95,12 +95,9 @@ fn exec_single_cmd(
 
     // 写入输入
     if let Some(input) = input {
-        child
-            .stdin
-            .as_mut()
-            .unwrap()
-            .write_all(&input)
-            .map_err(|e| {
+        if let Some(mut stdin) = child.stdin.take() {
+            // take() 拿走所有权
+            stdin.write_all(&input).map_err(|e| {
                 RuntimeError::from_io_error(
                     e,
                     format!("pipe stdin to `{cmdstr}`").into(),
@@ -108,18 +105,19 @@ fn exec_single_cmd(
                     depth,
                 )
             })?;
+            // stdin 在这里超出作用域被 drop，管道写端关闭 -> 子进程读到 EOF
+        }
     }
-
-    // TODO not work yet
-    // 合并 stderr 和 stdout 的流
-    if mode & 4 != 0
-        && let Some(mut stderr) = child.stderr.take()
-    {
-        // if let Some(mut stdout) = child.stdout.take() {
-        std::io::copy(&mut stderr, &mut std::io::stdout()).unwrap(); // 将 stderr 合并到 stdout
-        // }
-    }
-
+    // 非管道模式下，若需要把 stderr 合并到 stdout，用独立线程并发转发，避免与 stdout/stdin 读写产生死锁
+    let stderr_thread = if !pipe_out && mode & 4 != 0 {
+        child.stderr.take().map(|mut stderr| {
+            std::thread::spawn(move || {
+                let _ = std::io::copy(&mut stderr, &mut std::io::stdout());
+            })
+        })
+    } else {
+        None
+    };
     // 中断信号处理：SIGINT 由全局 handler 捕获（在 repl.rs 中安装），
     // 仅设置标志位，不会杀死 lume 自身。
     // 子进程会收到终端发送的 SIGINT 并退出，wait 随后返回。
@@ -211,6 +209,11 @@ fn exec_single_cmd(
             }
         };
         childman::clear_child();
+
+        // 等 stderr 转发线程完成，确保输出顺序/完整性
+        if let Some(t) = stderr_thread {
+            let _ = t.join();
+        }
 
         if status.success() {
             Ok(None)
