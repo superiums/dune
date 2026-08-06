@@ -6,7 +6,7 @@ use chrono::{
 use common_macros::hash_map;
 use std::{collections::BTreeMap, thread, time::Duration};
 
-use crate::libs::helper::{check_args_len, check_exact_args_len};
+use crate::libs::helper::{check_args_len, check_exact_args_len, get_string_arg};
 use crate::libs::lazy_module::LazyModule;
 use crate::{RuntimeError, libs::BuiltinInfo, reg_info, reg_lazy};
 
@@ -52,7 +52,7 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         now => "get current datetime as DateTime object or formatted string", "[format_string]"
         parse => "parse datetime string, optionally with a chrono format string", "<datetime_string> [format_string]"
         add => "add a signed duration string (e.g. '1d2h30m', '-1h') or integer seconds to a datetime (defaults to now)", "[datetime] <duration>"
-        diff => "calculate difference between two datetimes in given unit (defaults to seconds)", "<datetime1> <datetime2> [unit]"
+        diff => "calculate difference between two datetimes in given unit", "<datetime1> [datetime2] <unit>"
         timezone => "convert datetime to a different timezone offset (in hours)", "[datetime] <offset_hours> [format_string]"
         is_leap => "check if a year is a leap year", "[year]"
         to_string => "convert DateTime to string", "<datetime> [format_string]"
@@ -574,18 +574,14 @@ fn diff(
     check_args_len("diff", &args, 2..=3, ctx)?;
     let mut it = args.into_iter();
     let dt1 = parse_datetime_arg(it.next().unwrap(), ctx)?;
-    let dt2 = parse_datetime_arg(it.next().unwrap(), ctx)?;
-
-    let unit = match it.next() {
-        Some(Expression::String(s)) => s,
-        Some(e) => {
-            return Err(RuntimeError::common(
-                format!("diff expects a unit string, got {e}").into(),
-                ctx.clone(),
-                0,
-            ));
-        }
-        None => "s".to_string(),
+    let second = it.next().unwrap();
+    let (dt2, unit) = if let Some(third) = it.next() {
+        (
+            parse_datetime_arg(second, ctx)?,
+            get_string_arg(third, ctx)?,
+        )
+    } else {
+        (Local::now().naive_local(), get_string_arg(second, ctx)?)
     };
 
     let duration = dt2 - dt1;
