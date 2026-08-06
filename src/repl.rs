@@ -505,7 +505,9 @@ pub fn run_repl(env: &mut Environment) {
         }
 
         // slash command:
-        if let Some(rest) = full_input.strip_prefix('/') {
+        if let Some(rest) = full_input.strip_prefix('/')
+            && !rest.contains('/')
+        {
             if rest.is_empty() {
                 // menu
                 match &slash_menu {
