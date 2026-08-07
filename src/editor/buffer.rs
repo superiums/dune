@@ -110,7 +110,7 @@ impl LineBuffer {
             let mut found_non_space = false;
             let mut pos = 0;
             for i in (0..self.cursor).rev() {
-                if self.chars[i] == ' ' {
+                if matches!(self.chars[i], ' ' | '/' | '.' | '(' | ',' | ';' | '>') {
                     if found_non_space {
                         pos = i + 1;
                         break;
