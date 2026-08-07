@@ -131,7 +131,8 @@ pub fn select(
         mut s if s.len() == 1 => match s.next().unwrap() {
             Expression::List(list) => list.as_ref().iter().map(|x| x.to_string()).collect(),
             Expression::BSet(list) => list.as_ref().iter().map(|x| x.to_string()).collect(),
-            _ => s.map(|x| x.to_string()).collect(),
+            Expression::String(s) | Expression::Symbol(s) => vec![s],
+            other => vec![other.to_string()],
         },
         s => s.map(|x| x.to_string()).collect(),
     };
