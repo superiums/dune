@@ -1,12 +1,12 @@
 [package]
 name = "lumesh"
-version = "0.17.6"
+version = "0.17.7"
 authors = ["Santo; Superiums; Adam McDaniel"]
 edition = "2024"
 license = "MIT"
 description = "a lighting shell ⚡ bash alternative"
 readme = "README.md"
-documentation = "https://docs.rs/lumesh"
+documentation = "https://www.lumesh.cc.cd/doc"
 homepage = "https://www.lumesh.cc.cd"
 repository = "https://codeberg.org/santo/lumesh"
 

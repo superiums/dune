@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.17.7]
+- optimize `ctrl+w`
+delete terminated while seeing : `' ' | '/' | '.' | '(' | ',' | ';' | '>'`
+- fix `table.select` with only one column name
+- fix `-` to stauring sub while pad, etc.
+
 ## [0.17.6]
 - allow `time.diff` without dt2
 - fix pipe data write lock
