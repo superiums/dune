@@ -1,3 +1,4 @@
+use crate::expression::LumeRegex;
 use crate::libs::BuiltinInfo;
 use crate::libs::helper::check_exact_args_len;
 use crate::libs::lazy_module::LazyModule;
@@ -7,6 +8,8 @@ use std::collections::BTreeMap;
 
 pub fn regist_lazy() -> LazyModule {
     reg_lazy!({
+        // build
+        from,
         // 匹配定位
         find, find_all,
         // 匹配验证
@@ -20,6 +23,9 @@ pub fn regist_lazy() -> LazyModule {
 
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
     reg_info!({
+        // build
+        from => "build regex from tring pattern", "<pattern_string>"
+
         // 匹配定位
         find => "first match, returns {start,end,found}", "<pattern> <text>"
         find_all => "all matches, list of {start,end,found}", "<pattern> <text>"
@@ -69,6 +75,29 @@ fn get_r_args<'a>(
         )),
     }
 }
+
+// build
+fn from(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("from", &args, 1, ctx)?;
+    match &args[0] {
+        Expression::String(s) | Expression::Symbol(s) => {
+            let regex = Regex::new(s).map_err(|e| {
+                RuntimeError::common(format!("invalid regex pattern: {e}").into(), ctx.clone(), 0)
+            })?;
+            Ok(Expression::Regex(LumeRegex { regex }))
+        }
+        _ => Err(RuntimeError::common(
+            "regex::from requires a string pattern as argument".into(),
+            ctx.clone(),
+            0,
+        )),
+    }
+}
+
 // 匹配验证函数
 fn is_match(
     args: Vec<Expression>,
