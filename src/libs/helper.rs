@@ -362,7 +362,7 @@ pub fn get_table_arg(expr: Expression, ctx: &Expression) -> Result<TableData, Ru
         Expression::Table(t) => Ok(t),
         e => Err(RuntimeError::new(
             RuntimeErrorKind::TypeError {
-                expected: "Table/List as 1st arg for sortby".into(),
+                expected: "Table/List as 1st arg".into(),
                 found: e.type_name(),
                 sym: e.to_string(),
             },
