@@ -871,7 +871,7 @@ fn last_path_tag(punct: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResult<'
 /// Returns true if byte `b` is a path-scanning delimiter.
 #[inline]
 fn is_path_delimiter(c: char) -> bool {
-    c.is_ascii_whitespace() || matches!(c, ';' | '`' | ')' | ']' | '}' | '|' | '>')
+    c.is_ascii_whitespace() || matches!(c, ';' | '`' | ')' | ']' | '}' | '|' | '>' | ',')
 }
 
 #[cfg(windows)]
