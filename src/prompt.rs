@@ -1,9 +1,8 @@
 use std::env;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
 
 use common_macros::hash_map;
 
@@ -12,14 +11,15 @@ use crate::{CFM_CONFIG, Environment, Expression, STRICT_ENABLED};
 // 提示符状态缓存
 #[derive(Clone)]
 struct PromptCache {
-    last_update: Instant,
+    dir: PathBuf,
     content: String,
-    ttl: Duration,
+    updated: bool,
 }
 
 #[derive(Clone)]
 struct PromptEngine {
     starship: bool,
+    lazy: u8,
     custom_template: Option<String>,
     template_func: Option<Expression>,
     template_continuation: Option<String>,
@@ -28,6 +28,7 @@ struct PromptEngine {
 pub trait PromptEngineCommon {
     fn get_prompt(&self, status: i32, duration: u128) -> String;
     fn get_prompt_continuation(&self) -> String;
+    fn set_dir_cache(&self, dir: PathBuf);
 }
 // struct MyPrompt {}
 
@@ -45,6 +46,14 @@ pub trait PromptEngineCommon {
 //     }
 // }
 impl PromptEngineCommon for PromptEngine {
+    fn set_dir_cache(&self, dir: PathBuf) {
+        if self.lazy > 0
+            && let Ok(mut cache) = self.cache.lock()
+        {
+            cache.dir = dir;
+            cache.updated = false;
+        }
+    }
     // 核心提示符生成方法
     fn get_prompt(&self, status: i32, duration: u128) -> String {
         // dbg!("getting prompt");
@@ -53,8 +62,9 @@ impl PromptEngineCommon for PromptEngine {
         match self.starship {
             false => {
                 // 1. 检查缓存有效性
-                if let Ok(cache) = self.cache.lock()
-                    && cache.last_update.elapsed() < cache.ttl
+                if self.lazy > 1
+                    && let Ok(cache) = self.cache.lock()
+                    && cache.updated
                 {
                     return cache.content.clone();
                 }
@@ -69,12 +79,11 @@ impl PromptEngineCommon for PromptEngine {
                 };
 
                 // 3. 更新缓存
-                if let Ok(mut cache) = self.cache.lock() {
-                    *cache = PromptCache {
-                        last_update: Instant::now(),
-                        content: prompt.clone(),
-                        ttl: cache.ttl,
-                    };
+                if self.lazy > 0
+                    && let Ok(mut cache) = self.cache.lock()
+                {
+                    cache.content = prompt.clone();
+                    cache.updated = true;
                 }
 
                 prompt
@@ -92,31 +101,19 @@ impl PromptEngineCommon for PromptEngine {
     }
 }
 impl PromptEngine {
-    // pub fn new() -> Self {
-    //     let starship_enabled = env::var("STARSHIP_SHELL")
-    //         .map(|s| !s.is_empty())
-    //         .unwrap_or(false);
-
-    //     Self {
-    //         starship_enabled,
-    //         custom_template: None,
-    //         cache: Arc::new(Mutex::new(PromptCache {
-    //             last_update: Instant::now(),
-    //             content: "> ".to_string(),
-    //             ttl: Duration::from_secs(2),
-    //         })),
-    //     }
-    // }
-
-    // 设置自定义模板 (支持 {cwd}, {git} 等占位符)
-    // pub fn set_template(&mut self, template: String) {
-    //     self.custom_template = Some(template);
-    // }
-    fn render_from_func(&self, func: &Expression, status: i32, duration: u128) -> String {
-        // dbg!(&func.type_name());
-        if let Ok(cwd) = env::current_dir()
-            && let Some(cwd_str) = cwd.to_str()
+    fn get_cwd(&self) -> Option<PathBuf> {
+        if self.lazy > 0
+            && let Ok(cache) = self.cache.lock()
         {
+            Some(cache.dir.clone())
+        } else {
+            env::current_dir().ok()
+        }
+    }
+    fn render_from_func(&self, func: &Expression, status: i32, duration: u128) -> String {
+        let cwd = self.get_cwd();
+
+        if let Some(cwd_pb) = cwd {
             let cfm = CFM_CONFIG.with_borrow(|cfm| cfm == &Some(true));
             let strict = STRICT_ENABLED.with_borrow(|s| s == &true);
             let jobs = crate::jobman::running_count();
@@ -128,7 +125,10 @@ impl PromptEngine {
                 String::from("jobs") => Expression::from(jobs as i64),
             });
             let r = func
-                .apply(vec![Expression::String(cwd_str.to_string()), ctx])
+                .apply(vec![
+                    Expression::String(cwd_pb.to_string_lossy().to_string()),
+                    ctx,
+                ])
                 .eval(&mut Environment::new());
             return match r {
                 Ok(s) => s.to_string(),
@@ -164,22 +164,22 @@ impl PromptEngine {
                 },
             );
 
-        if let Ok(cwd) = env::current_dir()
-            && let Some(cwd_str) = cwd.to_str()
-        {
+        let cwd = self.get_cwd();
+
+        if let Some(cwd_pb) = cwd {
             result = if result.contains("$CWD_SHORT") {
-                result.replace("$CWD_SHORT", &get_short_path(cwd.as_path()))
+                result.replace("$CWD_SHORT", &get_short_path(cwd_pb.as_path()))
             } else {
                 #[cfg(unix)]
-                if cwd_str.starts_with("/home/")
+                if cwd_pb.starts_with("/home/")
                     && let Some(home_dir) = dirs::home_dir()
                 {
-                    let cwd_new_str = cwd_str
-                        .to_owned()
+                    let cwd_new_str = cwd_pb
+                        .to_string_lossy()
                         .replace(home_dir.to_string_lossy().as_ref(), "~");
                     return result.replace("$CWD", &cwd_new_str);
                 }
-                result.replace("$CWD", cwd_str)
+                result.replace("$CWD", &cwd_pb.to_string_lossy())
             };
         }
         // 可以扩展更多占位符...
@@ -294,28 +294,28 @@ fn get_short_path(path: &Path) -> String {
 }
 
 pub fn get_prompt_engine(settings: Option<Expression>) -> Box<dyn PromptEngineCommon> {
-    let (starship, ttl, template, template_continuation) = match settings {
+    let (starship, lazy, template, template_continuation) = match settings {
         Some(Expression::Map(sets)) => {
-            let ttl = sets
-                .get("ttl")
-                .map(|t| match t {
-                    Expression::Integer(ttl) => *ttl as u64,
-                    _ => 2,
-                })
-                .unwrap_or(2);
-            let starship = sets
-                .get("starship")
-                .is_some_and(|st| st.to_string() == "true" || st.is_truthy());
+            let starship = sets.get("starship").is_some_and(|st| st.is_truthy());
+
+            let lazy = sets.get("lazy").map_or(0, |st| {
+                if let Expression::Integer(x) = st {
+                    *x as u8
+                } else {
+                    0
+                }
+            });
             let template = sets.get("prompt_template").cloned();
             let template_continuation = sets.get("prompt_continuation").map(|tc| tc.to_string());
-            (starship, ttl, template, template_continuation)
+            (starship, lazy, template, template_continuation)
         }
 
-        _ => (false, 2, None, None),
+        _ => (false, 0, None, None),
     };
 
     Box::new(PromptEngine {
         starship,
+        lazy,
         template_continuation,
         template_func: template.clone().and_then(|f| match f {
             Expression::Lambda(..) => Some(f),
@@ -327,11 +327,9 @@ pub fn get_prompt_engine(settings: Option<Expression>) -> Box<dyn PromptEngineCo
             _ => None,
         }),
         cache: Arc::new(Mutex::new(PromptCache {
+            dir: env::current_dir().unwrap_or_default(),
             content: "> ".to_string(),
-            ttl: Duration::from_secs(ttl),
-            last_update: Instant::now()
-                .checked_sub(Duration::from_secs(ttl))
-                .unwrap(),
+            updated: false,
         })),
     })
 }

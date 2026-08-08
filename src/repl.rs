@@ -10,7 +10,7 @@ use crate::editor::{
 use crate::expression::alias::get_alias_completion;
 use crate::libs::{LIBS_INFO, is_lib};
 use crate::syntax::{get_ayu_dark_theme, get_dark_theme, get_light_theme, get_merged_theme};
-use crate::utils::get_current_path_string;
+use crate::utils::{get_current_path, get_current_path_string};
 use crate::{CFM_CONFIG, Expression, STRICT_ENABLED, childman};
 use crate::{Environment, check, highlight, parse_and_eval, prompt::get_prompt_engine};
 use std::collections::HashMap;
@@ -531,8 +531,13 @@ pub fn run_repl(env: &mut Environment) {
                     if parse_and_eval(&cd_cmd, &mut shared_env.lock().unwrap()) {
                         editor.history_mut().add(cd_cmd);
                         // update current dir in history
-                        let cwd = get_current_path_string(&mut shared_env.lock().unwrap());
-                        editor.history_mut().set_current_dir(cwd);
+
+                        let cwd = get_current_path(&mut shared_env.lock().unwrap());
+                        editor
+                            .history_mut()
+                            .set_current_dir(cwd.to_string_lossy().to_string());
+
+                        pe.set_dir_cache(cwd);
                     }
                 }
             } else if rest == "q" {
@@ -551,10 +556,13 @@ pub fn run_repl(env: &mut Environment) {
                             .into_iter()
                             .map(Expression::from)
                             .collect::<Vec<_>>();
-                        let mut forked_env = shared_env.lock().unwrap().fork();
-                        forked_env.define("HISTORY", Expression::from(history));
-                        let cmd = format!("$HISTORY | ui.pick('select history') | eval_str()");
-                        parse_and_eval(&cmd, &mut forked_env);
+                        if !history.is_empty() {
+                            let mut forked_env = shared_env.lock().unwrap().fork();
+                            forked_env.define("HISTORY", Expression::from(history));
+                            let cmd =
+                                format!("$HISTORY | ui.pick('select history') ?! | eval_str()");
+                            parse_and_eval(&cmd, &mut forked_env);
+                        }
                     }
                     "hh" => {
                         let history_here = editor
@@ -563,10 +571,13 @@ pub fn run_repl(env: &mut Environment) {
                             .into_iter()
                             .map(Expression::from)
                             .collect::<Vec<_>>();
-                        let mut forked_env = shared_env.lock().unwrap().fork();
-                        forked_env.define("HISTORY", Expression::from(history_here));
-                        let cmd = format!("$HISTORY | ui.pick('select history') | eval_str()");
-                        parse_and_eval(&cmd, &mut forked_env);
+                        if !history_here.is_empty() {
+                            let mut forked_env = shared_env.lock().unwrap().fork();
+                            forked_env.define("HISTORY", Expression::from(history_here));
+                            let cmd =
+                                format!("$HISTORY | ui.pick('select history') ?! | eval_str()");
+                            parse_and_eval(&cmd, &mut forked_env);
+                        }
                     }
                     "hm" => {
                         let history_multi_dir = editor
@@ -575,10 +586,13 @@ pub fn run_repl(env: &mut Environment) {
                             .into_iter()
                             .map(Expression::from)
                             .collect::<Vec<_>>();
-                        let mut forked_env = shared_env.lock().unwrap().fork();
-                        forked_env.define("HISTORY", Expression::from(history_multi_dir));
-                        let cmd = format!("$HISTORY | ui.pick('select history') | eval_str()");
-                        parse_and_eval(&cmd, &mut forked_env);
+                        if !history_multi_dir.is_empty() {
+                            let mut forked_env = shared_env.lock().unwrap().fork();
+                            forked_env.define("HISTORY", Expression::from(history_multi_dir));
+                            let cmd =
+                                format!("$HISTORY | ui.pick('select history') ?! | eval_str()");
+                            parse_and_eval(&cmd, &mut forked_env);
+                        }
                     }
                     "history" => {
                         if arg.is_empty() {
@@ -622,8 +636,12 @@ pub fn run_repl(env: &mut Environment) {
                 editor.history_mut().add(full_input);
                 // update current dir in history
                 if changing {
-                    let cwd = get_current_path_string(&mut shared_env.lock().unwrap());
-                    editor.history_mut().set_current_dir(cwd);
+                    let cwd = get_current_path(&mut shared_env.lock().unwrap());
+                    editor
+                        .history_mut()
+                        .set_current_dir(cwd.to_string_lossy().to_string());
+
+                    pe.set_dir_cache(cwd);
                 }
             } else {
                 status = 1;
