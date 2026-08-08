@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.17.8]
+- optimize status code
+- rename prompt_template/continuation, remove prefix
+- add `lazy` for prompt
+- fix tokenizer for boolean value followed by `,`
+- support regex `flag` for `regex.from`
+- add regex.from
+- fix a err tip
+
 ## [0.17.7]
 - optimize `ctrl+w`
 delete terminated while seeing : `' ' | '/' | '.' | '(' | ',' | ';' | '>'`
