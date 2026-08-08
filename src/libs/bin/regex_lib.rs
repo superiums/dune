@@ -1,6 +1,6 @@
 use crate::expression::LumeRegex;
 use crate::libs::BuiltinInfo;
-use crate::libs::helper::check_exact_args_len;
+use crate::libs::helper::{check_args_len, check_exact_args_len, get_string_ref};
 use crate::libs::lazy_module::LazyModule;
 use crate::{Environment, Expression, RuntimeError, reg_info, reg_lazy};
 use regex_lite::Regex;
@@ -24,7 +24,7 @@ pub fn regist_lazy() -> LazyModule {
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
     reg_info!({
         // build
-        from => "build regex from tring pattern", "<pattern_string>"
+        from => "build regex from string pattern", "<pattern_string> [i|m|s|x|R|U]"
 
         // 匹配定位
         find => "first match, returns {start,end,found}", "<pattern> <text>"
@@ -82,22 +82,40 @@ fn from(
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("from", &args, 1, ctx)?;
-    match &args[0] {
-        Expression::String(s) | Expression::Symbol(s) => {
-            let regex = Regex::new(s).map_err(|e| {
-                RuntimeError::common(format!("invalid regex pattern: {e}").into(), ctx.clone(), 0)
-            })?;
-            Ok(Expression::Regex(LumeRegex { regex }))
-        }
-        _ => Err(RuntimeError::common(
-            "regex::from requires a string pattern as argument".into(),
-            ctx.clone(),
-            0,
-        )),
-    }
-}
+    check_args_len("from", &args, 1..=2, ctx)?; // pattern [, flags]
 
+    let pattern = get_string_ref(&args[0], ctx)?;
+
+    let mut builder = regex_lite::RegexBuilder::new(pattern);
+
+    if args.len() > 1 {
+        let flags = get_string_ref(&args[1], ctx)?;
+
+        for c in flags.chars() {
+            match c {
+                'i' => builder.case_insensitive(true),
+                'm' => builder.multi_line(true),
+                's' => builder.dot_matches_new_line(true),
+                'x' => builder.ignore_whitespace(true),
+                'R' => builder.crlf(true),
+                'U' => builder.swap_greed(true),
+                other => {
+                    return Err(RuntimeError::common(
+                        format!("unknown regex flag: '{other}'").into(),
+                        ctx.clone(),
+                        0,
+                    ));
+                }
+            };
+        }
+    }
+
+    let regex = builder.build().map_err(|e| {
+        RuntimeError::common(format!("invalid regex pattern: {e}").into(), ctx.clone(), 0)
+    })?;
+
+    Ok(Expression::Regex(LumeRegex { regex }))
+}
 // 匹配验证函数
 fn is_match(
     args: Vec<Expression>,
