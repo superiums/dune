@@ -2,15 +2,15 @@ use crate::{
     Environment, Expression, Int, RuntimeError,
     libs::{
         BuiltinInfo,
-        helper::{
-            check_args_len, check_exact_args_len, get_integer_ref, get_string_arg, get_string_ref,
-        },
+        helper::{check_args_len, check_exact_args_len, get_string_arg, get_string_ref},
         lazy_module::LazyModule,
     },
     reg_info, reg_lazy,
     utils::expand_home,
 };
 
+#[cfg(unix)]
+use crate::libs::helper::get_integer_ref;
 use crate::utils::{self, get_current_path, join_current_path};
 use std::ffi::OsStr;
 use std::io::Write;

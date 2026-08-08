@@ -169,6 +169,7 @@ pub fn exec_in_pty(
         })
         .map_err(|e| RuntimeErrorKind::CustomError(e.to_string().into()))?;
 
+    #[cfg(unix)]
     let pair_master_fd = pair.master.as_raw_fd();
 
     // Unix 特定的终端设置
