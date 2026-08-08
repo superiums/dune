@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, collections::BTreeMap};
 
 // ============== 运行时错误部分 ==============
 use crate::{Expression, Int, LmError};
@@ -179,51 +179,51 @@ impl std::error::Error for RuntimeError {
 }
 
 impl RuntimeError {
-    pub const ERROR_CODE_CANNOT_APPLY: Int = 1;
-    pub const ERROR_CODE_SYMBOL_NOT_DEFINED: Int = 2;
-    pub const ERROR_CODE_COMMAND_FAILED: Int = 3;
-    pub const ERROR_CODE_FOR_NON_LIST: Int = 5;
-    pub const ERROR_CODE_RECURSION_DEPTH: Int = 6;
-    pub const ERROR_CODE_PERMISSION_DENIED: Int = 7;
-    pub const ERROR_CODE_PROGRAM_NOT_FOUND: Int = 8;
-    pub const ERROR_CODE_CUSTOM_ERROR: Int = 9;
-    pub const ERROR_CODE_REDECLARATION: Int = 10; // Added for Redeclaration
-    pub const ERROR_CODE_UNDECLARED_VARIABLE: Int = 11; // Added for UndeclaredVariable
-    pub const ERROR_CODE_NO_MATCHING_BRANCH: Int = 12; // Added for NoMatchingBranch
-    pub const ERROR_CODE_TOO_MANY_ARGUMENTS: Int = 13; // Added for TooManyArguments
-    pub const ERROR_CODE_ARGUMENT_MISMATCH: Int = 14; // Added for ArgumentMismatch
-    pub const ERROR_CODE_INVALID_DEFAULT_VALUE: Int = 15; // Added for InvalidDefaultValue
-    pub const ERROR_CODE_INVALID_OPERATOR: Int = 16; // Added for InvalidOperator
-    pub const ERROR_CODE_INDEX_OUT_OF_BOUNDS: Int = 17; // Added for IndexOutOfBounds
-    pub const ERROR_CODE_KEY_NOT_FOUND: Int = 18; // Added for KeyNotFound
-    pub const ERROR_CODE_TYPE_ERROR: Int = 19; // Added for TypeError
-    pub const ERROR_CODE_EARLY_RETURN: Int = 20; // Added for EarlyReturn
+    pub const ERROR_CODE_CANNOT_APPLY: u8 = 101;
+    pub const ERROR_CODE_SYMBOL_NOT_DEFINED: u8 = 102;
+    pub const ERROR_CODE_COMMAND_FAILED: u8 = 103;
+    pub const ERROR_CODE_FOR_NON_LIST: u8 = 105;
+    pub const ERROR_CODE_RECURSION_DEPTH: u8 = 106;
+    pub const ERROR_CODE_PERMISSION_DENIED: u8 = 107;
+    pub const ERROR_CODE_PROGRAM_NOT_FOUND: u8 = 108;
+    pub const ERROR_CODE_CUSTOM_ERROR: u8 = 109;
+    pub const ERROR_CODE_REDECLARATION: u8 = 110;
+    pub const ERROR_CODE_UNDECLARED_VARIABLE: u8 = 111;
+    pub const ERROR_CODE_NO_MATCHING_BRANCH: u8 = 112;
+    pub const ERROR_CODE_TOO_MANY_ARGUMENTS: u8 = 113;
+    pub const ERROR_CODE_ARGUMENT_MISMATCH: u8 = 114;
+    pub const ERROR_CODE_INVALID_DEFAULT_VALUE: u8 = 115;
+    pub const ERROR_CODE_INVALID_OPERATOR: u8 = 116;
+    pub const ERROR_CODE_INDEX_OUT_OF_BOUNDS: u8 = 117;
+    pub const ERROR_CODE_KEY_NOT_FOUND: u8 = 118;
+    pub const ERROR_CODE_TYPE_ERROR: u8 = 119;
+    pub const ERROR_CODE_EARLY_RETURN: u8 = 120;
 
-    pub fn codes() -> Expression {
-        Expression::from(b_tree_map! {
-            String::from("cannot_apply") => Expression::Integer(Self::ERROR_CODE_CANNOT_APPLY),
-            String::from("symbol_not_defined") => Expression::Integer(Self::ERROR_CODE_SYMBOL_NOT_DEFINED),
-            String::from("command_failed") => Expression::Integer(Self::ERROR_CODE_COMMAND_FAILED),
-            String::from("for_non_list") => Expression::Integer(Self::ERROR_CODE_FOR_NON_LIST),
-            String::from("recursion_depth") => Expression::Integer(Self::ERROR_CODE_RECURSION_DEPTH),
-            String::from("permission_denied") => Expression::Integer(Self::ERROR_CODE_PERMISSION_DENIED),
-            String::from("program_not_found") => Expression::Integer(Self::ERROR_CODE_PROGRAM_NOT_FOUND),
-            String::from("custom_error") => Expression::Integer(Self::ERROR_CODE_CUSTOM_ERROR),
-            String::from("redeclaration") => Expression::Integer(Self::ERROR_CODE_REDECLARATION),
-            String::from("undeclared_variable") => Expression::Integer(Self::ERROR_CODE_UNDECLARED_VARIABLE),
-            String::from("no_matching_branch") => Expression::Integer(Self::ERROR_CODE_NO_MATCHING_BRANCH),
-            String::from("too_many_arguments") => Expression::Integer(Self::ERROR_CODE_TOO_MANY_ARGUMENTS),
-            String::from("argument_mismatch") => Expression::Integer(Self::ERROR_CODE_ARGUMENT_MISMATCH),
-            String::from("invalid_default_value") => Expression::Integer(Self::ERROR_CODE_INVALID_DEFAULT_VALUE),
-            String::from("invalid_operator") => Expression::Integer(Self::ERROR_CODE_INVALID_OPERATOR),
-            String::from("index_out_of_bounds") => Expression::Integer(Self::ERROR_CODE_INDEX_OUT_OF_BOUNDS),
-            String::from("key_not_found") => Expression::Integer(Self::ERROR_CODE_KEY_NOT_FOUND),
-            String::from("type_error") => Expression::Integer(Self::ERROR_CODE_TYPE_ERROR),
-            String::from("early_return") => Expression::Integer(Self::ERROR_CODE_EARLY_RETURN),
-        })
+    pub fn codes() -> BTreeMap<String, Expression> {
+        b_tree_map! {
+            String::from("cannot_apply") => Expression::from(Self::ERROR_CODE_CANNOT_APPLY),
+            String::from("symbol_not_defined") => Expression::from(Self::ERROR_CODE_SYMBOL_NOT_DEFINED),
+            String::from("command_failed") => Expression::from(Self::ERROR_CODE_COMMAND_FAILED),
+            String::from("for_non_list") => Expression::from(Self::ERROR_CODE_FOR_NON_LIST),
+            String::from("recursion_depth") => Expression::from(Self::ERROR_CODE_RECURSION_DEPTH),
+            String::from("permission_denied") => Expression::from(Self::ERROR_CODE_PERMISSION_DENIED),
+            String::from("program_not_found") => Expression::from(Self::ERROR_CODE_PROGRAM_NOT_FOUND),
+            String::from("custom_error") => Expression::from(Self::ERROR_CODE_CUSTOM_ERROR),
+            String::from("redeclaration") => Expression::from(Self::ERROR_CODE_REDECLARATION),
+            String::from("undeclared_variable") => Expression::from(Self::ERROR_CODE_UNDECLARED_VARIABLE),
+            String::from("no_matching_branch") => Expression::from(Self::ERROR_CODE_NO_MATCHING_BRANCH),
+            String::from("too_many_arguments") => Expression::from(Self::ERROR_CODE_TOO_MANY_ARGUMENTS),
+            String::from("argument_mismatch") => Expression::from(Self::ERROR_CODE_ARGUMENT_MISMATCH),
+            String::from("invalid_default_value") => Expression::from(Self::ERROR_CODE_INVALID_DEFAULT_VALUE),
+            String::from("invalid_operator") => Expression::from(Self::ERROR_CODE_INVALID_OPERATOR),
+            String::from("index_out_of_bounds") => Expression::from(Self::ERROR_CODE_INDEX_OUT_OF_BOUNDS),
+            String::from("key_not_found") => Expression::from(Self::ERROR_CODE_KEY_NOT_FOUND),
+            String::from("type_error") => Expression::from(Self::ERROR_CODE_TYPE_ERROR),
+            String::from("early_return") => Expression::from(Self::ERROR_CODE_EARLY_RETURN),
+        }
     }
 
-    pub fn code(&self) -> Int {
+    pub fn code(&self) -> u8 {
         match self.kind {
             RuntimeErrorKind::CannotApply(..) => Self::ERROR_CODE_CANNOT_APPLY,
             RuntimeErrorKind::SymbolNotDefined(..) => Self::ERROR_CODE_SYMBOL_NOT_DEFINED,

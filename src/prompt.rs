@@ -26,7 +26,7 @@ struct PromptEngine {
     cache: Arc<Mutex<PromptCache>>,
 }
 pub trait PromptEngineCommon {
-    fn get_prompt(&self, status: i32, duration: u128) -> String;
+    fn get_prompt(&self, status: u8, duration: u128) -> String;
     fn get_prompt_continuation(&self) -> String;
     fn set_dir_cache(&self, dir: PathBuf);
 }
@@ -55,7 +55,7 @@ impl PromptEngineCommon for PromptEngine {
         }
     }
     // 核心提示符生成方法
-    fn get_prompt(&self, status: i32, duration: u128) -> String {
+    fn get_prompt(&self, status: u8, duration: u128) -> String {
         // dbg!("getting prompt");
 
         // 2. 生成新提示符
@@ -110,7 +110,7 @@ impl PromptEngine {
             env::current_dir().ok()
         }
     }
-    fn render_from_func(&self, func: &Expression, status: i32, duration: u128) -> String {
+    fn render_from_func(&self, func: &Expression, status: u8, duration: u128) -> String {
         let cwd = self.get_cwd();
 
         if let Some(cwd_pb) = cwd {
@@ -137,7 +137,7 @@ impl PromptEngine {
         }
         self.default_prompt()
     }
-    fn render_template(&self, template: &str, status: i32, duration: u128) -> String {
+    fn render_template(&self, template: &str, status: u8, duration: u128) -> String {
         // 实现简单的占位符替换
         let jobs = crate::jobman::running_count();
 
@@ -186,7 +186,7 @@ impl PromptEngine {
         result
     }
 
-    fn get_starship_prompt(&self, status: i32, duration: u128) -> Option<String> {
+    fn get_starship_prompt(&self, status: u8, duration: u128) -> Option<String> {
         let (width, _) = crossterm::terminal::size().unwrap_or((80, 157));
         let dir = env::current_dir().ok()?;
         let jobs = crate::jobman::running_count();

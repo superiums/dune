@@ -463,7 +463,7 @@ pub fn run_repl(env: &mut Environment) {
     env.undefine("LUME_SLASH_BINDINGS");
     env.undefine("LUME_SLASH_MENU");
     // =======main loop=======
-    let mut status = 0;
+    let mut status: u8 = 0;
     let mut duration = 0;
     loop {
         let prompt = pe.get_prompt(status, duration);
@@ -528,7 +528,7 @@ pub fn run_repl(env: &mut Environment) {
             } else if let Some(query) = rest.strip_prefix(' ') {
                 // quick jump
                 if let Some(cd_cmd) = editor.history().search_fuzzy_one_cd(query) {
-                    if parse_and_eval(&cd_cmd, &mut shared_env.lock().unwrap()) {
+                    if parse_and_eval(&cd_cmd, &mut shared_env.lock().unwrap()) == 0 {
                         editor.history_mut().add(cd_cmd);
                         // update current dir in history
 
@@ -627,11 +627,10 @@ pub fn run_repl(env: &mut Environment) {
         } else {
             // normal
             let start = std::time::Instant::now();
-            let result = parse_and_eval(&full_input, &mut shared_env.lock().unwrap());
+            status = parse_and_eval(&full_input, &mut shared_env.lock().unwrap());
             duration = start.elapsed().as_millis();
 
-            if result {
-                status = 0;
+            if status == 0 {
                 let changing = full_input.starts_with("cd ");
                 editor.history_mut().add(full_input);
                 // update current dir in history
@@ -643,8 +642,6 @@ pub fn run_repl(env: &mut Environment) {
 
                     pe.set_dir_cache(cwd);
                 }
-            } else {
-                status = 1;
             }
         }
 

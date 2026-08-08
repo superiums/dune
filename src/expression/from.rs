@@ -6,6 +6,12 @@ use std::{
     rc::Rc,
 };
 
+impl From<u8> for Expression {
+    fn from(x: u8) -> Self {
+        Self::Integer(x as Int)
+    }
+}
+
 impl From<Int> for Expression {
     fn from(x: Int) -> Self {
         Self::Integer(x)
@@ -30,11 +36,11 @@ impl From<String> for Expression {
     }
 }
 
-impl From<Vec<u8>> for Expression {
-    fn from(x: Vec<u8>) -> Self {
-        Self::Bytes(x)
-    }
-}
+// impl From<Vec<u8>> for Expression {
+//     fn from(x: Vec<u8>) -> Self {
+//         Self::Bytes(x)
+//     }
+// }
 
 impl From<bool> for Expression {
     fn from(x: bool) -> Self {

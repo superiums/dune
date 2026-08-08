@@ -4,8 +4,8 @@ use crate::libs::BuiltinInfo;
 use crate::libs::helper::{check_exact_args_len, get_integer_ref};
 use crate::{
     CFM_CONFIG, Environment, Expression, Int, LmError, MAX_RUNTIME_RECURSION, MAX_SYNTAX_RECURSION,
-    MAX_USEMODE_RECURSION, PRINT_DIRECT, RuntimeError, STRICT_ENABLED, set_cfm_enabled,
-    set_print_direct, set_strict_enabled,
+    MAX_USEMODE_RECURSION, PRINT_DIRECT, RuntimeError, STRICT_ENABLED, SyntaxError,
+    set_cfm_enabled, set_print_direct, set_strict_enabled,
 };
 use std::collections::BTreeMap;
 
@@ -15,7 +15,7 @@ use crate::{reg_info, reg_lazy};
 pub fn regist_lazy() -> LazyModule {
     reg_lazy!({
         dirs, env, vars, has, defined,
-        ecodes_rt, ecodes_lm,
+        error_codes,
 
         info,modes,
         // throw,
@@ -36,8 +36,7 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         has => "defined in current scope?", "<var>"
         defined => "defined in scope chain?", "<var>"
 
-        ecodes_rt => "list runtime error codes", ""
-        ecodes_lm => "list Lmerror codes", ""
+        error_codes => "list lume error codes", ""
 
         info => "os info", ""
         modes => "current mode flags {cfm,strict,pdm}", ""
@@ -153,19 +152,15 @@ fn defined(
     Ok(Expression::Boolean(env.is_defined(&name)))
 }
 
-fn ecodes_rt(
+fn error_codes(
     _args: Vec<Expression>,
     _env: &mut Environment,
     _: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    Ok(RuntimeError::codes())
-}
-fn ecodes_lm(
-    _args: Vec<Expression>,
-    _env: &mut Environment,
-    _: &Expression,
-) -> Result<Expression, RuntimeError> {
-    Ok(LmError::codes())
+    let mut ecodes = SyntaxError::codes();
+    ecodes.extend(RuntimeError::codes());
+    ecodes.extend(LmError::codes());
+    Ok(Expression::from(ecodes))
 }
 
 fn max_syntax(

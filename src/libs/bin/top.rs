@@ -762,7 +762,7 @@ fn eval_str(
         Ok(Expression::None)
     } else {
         println!("\n  >> Excuting: \x1b[38;5;208m\x1b[1m{exp}\x1b[m\x1b[0m");
-        Ok(Expression::Boolean(parse_and_eval(exp, env)))
+        Ok(Expression::from(parse_and_eval(exp, env)))
     }
 }
 fn exec_str(

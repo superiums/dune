@@ -1,9 +1,10 @@
-use crate::{Diagnostic, tokens::Tokens};
+use crate::{Diagnostic, Expression, tokens::Tokens};
 
+use common_macros::b_tree_map;
 use core::fmt;
 use detached_str::{Str, StrSlice};
 use nom::error::{ErrorKind, ParseError};
-use std::error::Error as StdError;
+use std::{collections::BTreeMap, error::Error as StdError};
 
 // ============== 语法错误部分 ==============
 
@@ -74,7 +75,59 @@ impl StdError for SyntaxError {
 }
 
 impl SyntaxError {
-    #[inline]
+    pub const ERROR_CODE_EXPECTED: u8 = 1;
+    pub const ERROR_CODE_TOKENIZATION_ERRORS: u8 = 2;
+    pub const ERROR_CODE_EXPECTED_CHAR: u8 = 3;
+    pub const ERROR_CODE_NOM_ERROR: u8 = 4;
+    pub const ERROR_CODE_INTERNAL_ERROR: u8 = 5;
+    pub const ERROR_CODE_INVALID_CMD_SYMBOL: u8 = 6;
+    pub const ERROR_CODE_CUSTOM_ERROR: u8 = 7;
+    pub const ERROR_CODE_UNKNOWN_OPERATOR: u8 = 8;
+    pub const ERROR_CODE_UNEXPECTED_TOKEN: u8 = 9;
+    pub const ERROR_CODE_INVALID_ESCAPE_SEQUENCE: u8 = 10;
+    pub const ERROR_CODE_PRECEDENCE_TOO_LOW: u8 = 11;
+    pub const ERROR_CODE_NO_EXPRESSION: u8 = 12;
+    pub const ERROR_CODE_ARGUMENT_MISMATCH: u8 = 13;
+    pub const ERROR_CODE_RECURSION_DEPTH: u8 = 14;
+
+    pub fn codes() -> BTreeMap<String, Expression> {
+        b_tree_map! {
+            String::from("expected") => Expression::from(Self::ERROR_CODE_EXPECTED),
+            String::from("tokenization_errors") => Expression::from(Self::ERROR_CODE_TOKENIZATION_ERRORS),
+            String::from("expected_char") => Expression::from(Self::ERROR_CODE_EXPECTED_CHAR),
+            String::from("nom_error") => Expression::from(Self::ERROR_CODE_NOM_ERROR),
+            String::from("internal_error") => Expression::from(Self::ERROR_CODE_INTERNAL_ERROR),
+            String::from("invalid_cmd_symbol") => Expression::from(Self::ERROR_CODE_INVALID_CMD_SYMBOL),
+            String::from("custom_error") => Expression::from(Self::ERROR_CODE_CUSTOM_ERROR),
+            String::from("unknown_operator") => Expression::from(Self::ERROR_CODE_UNKNOWN_OPERATOR),
+            String::from("unexpected_token") => Expression::from(Self::ERROR_CODE_UNEXPECTED_TOKEN),
+            String::from("invalid_escape_sequence") => Expression::from(Self::ERROR_CODE_INVALID_ESCAPE_SEQUENCE),
+            String::from("precedence_too_low") => Expression::from(Self::ERROR_CODE_PRECEDENCE_TOO_LOW),
+            String::from("no_expression") => Expression::from(Self::ERROR_CODE_NO_EXPRESSION),
+            String::from("argument_mismatch") => Expression::from(Self::ERROR_CODE_ARGUMENT_MISMATCH),
+            String::from("recursion_depth") => Expression::from(Self::ERROR_CODE_RECURSION_DEPTH),
+        }
+    }
+
+    pub fn code(&self) -> u8 {
+        match self.kind {
+            SyntaxErrorKind::Expected { .. } => Self::ERROR_CODE_EXPECTED,
+            SyntaxErrorKind::TokenizationErrors(..) => Self::ERROR_CODE_TOKENIZATION_ERRORS,
+            SyntaxErrorKind::ExpectedChar { .. } => Self::ERROR_CODE_EXPECTED_CHAR,
+            SyntaxErrorKind::NomError { .. } => Self::ERROR_CODE_NOM_ERROR,
+            SyntaxErrorKind::InternalError(..) => Self::ERROR_CODE_INTERNAL_ERROR,
+            SyntaxErrorKind::InvalidCmdSymbol(..) => Self::ERROR_CODE_INVALID_CMD_SYMBOL,
+            SyntaxErrorKind::CustomError(..) => Self::ERROR_CODE_CUSTOM_ERROR,
+            SyntaxErrorKind::UnknownOperator(..) => Self::ERROR_CODE_UNKNOWN_OPERATOR,
+            SyntaxErrorKind::UnExpectedToken(..) => Self::ERROR_CODE_UNEXPECTED_TOKEN,
+            SyntaxErrorKind::InvalidEscapeSequence(..) => Self::ERROR_CODE_INVALID_ESCAPE_SEQUENCE,
+            SyntaxErrorKind::PrecedenceTooLow(..) => Self::ERROR_CODE_PRECEDENCE_TOO_LOW,
+            SyntaxErrorKind::NoExpression => Self::ERROR_CODE_NO_EXPRESSION,
+            SyntaxErrorKind::ArgumentMismatch { .. } => Self::ERROR_CODE_ARGUMENT_MISMATCH,
+            SyntaxErrorKind::RecursionDepth { .. } => Self::ERROR_CODE_RECURSION_DEPTH,
+        }
+    }
+
     pub fn new(source: Str, kind: SyntaxErrorKind) -> Self {
         Self { source, kind }
     }

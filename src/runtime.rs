@@ -18,14 +18,13 @@ pub fn run_file(pb: PathBuf, env: &mut Environment) -> bool {
                 "SCRIPT",
                 Expression::String(pb.to_string_lossy().to_string()),
             );
-            parse_and_eval(&prelude, env)
+            parse_and_eval(&prelude, env) == 0
         }
         Err(e) => {
             eprintln!(
                 "\x1b[31m[IO ERROR]\x1b[0mFailed to read file '{}':\n  {e}",
                 pb.display()
             );
-            let _ = io::stderr().flush();
             false
         }
     }
@@ -132,9 +131,9 @@ pub fn knock_validate(env: &mut Environment) {
     }
 }
 /// return whether parse success. no matter execute result is.
-pub fn parse_and_eval(text: &str, env: &mut Environment) -> bool {
+pub fn parse_and_eval(text: &str, env: &mut Environment) -> u8 {
     if text.is_empty() {
-        return true;
+        return 0;
     };
 
     let parsed = parse_with_mode(text);
@@ -177,25 +176,24 @@ pub fn parse_and_eval(text: &str, env: &mut Environment) -> bool {
                             Expression::Lambda(..) => {}
                             r => println!("\n  >> [{}] <<\n{}", r.type_name(), r),
                         };
-                        let _ = io::stdout().flush();
                     }
                 }
                 Err(e) => {
                     let _ = io::stdout().flush();
                     eprintln!("\x1b[31m_____________\x1b[0m\n{e}");
-                    let _ = io::stderr().flush();
+                    return e.code();
                 }
             }
 
-            return true;
+            return 0;
         }
 
         Err(e) => {
+            let _ = io::stdout().flush();
             eprintln!("\x1b[31m[PARSE ERROR]\x1b[0m\n{e}");
-            let _ = io::stderr().flush();
+            return e.code();
         }
     }
-    false
 }
 
 pub fn init_config(env: &mut Environment) {
@@ -242,7 +240,7 @@ pub fn init_config(env: &mut Environment) {
             );
         }
 
-        if !parse_and_eval(INTRO_PRELUDE, env) {
+        if parse_and_eval(INTRO_PRELUDE, env) > 0 {
             eprintln!("Sorry, the config seems has some issue");
         }
     } else if !run_file(profile, env) {

@@ -22,7 +22,7 @@ pub fn catch_error(
 
                     deel.as_ref()
                         .apply(vec![Expression::from(b_tree_map! {
-                            String::from("code") => Expression::Integer(e.code()),
+                            String::from("code") => Expression::from(e.code()),
                             String::from("msg") => Expression::String(e.kind.to_string()),
                             String::from("expr") => Expression::String(e.context.to_string()),
                             String::from("ast") => Expression::String(format!("{:?}",e.context)),
@@ -48,7 +48,7 @@ pub fn catch_error(
             Ok(Expression::None)
         }
         CatchType::PrintOver => Ok(Expression::from(b_tree_map! {
-            String::from("code") => Expression::Integer(e.code()),
+            String::from("code") => Expression::from(e.code()),
             String::from("msg") => Expression::String(e.kind.to_string()),
             String::from("expr") => Expression::String(e.context.to_string()),
             String::from("ast") => Expression::String(format!("{:?}",e.context)),
