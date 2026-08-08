@@ -305,8 +305,8 @@ pub fn get_prompt_engine(settings: Option<Expression>) -> Box<dyn PromptEngineCo
                     0
                 }
             });
-            let template = sets.get("prompt_template").cloned();
-            let template_continuation = sets.get("prompt_continuation").map(|tc| tc.to_string());
+            let template = sets.get("template").cloned();
+            let template_continuation = sets.get("continuation").map(|tc| tc.to_string());
             (starship, lazy, template, template_continuation)
         }
 
