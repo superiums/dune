@@ -696,6 +696,8 @@
 	first match, returns {start,end,found}
 - find_all <pattern> <text>
 	all matches, list of {start,end,found}
+- from <pattern_string> <flags>
+	build regex from string and flags
 - is_match <pattern> <text>
 	contains a match?
 - named_captures <pattern> <text>
@@ -918,10 +920,8 @@
 	defined in scope chain?
 - dirs 
 	system directories map
-- ecodes_lm 
-	list Lmerror codes
-- ecodes_rt 
-	list runtime error codes
+- error_codes 
+	list Lume error codes
 - env [var]
 	root env map, or var value
 - has <var>

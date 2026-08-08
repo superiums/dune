@@ -24,10 +24,10 @@ if IS_INTERACTIVE {
     # avaluable fields in ctx: cfm,strict,status,duration,jobs
     set LUME_PROMPT_SETTINGS = {
         starship: 0,
-        ttl: 2,
-        prompt_continuation: "... ",
-        prompt_template: string.blue('$CWD_SHORT') + '|' + string.green('$CFM_TAG') + '|' + string.blue('$STRICT_TAG') + '❯  '.bold().yellow(),
-    #   prompt_template: (dir,ctx) -> {
+        lazy: 0,
+        continuation: "... ",
+        template: string.blue('$CWD_SHORT') + '|' + string.green('$CFM_TAG') + '|' + string.blue('$STRICT_TAG') + '❯  '.bold().yellow(),
+    #   template: (dir,ctx) -> {
     #     string.blue($dir) + ' |'.green().bold() \
     #     + ($ctx.cfm ? 'CFM'.green() + '|' : '') \
     #     + ($ctx.strict ? 'S'.yellow() + '| ' : '' ) \

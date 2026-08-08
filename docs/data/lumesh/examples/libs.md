@@ -359,6 +359,7 @@ capture <pattern> <text>
 captures <pattern> <text>
 find <pattern> <text>
 find_all <pattern> <text>
+from <pattern_string> [flag]
 is_match <pattern> <text>
 named_captures <pattern> <text>
 replace <text> <pattern> <replacement>
@@ -470,8 +471,7 @@ yellow <string>
 ### sys
 defined <var>
 dirs 
-ecodes_lm 
-ecodes_rt 
+error_codes
 env [var]
 has <var>
 info 
