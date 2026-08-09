@@ -2,21 +2,25 @@
 # Lumesh GitHub Installation Script
 # Downloads binaries from GitHub releases and installs to user or system
 set -e
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
 # Configuration
 GITHUB_REPO="superiums/lumesh"
 INSTALL_DIR="$HOME/.local/bin"  # Default to user installation
 CONFIG_DIR="$HOME/.config/lumesh"
 DOC_DIR="$HOME/.local/share"
 SYSTEM_INSTALL_DIR="/usr/local/bin"
-VARIANT_SUFFIX=""   # 新增：普通版为空，AI-HTTPS版为 "-ai-https"  
+VARIANT_SUFFIX=""   # 新增：普通版为空，AI-HTTPS版为 "-ai-https"
+RELEASE_JSON=""      # 缓存 releases/latest 的完整 JSON，供 checksum 校验复用
 
 sudo_cmd=""
+
 # Platform detection
 detect_platform() {
     case "$(uname -s)" in
@@ -53,6 +57,7 @@ detect_platform() {
         *)          echo -e "${RED}Unsupported architecture: $(uname -m)${NC}"; exit 1 ;;
     esac
 }
+
 # Get platform-specific asset name
 get_asset_name() {
     case "$PLATFORM" in
@@ -74,6 +79,7 @@ get_asset_name() {
             ;;
     esac
 }
+
 set_macos_path() {
     if [ "$PLATFORM" = "darwin" ]; then
         if [ "$INSTALL_DIR" = "$SYSTEM_INSTALL_DIR" ]; then
@@ -85,29 +91,30 @@ set_macos_path() {
         fi
     fi
 }
-# Ask user which binary variant to install  
-ask_variant_type() {  
-    echo -e "${YELLOW}Choose binary variant:${NC}"  
-    echo "1) Standard (default) - AI on HTTPS via system TLS on windows/macos; HTTP only on linux/freebsd"  
-    echo "2) ai-https - AI on HTTPS via ureq on all platforms (larger binary)"  
-    echo ""  
-    read -p "Enter choice (1-2) [1]: " variant_choice < /dev/tty 
-    variant_choice=${variant_choice:-1}  
-  
-    case $variant_choice in  
-        1)  
-            VARIANT_SUFFIX=""  
-            echo -e "${GREEN}Standard variant selected${NC}"  
-            ;;  
-        2)  
-            VARIANT_SUFFIX="-ai-https"  
-            echo -e "${GREEN}ai-https variant selected${NC}"  
-            ;;  
-        *)  
-            echo -e "${RED}Invalid choice. Defaulting to standard variant.${NC}"  
-            VARIANT_SUFFIX=""  
-            ;;  
-    esac  
+
+# Ask user which binary variant to install
+ask_variant_type() {
+    echo -e "${YELLOW}Choose binary variant:${NC}"
+    echo "1) Standard (default) - AI on HTTPS via system TLS on windows/macos; HTTP only on linux/freebsd"
+    echo "2) ai-https - AI on HTTPS via ureq on all platforms (larger binary)"
+    echo ""
+    read -p "Enter choice (1-2) [1]: " variant_choice < /dev/tty
+    variant_choice=${variant_choice:-1}
+
+    case $variant_choice in
+        1)
+            VARIANT_SUFFIX=""
+            echo -e "${GREEN}Standard variant selected${NC}"
+            ;;
+        2)
+            VARIANT_SUFFIX="-ai-https"
+            echo -e "${GREEN}ai-https variant selected${NC}"
+            ;;
+        *)
+            echo -e "${RED}Invalid choice. Defaulting to standard variant.${NC}"
+            VARIANT_SUFFIX=""
+            ;;
+    esac
 }
 
 # Ask for installation type
@@ -141,21 +148,151 @@ ask_install_type() {
             ;;
     esac
 }
-# Get latest version from GitHub API
+
+# Get latest version from GitHub API (并缓存完整 JSON 供 checksum 校验使用)
 get_latest_version() {
     echo -e "${BLUE}Fetching latest version...${NC}"
-    LATEST_VERSION=$(curl -s "https://api.github.com/repos/$GITHUB_REPO/releases/latest" | grep -o '"tag_name": *"[^"]*"' | cut -d'"' -f4 | sed 's/^c//')
+
+    RELEASE_JSON=$(curl -sf "https://api.github.com/repos/$GITHUB_REPO/releases/latest")
+    if [ -z "$RELEASE_JSON" ]; then
+        echo -e "${RED}Failed to fetch release information from GitHub API${NC}"
+        exit 1
+    fi
+
+    LATEST_VERSION=$(echo "$RELEASE_JSON" | grep -o '"tag_name": *"[^"]*"' | cut -d'"' -f4 | sed 's/^c//')
     if [ -z "$LATEST_VERSION" ]; then
         echo -e "${RED}Failed to fetch latest version${NC}"
         exit 1
     fi
     echo -e "${GREEN}Latest version: $LATEST_VERSION${NC}"
 }
+
+# 从缓存的 RELEASE_JSON 中解析出指定资产的 sha256（GitHub 自动计算的 digest 字段）
+# digest 字段形如 "sha256:abcdef...", 部分历史 release 可能没有该字段
+get_expected_sha256() {
+    local asset_name="$1"
+
+    if [ -z "$RELEASE_JSON" ]; then
+        echo ""
+        return 0
+    fi
+
+    if command -v jq >/dev/null 2>&1; then
+        echo "$RELEASE_JSON" | jq -r --arg n "$asset_name" \
+            '.assets[]? | select(.name==$n) | (.digest // empty)' \
+            | sed -E 's/^sha256://'
+        return 0
+    fi
+
+    # 无 jq 时的降级方案：按资产对象分块后再抓取 digest 字段
+    echo "$RELEASE_JSON" | tr '\n' ' ' | awk -v RS='\\{' '
+        $0 ~ ("\"name\": *\"" name "\"") {
+            match($0, /"digest": *"sha256:[a-f0-9]+"/)
+            if (RSTART > 0) {
+                s = substr($0, RSTART, RLENGTH)
+                sub(/.*sha256:/, "", s)
+                gsub(/"/, "", s)
+                print s
+                exit
+            }
+        }
+    ' name="$asset_name"
+}
+
+# 校验文件的 sha256，expected 为空时跳过并给出警告（兼容没有 digest 的历史 release）
+verify_sha256() {
+    local file="$1"
+    local expected="$2"
+
+    if [ -z "$expected" ]; then
+        echo -e "${YELLOW}Warning: no checksum available from GitHub API for this asset, skipping verification${NC}"
+        return 0
+    fi
+
+    local actual=""
+    if command -v sha256sum >/dev/null 2>&1; then
+        actual=$(sha256sum "$file" | awk '{print $1}')
+    elif command -v shasum >/dev/null 2>&1; then
+        actual=$(shasum -a 256 "$file" | awk '{print $1}')
+    else
+        echo -e "${YELLOW}Warning: no sha256sum/shasum found, skipping verification${NC}"
+        return 0
+    fi
+
+    if [ "$actual" != "$expected" ]; then
+        echo -e "${RED}Checksum mismatch! expected=$expected actual=$actual${NC}"
+        return 1
+    fi
+
+    echo -e "${GREEN}Checksum verified: $actual${NC}"
+    return 0
+}
+
+# 带重试、内容嗅探和可选 sha256 校验的下载函数
+# 用法: download_with_retry <url> <output> [expected_sha256]
+download_with_retry() {
+    local url="$1"
+    local output="$2"
+    local expected_sha256="$3"
+    local max_retries=3
+    local retry_count=0
+    local temp_output="${output}.tmp"
+
+    rm -f "$temp_output"
+
+    while [ $retry_count -lt $max_retries ]; do
+        echo -e "${BLUE}Downloading (attempt $((retry_count + 1))/$max_retries)...${NC}"
+        local ok=1
+
+        if command -v curl >/dev/null 2>&1; then
+            # -f: 4xx/5xx 视为失败，避免把 GitHub 的错误页面当成正常内容写入
+            if curl -fL -C - --progress-bar -o "$temp_output" "$url"; then
+                ok=0
+            fi
+        elif command -v wget >/dev/null 2>&1; then
+            if wget -c --tries=1 --progress=bar:force -O "$temp_output" "$url"; then
+                ok=0
+            fi
+        else
+            echo -e "${RED}Neither curl nor wget found${NC}"
+            return 1
+        fi
+
+        if [ $ok -eq 0 ]; then
+            if [ ! -s "$temp_output" ]; then
+                echo -e "${YELLOW}Downloaded file is empty, retrying...${NC}"
+            elif head -c 512 "$temp_output" | grep -qiE '<html|"message"\s*:\s*"Not Found"'; then
+                echo -e "${YELLOW}Downloaded content looks like an error page, retrying...${NC}"
+            elif [ -n "$expected_sha256" ] && ! verify_sha256 "$temp_output" "$expected_sha256"; then
+                echo -e "${YELLOW}Checksum verification failed, retrying...${NC}"
+            else
+                mv "$temp_output" "$output"
+                echo -e "${GREEN}Download completed successfully${NC}"
+                return 0
+            fi
+        fi
+
+        rm -f "$temp_output"
+        retry_count=$((retry_count + 1))
+        if [ $retry_count -lt $max_retries ]; then
+            echo -e "${YELLOW}Download failed, retrying in $((retry_count * 5)) seconds...${NC}"
+            sleep $((retry_count * 5))
+        fi
+    done
+
+    echo -e "${RED}Download failed after $max_retries attempts: $url${NC}"
+    return 1
+}
+
 # Download binary from GitHub
 download_binary() {
     local asset_name=$(get_asset_name)
     local download_url="https://github.com/$GITHUB_REPO/releases/download/c$LATEST_VERSION/$asset_name"
+    local expected_sha256
+    expected_sha256=$(get_expected_sha256 "$asset_name")
+
     echo -e "${BLUE}Downloading $asset_name...${NC}"
+
     # Create install directory
     if [ "$INSTALL_DIR" = "$SYSTEM_INSTALL_DIR" ]; then
         if [ "$(id -u)" -ne 0 ]; then
@@ -166,92 +303,65 @@ download_binary() {
     else
         mkdir -p "$INSTALL_DIR"
     fi
-      # 创建临时目录
+
+    # 创建临时目录
     local TEMP_DIR=$(mktemp -d)
-  # 根据平台处理
-    if [ "$PLATFORM" = "windows" ]; then
-        download_with_retry "$download_url" "$TEMP_DIR/lume.exe"
-        $sudo_cmd mv "$TEMP_DIR/lume.exe" "$INSTALL_DIR/"
-    else
-        download_with_retry "$download_url" "$TEMP_DIR/lume"
-        $sudo_cmd mv "$TEMP_DIR/lume" "$INSTALL_DIR/"
+    local target="$TEMP_DIR/lume"
+    [ "$PLATFORM" = "windows" ] && target="$TEMP_DIR/lume.exe"
+
+    if ! download_with_retry "$download_url" "$target" "$expected_sha256"; then
+        echo -e "${RED}Failed to download asset '$asset_name'.${NC}"
+        echo -e "${RED}It may not exist for your platform/variant, or the release is incomplete/corrupted.${NC}"
+        echo -e "${RED}Check: https://github.com/$GITHUB_REPO/releases/tag/c$LATEST_VERSION${NC}"
+        rm -rf "$TEMP_DIR"
+        exit 1
     fi
+
+    $sudo_cmd mv "$target" "$INSTALL_DIR/lume"
+
     # 设置权限
     if [ "$PLATFORM" != "windows" ]; then
         $sudo_cmd chmod +x "$INSTALL_DIR/lume"
     fi
+
     # 清理临时目录
     rm -rf "$TEMP_DIR"
+
     echo -e "${GREEN}Downloaded to: $INSTALL_DIR/lume${NC}"
 }
-  # 带重试和验证的下载函数
-download_with_retry() {
-    local url="$1"
-    local output="$2"
-    local max_retries=3
-    local retry_count=0
-    local temp_output="${output}.tmp"
-    # 清理可能存在的临时文件
-    rm -f "$temp_output"
-    while [ $retry_count -lt $max_retries ]; do
-        echo -e "${BLUE}Downloading (attempt $((retry_count + 1))/$max_retries)...${NC}"
-        if command -v curl >/dev/null 2>&1; then
-            # 使用断点续传和进度显示
-            if curl -L -C - --progress-bar -o "$temp_output" "$url"; then
-                break
-            fi
-        elif command -v wget >/dev/null 2>&1; then
-            # 使用断点续传
-            if wget -c --progress=bar:force -O "$temp_output" "$url" 2>&1; then
-                break
-            fi
-        else
-            echo -e "${RED}Neither curl nor wget found${NC}"
-            return 1
-        fi
-        retry_count=$((retry_count + 1))
-        if [ $retry_count -lt $max_retries ]; then
-            echo -e "${YELLOW}Download failed, retrying in 5 seconds...${NC}"
-            sleep 5
-        fi
-    done
-    if [ $retry_count -eq $max_retries ]; then
-        echo -e "${RED}Download failed after $max_retries attempts${NC}"
-        rm -f "$temp_output"
-        return 1
-    fi
-    # 验证文件大小（基本检查）
-    if [ ! -s "$temp_output" ]; then
-        echo -e "${RED}Downloaded file is empty${NC}"
-        rm -f "$temp_output"
-        return 1
-    fi
-    # 移动到最终位置
-    mv "$temp_output" "$output"
-    echo -e "${GREEN}Download completed successfully${NC}"
-    return 0
-}
+
 # Download and extract data.tgz for non-Windows platforms
 download_data() {
     if [ "$PLATFORM" = "windows" ]; then
         echo -e "${YELLOW}Skipping data.tgz download on Windows${NC}"
         return
     fi
+
     echo -e "${BLUE}Downloading data.tgz...${NC}"
+
     local data_url="https://github.com/$GITHUB_REPO/releases/download/c$LATEST_VERSION/data.tgz"
     local temp_data="/tmp/data.tgz"
-    # Download data.tgz
-    # if command -v curl >/dev/null 2>&1; then
-    #     curl -L -o "$temp_data" "$data_url"
-    # elif command -v wget >/dev/null 2>&1; then
-    #     wget -O "$temp_data" "$data_url"
-    # fi
-    download_with_retry "$data_url" "$temp_data"
+    local expected_sha256
+    expected_sha256=$(get_expected_sha256 "data.tgz")
+
+    if ! download_with_retry "$data_url" "$temp_data" "$expected_sha256"; then
+        echo -e "${RED}Failed to download data.tgz. Aborting installation of docs/config.${NC}"
+        echo -e "${RED}Check: https://github.com/$GITHUB_REPO/releases/tag/c$LATEST_VERSION${NC}"
+        rm -f "$temp_data"
+        exit 1
+    fi
+
     # Create share directory and extract
     $sudo_cmd mkdir -p "$DOC_DIR"
     $sudo_cmd mkdir -p "$CONFIG_DIR"
+
     cd /tmp
-    $sudo_cmd tar -xzf "$temp_data" -C "$DOC_DIR"
+    if ! $sudo_cmd tar -xzf "$temp_data" -C "$DOC_DIR"; then
+        echo -e "${RED}Failed to extract data.tgz (archive may be corrupted)${NC}"
+        rm -f "$temp_data"
+        exit 1
+    fi
+
     if [ -d "$DOC_DIR/lumesh/examples" ]; then
         cp -f "$DOC_DIR/lumesh/examples/config.lm" "$CONFIG_DIR/"
         cp -f "$DOC_DIR/lumesh/examples/bindings.lm" "$CONFIG_DIR/"
@@ -260,8 +370,10 @@ download_data() {
         cp -f $DOC_DIR/lumesh/examples/prompt*.lm "$CONFIG_DIR/" 2>/dev/null || true
     fi
     rm "$temp_data"
+
     echo -e "${GREEN}Data extracted to: $DOC_DIR${NC}"
 }
+
 # Create symlink from lume to lumesh
 create_symlink() {
     echo -e "${BLUE}Creating symlink from lume to lumesh...${NC}"
@@ -278,6 +390,7 @@ create_symlink() {
     $sudo_cmd ln -s "$lume_path" "$lumesh_link"
     echo -e "${GREEN}Created symlink: $lumesh_link -> $lume_path${NC}"
 }
+
 # Setup PATH
 setup_path() {
     if [ "$PLATFORM" = "windows" ]; then
@@ -309,6 +422,7 @@ setup_path() {
     echo -e "${GREEN}Added $INSTALL_DIR to PATH in $shell_profile${NC}"
     echo -e "${YELLOW}Please restart your shell or run: source $shell_profile${NC}"
 }
+
 # Add Lumesh to system shells list for chsh usage
 add_to_shell_list() {
     local lume_path="$1"
@@ -339,6 +453,7 @@ add_to_shell_list() {
         echo -e "${BLUE}You can change your shell later with: chsh -s $lume_path${NC}"
     fi
 }
+
 # Configure Helix editor for tree-sitter-lumesh syntax highlighting
 configure_helix_lumesh() {
     echo -e "${BLUE}Checking Grammar Highlight Config...${NC}"
@@ -422,6 +537,7 @@ EOF
     echo "   ls -la $HELIX_RUNTIME/grammars/lumesh.so"
     echo "   ls -la $HELIX_RUNTIME/queries/lumesh"
 }
+
 # Main installation
 main() {
     echo -e "${BLUE}Lumesh GitHub Installation Script${NC}"
