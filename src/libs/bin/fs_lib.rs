@@ -1,5 +1,6 @@
 use crate::{
     Environment, Expression, Int, RuntimeError,
+    expression::FileSize,
     libs::{
         BuiltinInfo,
         helper::{check_args_len, check_exact_args_len, get_string_arg, get_string_ref},
@@ -27,7 +28,7 @@ pub fn regist_lazy() -> LazyModule {
         // permission & link
         chmod, chown, symlink, read_link,
         // check
-        exists, is_dir, is_file,
+        exists, is_dir, is_file, size,
         // read and write,
         head, tail, read, write, append,
         // assist
@@ -61,6 +62,7 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         exists => "path exists?", "<path>"
         is_dir => "is dir?", "<path>"
         is_file => "is file?", "<path>"
+        size => "get file size", "<path>"
 
         // read/write
         head => "first n lines", "<file> [n=10]"
@@ -441,6 +443,20 @@ fn is_file(
     let path = utils::abs(p, env);
     Ok(Expression::Boolean(path.is_file()))
 }
+
+fn size(
+    args: Vec<Expression>,
+    env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("size", &args, 1, ctx)?;
+    let p = get_string_ref(&args[0], ctx)?;
+    let path = utils::abs(&p, env);
+    let metadata = std::fs::metadata(&path)
+        .map_err(|e| RuntimeError::from_io_error(e, "read metadata".into(), args[0].clone(), 0))?;
+    Ok(Expression::FileSize(FileSize::from_bytes(metadata.len())))
+}
+
 // File Content Operations
 fn read(
     args: Vec<Expression>,
