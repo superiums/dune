@@ -2705,21 +2705,29 @@ fn parse_module_selective(input: Tokens<'_>) -> IResult<Tokens<'_>, ModuleInfo, 
 
     while !remaining.is_empty() {
         // 尝试解析 use 语句
-        if let Ok((rest, use_stmt)) = parse_use_statement(remaining) {
-            if let Expression::Use(alias, path) = use_stmt {
-                use_statements.push((alias, path));
+        match parse_use_statement(remaining) {
+            Ok((rest, use_stmt)) => {
+                if let Expression::Use(alias, path) = use_stmt {
+                    use_statements.push((alias, path));
+                }
+                remaining = rest;
+                continue;
             }
-            remaining = rest;
-            continue;
+            Err(nom::Err::Failure(e)) => return Err(nom::Err::Failure(e)), // 硬错误直接向上传播
+            Err(_) => {} // 可回溯错误，继续尝试下一种解析器
         }
 
         // 尝试解析函数声明
-        if let Ok((rest, func)) = parse_fn_declare(remaining) {
-            if let Expression::Function(name, ..) = &func {
-                functions.insert(name.clone(), func);
+        match parse_fn_declare(remaining) {
+            Ok((rest, func)) => {
+                if let Expression::Function(name, ..) = &func {
+                    functions.insert(name.clone(), func);
+                }
                 remaining = rest;
+                continue;
             }
-            continue;
+            Err(nom::Err::Failure(e)) => return Err(nom::Err::Failure(e)), // 硬错误直接向上传播
+            Err(_) => {} // 可回溯错误，继续尝试下一种解析器
         }
 
         let mut place = 0;
