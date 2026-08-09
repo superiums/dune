@@ -470,14 +470,14 @@ fn bang_dispatch(input: Input<'_>, ctx: Ctx) -> TokenizationResult<'_, (Token, D
         Ctx::Letter | Ctx::Word | Ctx::Number => alt((
             map_valid_token(punctuation_tag("!=="), TokenKind::Operator),
             map_valid_token(punctuation_tag("!="), TokenKind::Operator),
-            map_valid_token(prefix_tag("!~:"), TokenKind::Operator),
+            map_valid_token(operator_tag("!~:"), TokenKind::Operator),
             map_valid_token(postfix_break_tag("!"), TokenKind::OperatorPostfix),
             map_valid_token(punctuation_tag("!"), TokenKind::Punctuation),
         ))(input),
         Ctx::Start | Ctx::Space | Ctx::Open => alt((
             map_valid_token(punctuation_tag("!=="), TokenKind::Operator),
             map_valid_token(punctuation_tag("!="), TokenKind::Operator),
-            map_valid_token(prefix_tag("!~:"), TokenKind::Operator),
+            map_valid_token(operator_tag("!~:"), TokenKind::Operator),
             map_valid_token(prefix_tag("!"), TokenKind::OperatorPrefix),
             map_valid_token(punctuation_tag("!"), TokenKind::Punctuation),
         ))(input),
