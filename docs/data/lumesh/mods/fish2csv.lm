@@ -41,7 +41,7 @@ fn trans(input_file,output_dir='/tmp'){
 
     if !input_file { return }
     orderi += 1
-    let file_base = fs.base_name(True,input_file).at(0)
+    let file_base = fs.stem(input_file)
     let suc_dir =  fs.join(output_dir,'completions')
     let deel_dir =  fs.join(output_dir,'unprocessed')
     let output_file = fs.join(suc_dir, file_base + '.csv')
@@ -137,7 +137,7 @@ fn trans(input_file,output_dir='/tmp'){
                                 }
                                 # discard others
                              }else{
-                                argument = Regex.replace(`(".+?")|('.+?')|(\\\s)`,'_',args).split(' ').map(x -> x.split('\t').first().replace('"','')).join(' ')
+                                argument = regex.replace(`(".+?")|('.+?')|(\\\s)`,'_',args).split(' ').map(x -> x.split('\t').first().replace('"','')).join(' ')
                              }
                         }
                         r'f' => {i += 1; directive = directive + "@f" }

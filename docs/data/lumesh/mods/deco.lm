@@ -28,7 +28,8 @@ fn logit(){
 
 fn tipit(){
     fn before(){
-        print string.center($NAME, 40, '*')
+        # print string.center($NAME, 40, '*')
+        format '{NAME:*^40}'
     }
     [before,_]
 }
