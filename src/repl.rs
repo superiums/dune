@@ -529,15 +529,14 @@ pub fn run_repl(env: &mut Environment) {
                 // quick jump
                 if let Some(cd_cmd) = editor.history().search_fuzzy_one_cd(query) {
                     if parse_and_eval(&cd_cmd, &mut shared_env.lock().unwrap()) == 0 {
-                        editor.history_mut().add(cd_cmd);
                         // update current dir in history
-
                         let cwd = get_current_path(&mut shared_env.lock().unwrap());
                         editor
                             .history_mut()
                             .set_current_dir(cwd.to_string_lossy().to_string());
-
                         pe.set_dir_cache(cwd);
+                        // must after
+                        editor.history_mut().add(cd_cmd);
                     }
                 }
             } else if rest == "q" {
@@ -632,16 +631,19 @@ pub fn run_repl(env: &mut Environment) {
 
             if status == 0 {
                 let changing = full_input.starts_with("cd ");
-                editor.history_mut().add(full_input);
                 // update current dir in history
                 if changing {
                     let cwd = get_current_path(&mut shared_env.lock().unwrap());
                     editor
                         .history_mut()
                         .set_current_dir(cwd.to_string_lossy().to_string());
-
+                    // update prompt  cache dir
                     pe.set_dir_cache(cwd);
                 }
+                // must bellow set_current_dir
+                editor.history_mut().add(full_input);
+            } else {
+                editor.history_mut().add_tmp(full_input);
             }
         }
 

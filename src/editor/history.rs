@@ -12,6 +12,7 @@ pub struct HistoryEntry {
     pub last_path: String,
     pub last_order: u64,
     pub is_multi_dir: bool, // 是否在多个目录下运行过
+    pub is_temp: bool,
 }
 
 impl HistoryEntry {
@@ -22,6 +23,7 @@ impl HistoryEntry {
             last_path: path,
             last_order: order,
             is_multi_dir: false,
+            is_temp: false,
         }
     }
 }
@@ -74,6 +76,22 @@ impl History {
         &self.current_dir
     }
 
+    pub fn add_tmp(&mut self, entry: String) {
+        if entry.trim().is_empty() {
+            return;
+        }
+        self.global_order += 1;
+        let order = self.global_order;
+        let path = self.current_dir.clone();
+        self.entries.push(HistoryEntry {
+            command: entry,
+            weight: 1,
+            last_order: order,
+            last_path: path,
+            is_multi_dir: false,
+            is_temp: true,
+        });
+    }
     /// 添加一条历史记录，使用 self.current_dir 作为执行路径。
     /// 调用前须先调用 set_current_dir。
     pub fn add(&mut self, entry: String) {
@@ -245,33 +263,22 @@ impl History {
     }
 
     // ── Fuzzy 搜索（两阶段：本目录专属优先，再全局）─────────────
-
     pub fn search_fuzzy_one_cd(&self, query: &str) -> Option<String> {
-        // 阶段1：本目录专属 cd 命令
-        let local = self
-            .entries
-            .iter()
-            .filter(|e| {
-                !e.is_multi_dir
-                    && e.last_path == self.current_dir
-                    && e.command.starts_with("cd ")
-                    && fuzzy_match(query, &e.command)
-            })
-            .max_by_key(|e| e.weight)
-            .map(|e| e.command.lines().next().unwrap_or_default().to_string());
-
-        if local.is_some() {
-            return local;
-        }
-
-        // 阶段2：全局 cd 命令
         self.entries
             .iter()
-            .filter(|e| {
-                e.is_multi_dir && e.command.starts_with("cd ") && fuzzy_match(query, &e.command)
+            .filter_map(|e| {
+                if let Some(p) = e.command.strip_prefix("cd ")
+                    && p.trim_end_matches('/') != self.current_dir.trim_end_matches('/')
+                {
+                    // 只保留匹配成功的条目，并附带其匹配分数
+                    fuzzy_match_score(query, p).map(|score| (score, e.weight, e))
+                } else {
+                    None
+                }
             })
-            .max_by_key(|e| e.weight)
-            .map(|e| e.command.lines().next().unwrap_or_default().to_string())
+            // 先比匹配分数，分数相同再比历史权重
+            .max_by_key(|(score, weight, _)| (*score, *weight))
+            .map(|(_, _, e)| e.command.lines().next().unwrap_or_default().to_string())
     }
 
     // pub fn search_fuzzy_one(&self, query: &str) -> Option<String> {
@@ -489,15 +496,17 @@ impl History {
     pub fn save_to_file(&self, path: &str) -> io::Result<()> {
         let mut file = File::create(path)?;
         for entry in &self.entries {
-            writeln!(
-                file,
-                "{}\t{}\t{}\t{}\t{}",
-                entry.weight,
-                entry.last_order,
-                escape_field(&entry.last_path),
-                if entry.is_multi_dir { 1 } else { 0 },
-                escape_field(&entry.command)
-            )?;
+            if !entry.is_temp {
+                writeln!(
+                    file,
+                    "{}\t{}\t{}\t{}\t{}",
+                    entry.weight,
+                    entry.last_order,
+                    escape_field(&entry.last_path),
+                    if entry.is_multi_dir { 1 } else { 0 },
+                    escape_field(&entry.command)
+                )?;
+            }
         }
         Ok(())
     }
@@ -542,6 +551,7 @@ impl History {
                     last_order: o.parse().unwrap_or(0),
                     last_path: unescape_field(p),
                     is_multi_dir: *m == "1",
+                    is_temp: false,
                 },
                 // 旧4字段格式：weight\torder\tpath\tcommand
                 // [w, o, p, cmd] => HistoryEntry {
@@ -631,6 +641,7 @@ impl History {
                     last_path,
                     last_order,
                     is_multi_dir,
+                    is_temp: false,
                 });
             }
         }
@@ -719,15 +730,66 @@ fn unescape_field(s: &str) -> String {
     result
 }
 
-fn fuzzy_match(query: &str, target: &str) -> bool {
+/// 模糊匹配打分：要求 query 的字符必须按顺序出现在 target 中（可不连续）。
+/// 匹配失败返回 None；匹配成功返回一个分数，分数越大表示匹配质量越高。
+///
+/// 打分规则：
+/// - 每匹配一个字符得基础分 1
+/// - 连续匹配（上一个匹配字符紧挨着当前字符）额外加分，鼓励连续子串
+/// - 匹配起始位置越靠前，额外加分（鼓励前缀式匹配）
+/// - 大小写不敏感
+fn fuzzy_match_score(query: &str, target: &str) -> Option<i64> {
     if query.is_empty() {
-        return true;
+        return Some(0);
     }
-    let mut chars = target.chars();
-    for q in query.chars() {
-        if !chars.any(|c| c == q) {
-            return false;
+    if target.is_empty() {
+        return None;
+    }
+
+    // 大小写归一化后再比较，避免因大小写不同而漏匹配
+    let query_lower: Vec<char> = query.to_lowercase().chars().collect();
+    let target_lower: Vec<char> = target.to_lowercase().chars().collect();
+
+    let mut score: i64 = 0;
+    let mut t_idx = 0usize; // target 游标
+    let mut last_match_idx: Option<usize> = None; // 上一次成功匹配的位置，用于判断是否连续
+    let mut first_match_idx: Option<usize> = None; // 第一次匹配位置，用于前缀加分
+
+    for &q in &query_lower {
+        // 从当前游标开始，在 target 中寻找下一个等于 q 的字符
+        let found = target_lower[t_idx..]
+            .iter()
+            .position(|&c| c == q)
+            .map(|rel| t_idx + rel);
+
+        let idx = match found {
+            Some(idx) => idx,
+            None => return None, // 找不到，说明不满足按序子序列匹配
+        };
+
+        if first_match_idx.is_none() {
+            first_match_idx = Some(idx);
         }
+
+        // 基础分
+        score += 1;
+
+        // 连续匹配加分：与上一个匹配字符紧挨着，说明是连续子串，质量更高
+        if let Some(last) = last_match_idx
+            && idx == last + 1
+        {
+            score += 3;
+        }
+
+        last_match_idx = Some(idx);
+        t_idx = idx + 1;
     }
-    true
+
+    // 起始位置越靠前，加分越多（鼓励前缀式/开头命中）
+    if let Some(first) = first_match_idx {
+        let prefix_bonus = (target_lower.len().saturating_sub(first)) as i64;
+        score += prefix_bonus / target_lower.len().max(1) as i64 * 2;
+    }
+
+    Some(score)
 }
