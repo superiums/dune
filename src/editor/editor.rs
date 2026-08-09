@@ -1429,9 +1429,13 @@ impl Editor {
             if self.show_hint {
                 if let Some(ref hinter) = self.hinter {
                     let byte_end = line.len();
-                    if let Some(hint) = hinter.hint(&line, byte_end) {
+                    if !line.trim().is_empty()
+                        && let Some(hint) = hinter.hint(&line, byte_end)
+                    {
                         self.current_hint = Some(hint);
-                    } else if let Some(hint) = self.history.search_hint(&line) {
+                    } else if !line.trim().is_empty()
+                        && let Some(hint) = self.history.search_hint(&line)
+                    {
                         self.current_hint = Some(hint);
                     } else {
                         self.current_hint = None;
