@@ -1136,7 +1136,10 @@ fn symbol(input: Input<'_>, is_cfm: bool, ctx: Ctx, last_ctx: Ctx) -> Tokenizati
 }
 
 fn whitespace(input: Input<'_>) -> TokenizationResult<'_> {
-    let ws_chars = input.chars().take_while(char::is_ascii_whitespace).count();
+    let ws_chars = input
+        .chars()
+        .take_while(|c| matches!(c, ' ' | '\t' | '\0'))
+        .count();
 
     if ws_chars == 0 {
         return Err(NOT_FOUND);
