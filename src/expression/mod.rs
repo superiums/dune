@@ -93,6 +93,7 @@ pub enum Expression {
     Use(Option<String>, String),
     ModuleCall(Vec<String>, Rc<Self>), //模块调用
     Blank,
+    Shift,
 }
 
 #[derive(Debug, Clone)]
@@ -382,7 +383,7 @@ impl PartialOrd for Expression {
                 Some(Ordering::Equal)
             }
 
-            // ===== 不同种类不比较 =====
+            // ===== 其他种类不比较 =====
             _ => None,
         }
     }

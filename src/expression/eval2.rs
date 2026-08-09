@@ -237,6 +237,14 @@ impl Expression {
                 Expression::None,
                 depth,
             )),
+            Self::Shift => {
+                state.pop_iter().map_err(|e| RuntimeError {
+                    kind: e,
+                    context: self.clone(),
+                    depth,
+                })?;
+                Ok(Expression::None)
+            }
             Self::Catch(body, typ, deeling) => {
                 // dbg!(&typ, &deeling);
                 let result = body.as_ref().eval_mut(state, env, depth + 1);
@@ -876,10 +884,7 @@ where
 
     let r = if state.contains(State::IN_ASSIGN) || state.contains(State::IN_PIPE) {
         let mut results = Vec::with_capacity(count);
-        for _ in 0..count {
-            if state.pop_iter().is_err() {
-                break;
-            };
+        while state.pop_iter().is_ok() {
             match body.eval_mut(state, env, depth) {
                 Ok(result) => results.push(result),
                 Err(RuntimeError {
@@ -895,10 +900,7 @@ where
                 }) => {
                     continue; // Rust 的 continue，跳到下一次迭代
                 }
-                Err(RuntimeError {
-                    kind: RuntimeErrorKind::IteratorExhausted(_),
-                    ..
-                }) => break, // 循环正常结束
+
                 Err(e) => {
                     state.clear_iter();
                     if is_last_in_loop {
@@ -919,10 +921,7 @@ where
             Ok(Expression::None)
         }
     } else {
-        for _ in 0..count {
-            if state.pop_iter().is_err() {
-                break;
-            }
+        while state.pop_iter().is_ok() {
             match body.eval_mut(state, env, depth) {
                 Ok(_) => {}
                 Err(RuntimeError {
@@ -935,10 +934,6 @@ where
                 }) => {
                     continue; // Rust 的 continue，跳到下一次迭代
                 }
-                Err(RuntimeError {
-                    kind: RuntimeErrorKind::IteratorExhausted(_),
-                    ..
-                }) => break,
                 Err(e) => {
                     state.clear_iter();
                     if is_last_in_loop {

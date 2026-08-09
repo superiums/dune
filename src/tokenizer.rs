@@ -765,6 +765,7 @@ fn any_keyword(input: Input<'_>) -> TokenizationResult<'_> {
         postfix_break_tag("break"),
         postfix_break_tag("continue"),
         postfix_break_tag("return"),
+        postfix_break_tag("shift"),
         space_followed_tag("del"),
         space_followed_tag("use"),
     ))(input)

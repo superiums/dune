@@ -947,6 +947,7 @@ fn parse_control_flow(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, Synt
         "break" => parse_break(input),
         "continue" => parse_continue(input),
         "return" => parse_return(input),
+        "shift" => parse_shift(input),
         _ => Err(nom::Err::Error(SyntaxErrorKind::NoExpression)),
     }
 }
@@ -1281,6 +1282,10 @@ fn parse_return(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErro
         input,
         Expression::Return(Rc::new(expr.unwrap_or(Expression::None))),
     ))
+}
+fn parse_shift(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
+    let (input, _) = text("shift")(input)?;
+    Ok((input, Expression::Shift))
 }
 fn parse_break(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
     let (input, _) = text("break")(input)?;

@@ -41,8 +41,10 @@ pub enum RuntimeErrorKind {
     UndeclaredVariable(String),
     #[error("undeclared local variable: `{0}`")]
     UndeclaredLocalVariable(String),
-    #[error("iterator exhausted: `{0}`")]
-    IteratorExhausted(String),
+    #[error("iterator on `{0}` exhausted, last value: `{1}`")]
+    IteratorExhausted(String, String),
+    #[error("iter on none iterable")]
+    IterOnNoneIterable(),
     #[error("no matching branch while evaluating `{0}`")]
     NoMatchingBranch(String),
     #[error("too many arguments for function `{name}`: max {max}, found {received}")]

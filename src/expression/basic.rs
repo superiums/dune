@@ -650,6 +650,7 @@ impl Expression {
             Self::Regex(r) => write!(f, "{}g'{}'", idt(i), r.regex.as_str()),
             Self::TimeDef(t) => write!(f, "{}t'{t}'", idt(i)),
             Self::Blank => write!(f, "{}_", idt(i)),
+            Self::Shift => write!(f, "{}shift", idt(i)),
             Self::Table(t) => write!(f, "{}{t:?}", idt(i)),
         }
     }
@@ -673,6 +674,7 @@ impl Expression {
             Self::Range(s, st) => write!(f, "{}Range〈{s:?}:{st}〉", prefix),
             Self::None => write!(f, "{}None", prefix),
             Self::Blank => write!(f, "{}_", prefix),
+            Self::Shift => write!(f, "{}shift", prefix),
 
             // 字符串相关
             Self::StringSafe(s) => write!(f, "{}StringSafe〈{s:?}〉", prefix),
@@ -1072,6 +1074,7 @@ impl Expression {
 
             Self::None => "None",
             Self::Blank => "Blank",
+            Self::Shift => "Shift",
             Self::Table(_) => "Table",
             // _ => format!("{:?}", self).split('(').next().unwrap().into(),
         }

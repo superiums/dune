@@ -156,7 +156,7 @@ impl State {
         self.4 = Some((var_name, index_name, 0, iterator));
     }
     #[inline]
-    pub fn pop_iter(&mut self) -> Result<bool, RuntimeErrorKind> {
+    pub fn pop_iter(&mut self) -> Result<(), RuntimeErrorKind> {
         match self.4.as_mut() {
             Some((v, ind, idx, iter)) => {
                 if let Some(value) = iter.next() {
@@ -167,12 +167,17 @@ impl State {
                             .insert(index.to_string(), Expression::Integer(*idx as Int));
                         *idx += 1;
                     };
-                    Ok(true)
+                    Ok(())
                 } else {
-                    Err(RuntimeErrorKind::IteratorExhausted(v.clone()))
+                    Err(RuntimeErrorKind::IteratorExhausted(
+                        v.clone(),
+                        self.3
+                            .get(v.as_str())
+                            .map_or("".to_string(), |x| x.to_string()),
+                    ))
                 }
             }
-            None => Ok(false),
+            None => Err(RuntimeErrorKind::IterOnNoneIterable()),
         }
     }
     #[inline]
