@@ -332,8 +332,13 @@ fn format(
     state: &mut State,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_args_len("format", args, 2.., ctx)?;
+    check_args_len("format", args, 1.., ctx)?;
     let data0 = args[0].eval_mut(state, env, 0)?;
+
+    if args.len() == 1 {
+        return Ok(Expression::String(data0.to_string()));
+    }
+
     let data1 = args[1].eval_mut(state, env, 0)?;
 
     let (template, data_first) = match args[0] {

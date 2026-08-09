@@ -355,7 +355,7 @@ fn get_map(
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("get_map", &args, 1, ctx)?;
+    check_exact_args_len("get_map", &args, 2, ctx)?;
     let mut it = args.into_iter();
     let data = it.next().unwrap();
     let t = get_table_arg(data, ctx)?;
@@ -386,7 +386,7 @@ fn get(
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("get", &args, 1, ctx)?;
+    check_exact_args_len("get", &args, 2, ctx)?;
     let mut it = args.into_iter();
     let data = it.next().unwrap();
     let t = get_table_arg(data, ctx)?;
