@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.18.0]
+- add terminate on empty `_!` for pipe
+`'' _! | print 'go'` will terminate the pipe for empty data on left
+
+- add handler on empty `_:`
+`let v = a _! b` value will be b while a is empty
+
+- add `shift` for loop
+```bash
+let config
+for arg in argv {
+    if arg.starts_with('-c'){
+        shift
+        set config = arg            # arg here is the next one aftere `-c`
+    }
+    ...
+}
+```
+
+- add sha256 check for install script
+- add fs.size
+- update script in mod
+- fix arg check for table.get/get_row,format,and err tip
+- report err in use
+- fix tokenizer for `!~:` tag
+- fix whitespace eat linebreak in tokenizer
+- skip hint while empty in editor
+- add history tmp to allow non correct code to be iterable in history o f current session
+- fzy match score for '/' cmd
+
 ## [0.17.8]
 - optimize status code
 - rename prompt_template/continuation, remove prefix
