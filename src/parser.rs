@@ -230,9 +230,9 @@ impl PrattParser {
                     // dbg!("--> binOp: trying next loop", input, next_min_prec);
                     // dbg!("--> binOp: trying next loop", &lhs, &operator);
                     match operator {
-                        "?." | "?+" | "??" |"?>" | "?!" | "?~" => {
+                        "?." | "?+" | "??" |"?>" | "?!" | "_!" | "?~" => {
                             // dbg!("--->try catch ast:");
-                            lhs = Self::build_catch_ast(op_info, lhs)?
+                            lhs = Self::build_catch_unary(op_info, lhs)?
                         }
                         // custom unary op __+ as Operator: a __+
                         opx if opx.starts_with("__") => {
@@ -693,7 +693,7 @@ impl PrattParser {
             //     false,
             //     OperatorKind::Prefix,
             // )),
-            "?." | "?+" | "??" | "?>" | "?!" | "?:" | "?~" | "&:" => {
+            "?." | "?+" | "??" | "?>" | "?!" | "_!" | "?~" | "?:" | "&:" | "_:" => {
                 Some(OperatorInfo::new(op, PREC_CATCH, false))
             }
 
@@ -897,12 +897,17 @@ impl PrattParser {
             )),
             "?:" => Ok(Expression::Catch(
                 Rc::new(lhs),
-                CatchType::Deel,
+                CatchType::OnError,
                 Some(Rc::new(rhs)),
             )),
             "&:" => Ok(Expression::Catch(
                 Rc::new(lhs),
                 CatchType::OnSuccess,
+                Some(Rc::new(rhs)),
+            )),
+            "_:" => Ok(Expression::Catch(
+                Rc::new(lhs),
+                CatchType::OnEmpty,
                 Some(Rc::new(rhs)),
             )),
             opx if opx.starts_with("..") => {
@@ -914,7 +919,7 @@ impl PrattParser {
         }
     }
 
-    fn build_catch_ast(
+    fn build_catch_unary(
         op: OperatorInfo,
         lhs: Expression,
     ) -> Result<Expression, nom::Err<SyntaxErrorKind>> {
@@ -924,9 +929,12 @@ impl PrattParser {
             "?+" => Expression::Catch(Rc::new(lhs), CatchType::PrintStd, None),
             "??" => Expression::Catch(Rc::new(lhs), CatchType::PrintErr, None),
             "?>" => Expression::Catch(Rc::new(lhs), CatchType::PrintOver, None),
-            "?!" => Expression::Catch(Rc::new(lhs), CatchType::Terminate, None),
+            "?!" => Expression::Catch(Rc::new(lhs), CatchType::TerminateOnErr, None),
+            "_!" => Expression::Catch(Rc::new(lhs), CatchType::TerminateOnEmpty, None),
             "?~" => Expression::Catch(Rc::new(lhs), CatchType::ToBoolean, None),
-            "&:" => Expression::Catch(Rc::new(lhs), CatchType::OnSuccess, None),
+            // "&:" => Expression::Catch(Rc::new(lhs), CatchType::OnSuccess, None),
+            // "_:" => Expression::Catch(Rc::new(lhs), CatchType::OnEmpty, None),
+            // "?:" => Expression::Catch(Rc::new(lhs), CatchType::Deel, None),
             _ => unreachable!(),
         })
     }
@@ -1255,13 +1263,17 @@ fn parse_fn_declare(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, Syntax
         map(text("?+"), |_| (CatchType::PrintStd, None)),
         map(text("??"), |_| (CatchType::PrintErr, None)),
         map(text("?>"), |_| (CatchType::PrintOver, None)),
-        map(text("?!"), |_| (CatchType::Terminate, None)),
+        map(text("?!"), |_| (CatchType::TerminateOnErr, None)),
+        map(text("_!"), |_| (CatchType::TerminateOnEmpty, None)),
         map(text("?~"), |_| (CatchType::ToBoolean, None)),
         map(preceded(text("?:"), cut(parse_expr)), |e| {
-            (CatchType::Deel, Some(Rc::new(e)))
+            (CatchType::OnError, Some(Rc::new(e)))
         }),
         map(preceded(text("&:"), cut(parse_expr)), |e| {
             (CatchType::OnSuccess, Some(Rc::new(e)))
+        }),
+        map(preceded(text("_:"), cut(parse_expr)), |e| {
+            (CatchType::OnEmpty, Some(Rc::new(e)))
         }),
     )))(input)?;
 

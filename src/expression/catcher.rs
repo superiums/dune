@@ -15,7 +15,7 @@ pub fn catch_error(
     depth: usize,
 ) -> Result<Expression, RuntimeError> {
     match typ {
-        CatchType::Deel => match deeling {
+        CatchType::OnError => match deeling {
             Some(deel) => match deel.as_ref() {
                 Expression::Symbol(..) | Expression::Lambda(..) | Expression::Function(..) => {
                     // dbg!(&deel.type_name());
@@ -39,6 +39,7 @@ pub fn catch_error(
         CatchType::Ignore => Ok(Expression::None),
         CatchType::ToBoolean => Ok(Expression::Boolean(false)),
         CatchType::OnSuccess => Err(e), // 失败时原样透传，不拦截
+        CatchType::OnEmpty => Err(e),   // 失败时原样透传，不拦截
         CatchType::PrintStd => {
             println!("{e:?}");
             Ok(Expression::None)
@@ -56,7 +57,7 @@ pub fn catch_error(
             String::from("depth") => Expression::Integer(e.depth as i64),
             // String::from("expr") => Expression::Quote(body.clone())
         })),
-        CatchType::Terminate => Err(RuntimeError::new(
+        CatchType::TerminateOnErr | CatchType::TerminateOnEmpty => Err(RuntimeError::new(
             RuntimeErrorKind::Terminated,
             e.context,
             e.depth,

@@ -255,10 +255,12 @@ pub enum CatchType {
     PrintStd,
     PrintErr,
     PrintOver,
-    Terminate,
-    Deel,
+    TerminateOnErr,
+    OnError,
     ToBoolean,
     OnSuccess,
+    OnEmpty,
+    TerminateOnEmpty,
 }
 
 impl PartialOrd for Expression {

@@ -20,9 +20,9 @@ use std::{
 
 pub fn regist_all() -> HashMap<&'static str, Rc<BuiltinFunc>> {
     reg_all!({
-        jobs,exit, cd, cwd,
+        jobs, exit, cd, cwd,
         tap, print, pprint, println, eprint, eprintln, read,
-        dig, len, rev, flatten,  select,
+        dig, len, is_empty, rev, flatten,  select,
         not,
         eval, exec, eval_str, exec_str, include, import,
         help,
@@ -51,6 +51,7 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         // Data manipulation
         dig => "get nested value by dot path. e.g. dig m 'a.b.0'", "<map|list|set|range|table> <path>"
         len => "size of collection", "<list|set|map|table|range|string|bytes>"
+        is_empty => "is empty?", "<expr>"
         rev => "reverse", "<string|list|table|bytes>"
         flatten => "flatten nested list/map to flat list", "<collection>"
         select => "select columns from table", "<table> <columns...>"
@@ -702,6 +703,15 @@ pub fn len(
         }
     };
     Ok(Expression::Integer(i))
+}
+
+pub fn is_empty(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("is_empty", &args, 1, ctx)?;
+    Ok(Expression::Boolean(args[0].is_empty()))
 }
 
 pub fn rev(

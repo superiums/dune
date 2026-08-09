@@ -601,9 +601,10 @@ impl Expression {
                     CatchType::PrintStd => write!(f, " ?+"),
                     CatchType::PrintErr => write!(f, " ??"),
                     CatchType::PrintOver => write!(f, " ?>"),
-                    CatchType::Terminate => write!(f, " ?!"),
+                    CatchType::TerminateOnErr => write!(f, " ?!"),
                     CatchType::ToBoolean => write!(f, " ?~"),
-                    CatchType::Deel => {
+                    CatchType::TerminateOnEmpty => write!(f, " _!"),
+                    CatchType::OnError => {
                         write!(f, " ?: ")?;
                         if let Some(handler) = deel {
                             handler.fmt_display_indent(f, 0)?;
@@ -614,6 +615,15 @@ impl Expression {
                     }
                     CatchType::OnSuccess => {
                         write!(f, " &: ")?;
+                        if let Some(handler) = deel {
+                            handler.fmt_display_indent(f, 0)?;
+                        } else {
+                            write!(f, "{{}}")?;
+                        }
+                        Ok(())
+                    }
+                    CatchType::OnEmpty => {
+                        write!(f, " _: ")?;
                         if let Some(handler) = deel {
                             handler.fmt_display_indent(f, 0)?;
                         } else {
@@ -1421,6 +1431,25 @@ impl Expression {
             Self::Table(t) => t.row_count() > 0,
             Self::AliasDef(_, c) => c.is_truthy(),
             Self::Group(c) => c.is_truthy(),
+            _ => false,
+        }
+    }
+    pub fn is_empty(&self) -> bool {
+        match self {
+            Self::None => true,
+            Self::Blank => true,
+            Self::String(s) => s.is_empty(),
+            Self::StringSafe(s) => s.is_empty(),
+            Self::StringTemplate(s) => s.is_empty(),
+            Self::Bytes(b) => b.is_empty(),
+            Self::List(exprs) => exprs.is_empty(),
+            Self::BSet(exprs) => exprs.is_empty(),
+            Self::HMap(exprs) => exprs.is_empty(),
+            Self::Map(exprs) => exprs.is_empty(),
+            Self::Range(exprs, _) => exprs.is_empty(),
+            Self::Regex(r) => r.regex.as_str().is_empty(),
+            Self::Table(t) => t.row_count() == 0,
+            Self::Group(c) => c.is_empty(),
             _ => false,
         }
     }

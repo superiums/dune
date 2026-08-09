@@ -256,6 +256,16 @@ impl Expression {
                             Some(next) => next.as_ref().eval_mut(state, env, depth + 1),
                             None => Ok(result),
                         },
+                        CatchType::OnEmpty if result.is_empty() => match deeling {
+                            // 成功后执行右侧表达式，返回右侧结果（类似 bash a && b 的返回值）
+                            Some(next) => next.as_ref().eval_mut(state, env, depth + 1),
+                            None => Ok(result),
+                        },
+                        CatchType::TerminateOnEmpty if result.is_empty() => Err(RuntimeError {
+                            kind: RuntimeErrorKind::Terminated,
+                            context: self.clone(),
+                            depth,
+                        }),
                         _ => Ok(result),
                     },
                     Err(e) => catch_error(e, typ, deeling, state, env, depth + 1),

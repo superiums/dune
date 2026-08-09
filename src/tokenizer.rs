@@ -500,6 +500,8 @@ fn underscore_dispatch(input: Input<'_>, ctx: Ctx) -> TokenizationResult<'_, (To
             map_valid_token(punctuation_tag("_"), TokenKind::Symbol),
         ))(input),
         _ => alt((
+            map_valid_token(space_brace_followed_tag("_:"), TokenKind::Operator), //onEmpty catch
+            map_valid_token(space_brace_followed_tag("_!"), TokenKind::Operator), //TerminateOnEmpty catch
             // custom unary op __+ as Operator: a __+
             map_valid_token(punct_seq_tag("__"), TokenKind::Operator), //custom op define
             //`ls _` `[0.._]` `[_..9]` `a[.._:2]
