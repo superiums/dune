@@ -14,6 +14,15 @@ use crate::{Expression, expression::table::TableData, libs::bin::into_lib::strip
 /// 嵌套表格能接受的最小可用宽度，低于这个值就没必要画表格了
 const MIN_TABLE_WIDTH: usize = 20;
 
+/// 一列要保持"可读"所需的最小宽度：低于这个宽度，即使技术上能塞进去，
+/// 也会退化成一列高瘦的竖条，观感上等价于"表格被拆碎"。
+const MIN_READABLE_COL_WIDTH: usize = 4;
+
+/// 允许在 fit_width 基础上再压缩的宽度容忍系数。
+/// 适度超宽可以靠 wrap 挽回；超过太多说明列本身撑不开，
+/// wrap 只会把表格拆得很碎，不如直接回退文本。
+const WRAP_TOLERANCE: f64 = 1.5;
+
 /// 计算多行字符串中"可见"最大宽度（去除 ANSI 转义序列后按字符数计）
 fn visible_width(s: &str) -> usize {
     s.lines()
@@ -22,24 +31,82 @@ fn visible_width(s: &str) -> usize {
         .unwrap_or(0)
 }
 
+/// 计算文本中最长的空白分隔 token 的可见宽度（去 ANSI）。
+/// 这是 keep_words(true) 语义下，一列不可能再压缩到更窄的下限。
+fn max_token_width(text: &str) -> usize {
+    text.split_whitespace()
+        .map(|w| strip_ansi_escapes(w).chars().count())
+        .max()
+        .unwrap_or(0)
+}
+
+/// 廉价预筛：只看列数 + 首行（非表头）数据总长度，
+/// 用于在真正构建 Builder/Table 之前就排除明显没救的情况。
+/// 这只是"跳过构建"的快速路径，不是最终决策——
+/// 真正的判断在表格构建完成、fit_width 之前，对完整渲染结果测宽度
+/// (见 `accept_natural_width`)。
+fn quick_reject(
+    cols: usize,
+    first_row_total_len: usize,
+    max_width: usize,
+    max_wraped_width: usize,
+) -> bool {
+    if cols == 0 {
+        return true;
+    }
+    if max_wraped_width + cols * 3 + 1 >= max_width {
+        return true;
+    }
+    if cols * MIN_READABLE_COL_WIDTH > max_width {
+        return true;
+    }
+    (first_row_total_len as f64) > max_width as f64 * WRAP_TOLERANCE
+}
+
+/// 权威判断：表格已经 build() 完毕、样式已应用，但**尚未调用 fit_width**，
+/// 此时测的是自然宽度，未被强制压缩，判断才有意义。
+/// 必须在这个时机调用——`Width::wrap` 之后的宽度恒 <= max_width，
+/// 用它判断"要不要放弃"为时已晚（这正是最初 bug 的根因）。
+fn accept_natural_width(table: &Table, max_width: usize) -> bool {
+    visible_width(&table.to_string()) as f64 <= max_width as f64 * WRAP_TOLERANCE
+}
+
+/// 嵌套表格的统一收尾：先做自然宽度把关，通过才 fit_width；
+/// 顶层表格（nested == false）跳过把关，保持"必须画出来"的既有行为。
+fn finalize_table(mut table: Table, max_width: usize, nested: bool) -> Option<Table> {
+    if nested && !accept_natural_width(&table, max_width) {
+        return None;
+    }
+    fit_width(&mut table, max_width);
+    Some(table)
+}
+
 pub fn pretty_printer(arg: &Expression) -> Result<Expression, crate::RuntimeError> {
     let specified_width = crossterm::terminal::size().unwrap_or((120, 0)).0 as usize;
     match arg {
         Expression::Table(table_data) => {
-            println!(
-                "{}",
-                print_table_with_tabled(table_data, true, specified_width)
-            )
+            let out = print_table_with_tabled(table_data, true, specified_width, false)
+                .map(|t| t.to_string())
+                .unwrap_or_else(|| format!("{arg:#}"));
+            println!("{}", out)
         }
-        Expression::Map(exprs) => println!("{}", pprint_map(exprs.as_ref(), true, specified_width)),
+        Expression::Map(exprs) => {
+            let out = pprint_map(exprs.as_ref(), true, specified_width)
+                .map(|t| t.to_string())
+                .unwrap_or_else(|| format!("{arg:#}"));
+            println!("{}", out)
+        }
         Expression::HMap(exprs) => {
-            println!("{}", pprint_hmap(exprs.as_ref(), true, specified_width))
+            let out = pprint_hmap(exprs.as_ref(), true, specified_width)
+                .map(|t| t.to_string())
+                .unwrap_or_else(|| format!("{arg:#}"));
+            println!("{}", out)
         }
         Expression::List(exprs) => {
-            println!(
-                "{}",
-                pprint_list(exprs.as_ref(), true, specified_width, false)
-            )
+            let out = pprint_list(exprs.as_ref(), true, specified_width, false)
+                .map(|t| t.to_string())
+                .unwrap_or_else(|| format!("{arg:#}"));
+            println!("{}", out)
         }
         _ => {
             println!("{arg:#}");
@@ -52,14 +119,20 @@ pub fn pretty_formatter(arg: &Expression) -> String {
     let specified_width = crossterm::terminal::size().unwrap_or((120, 0)).0 as usize;
     match arg {
         Expression::Table(table_data) => {
-            print_table_with_tabled(table_data, false, specified_width).to_string()
+            print_table_with_tabled(table_data, false, specified_width, false)
+                .map(|t| t.to_string())
+                .unwrap_or_else(|| format!("{arg:#}"))
         }
-        Expression::Map(exprs) => pprint_map(exprs.as_ref(), false, specified_width).to_string(),
-        Expression::HMap(exprs) => pprint_hmap(exprs.as_ref(), false, specified_width).to_string(),
-        Expression::List(exprs) => {
-            pprint_list(exprs.as_ref(), false, specified_width, false).to_string()
-        }
-        _ => format!("{arg:?}"),
+        Expression::Map(exprs) => pprint_map(exprs.as_ref(), false, specified_width)
+            .map(|t| t.to_string())
+            .unwrap_or_else(|| format!("{arg:#}")),
+        Expression::HMap(exprs) => pprint_hmap(exprs.as_ref(), false, specified_width)
+            .map(|t| t.to_string())
+            .unwrap_or_else(|| format!("{arg:#}")),
+        Expression::List(exprs) => pprint_list(exprs.as_ref(), false, specified_width, false)
+            .map(|t| t.to_string())
+            .unwrap_or_else(|| format!("{arg:#}")),
+        _ => format!("{arg:#}"),
     }
 }
 
@@ -71,22 +144,25 @@ struct KeyValueRow {
     value: String,
 }
 
-/// 尝试用子表格渲染，宽度不够时回退成 Display 文本
+/// 尝试用子表格渲染，宽度不够/结构不适合时回退成 Display 文本
 fn try_render_sub_table<F>(build: F, fallback_val: &Expression, cell_width: usize) -> String
 where
-    F: FnOnce() -> Table,
+    F: FnOnce() -> Option<Table>,
 {
-    // 空间太小，直接不画表格
+    // 空间太小，直接不画表格，连 build 都不必调用
     if cell_width < MIN_TABLE_WIDTH {
-        return textwrap::fill(&format!("{fallback_val}"), cell_width.max(1));
+        return textwrap::fill(&format!("{fallback_val:#}"), cell_width.max(1));
     }
 
-    let sub = build().to_string();
+    let sub = match build() {
+        Some(t) => t.to_string(),
+        None => return textwrap::fill(&format!("{fallback_val:#}"), cell_width),
+    };
 
-    // 即使按 cell_width 做了 wrap，如果内容本身仍然超宽（例如单个超长 token
-    // 或者子表格列太多导致最小宽度也超过 cell_width），就放弃表格形式
+    // 兜底：即使自然宽度把关通过了，wrap 之后如果内容本身仍然超宽
+    // （例如单个超长 token），仍然放弃表格形式
     if visible_width(&sub) > cell_width {
-        return textwrap::fill(&format!("{fallback_val}"), cell_width);
+        return textwrap::fill(&format!("{fallback_val:#}"), cell_width);
     }
 
     sub
@@ -100,23 +176,43 @@ fn is_list_of_records(items: &[Expression]) -> bool {
             .all(|e| matches!(e, Expression::Map(_) | Expression::HMap(_)))
 }
 
-fn print_table_with_tabled(table: &TableData, with_color: bool, max_width: usize) -> Table {
-    let mut builder = Builder::with_capacity(table.row_count(), table.column_count());
+fn print_table_with_tabled(
+    table: &TableData,
+    with_color: bool,
+    max_width: usize,
+    nested: bool,
+) -> Option<Table> {
+    let headers = table.headers();
+    let cols = headers.len();
 
-    builder.push_record(table.headers());
-    for row in table.rows() {
+    let mut rows_iter = table.rows().iter();
+    let first_row: Vec<String> = match rows_iter.next() {
+        Some(row) => row.iter().map(|x| x.to_string()).collect(),
+        None => Vec::new(),
+    };
+    let first_row_len: usize = first_row.iter().map(|c| visible_width(c)).sum();
+    let max_wraped_width: usize = first_row.iter().map(|c| max_token_width(c)).sum();
+    // +3 splitter
+    if nested && quick_reject(cols, first_row_len, max_width, max_wraped_width) {
+        return None;
+    }
+
+    let mut builder = Builder::with_capacity(table.row_count(), cols);
+    builder.push_record(headers);
+    if !first_row.is_empty() {
+        builder.push_record(first_row);
+    }
+    for row in rows_iter {
         builder.push_record(row.iter().map(|x| x.to_string()));
     }
 
-    let mut table = builder.build();
+    let mut built = builder.build();
     if with_color {
-        table.modify(Rows::first(), Color::FG_BLUE);
+        built.modify(Rows::first(), Color::FG_BLUE);
     }
+    apply_table_style(&mut built, false, nested);
 
-    table.with(Style::rounded());
-
-    fit_width(&mut table, max_width);
-    table
+    finalize_table(built, max_width, nested)
 }
 
 /// 类型擦除后的 (key, value) 迭代器。
@@ -134,17 +230,16 @@ fn pprint_map_internal<'a>(
     with_color: bool,
     max_width: usize,
     nested: bool,
-) -> Table {
+) -> Option<Table> {
     const COLS: usize = 2;
-    let table_padding = COLS * 3 + 1;
+    let table_padding = COLS * 3 + 1 + 5;
     let available_width = max_width.saturating_sub(table_padding);
 
-    let key_column_width = 12.min(available_width / 2);
+    let key_column_width = 12.min(available_width / 3);
     let value_budget = available_width.saturating_sub(key_column_width);
 
     // tabled::Table::new 必须拿到全部行才能算列宽，加上 is_hmap 要排序，
-    // 这一次 Vec 物化无法避免（库限制）；但调用方不再需要事先 collect，
-    // 省掉了"调用方 collect 一次 + 这里再 collect 一次"里前面那次。
+    // 这一次 Vec 物化无法避免（库限制）。
     let mut rows: Vec<KeyValueRow> = items
         .map(|(key, val)| {
             let value = render_field(&val, value_budget);
@@ -155,20 +250,34 @@ fn pprint_map_internal<'a>(
     if is_hmap {
         rows.sort();
     }
+
+    // 只用首行做廉价预筛，避免在明显没救的情况下构建 Table::new
+    if nested {
+        if let Some(first) = rows.first() {
+            let first_row_len = visible_width(&first.key) + visible_width(&first.value);
+            let max_wraped_width = max_token_width(&first.key) + max_token_width(&first.value);
+            if quick_reject(COLS, first_row_len, max_width, max_wraped_width) {
+                return None;
+            }
+        }
+    }
+
     let mut table = Table::new(rows);
 
     if is_hmap {
         if with_color {
             table.modify(Columns::first(), Color::FG_BLUE);
         }
-        table.modify(Columns::first(), Width::increase(key_column_width));
+        table.modify(
+            Columns::first(),
+            Width::truncate(key_column_width).suffix("…"),
+        );
     } else if with_color {
         table.modify(Columns::first(), Color::FG_GREEN);
     }
 
-    apply_table_style(&mut table, if is_hmap { 1 } else { 0 }, nested);
-    fit_width(&mut table, max_width);
-    table
+    apply_table_style(&mut table, is_hmap, nested);
+    finalize_table(table, max_width, nested)
 }
 
 /// 只有当表格自然宽度超过预算时才强制 wrap；
@@ -184,20 +293,22 @@ fn fit_width(table: &mut Table, max_width: usize) {
 /// 顶层表格保留完整边框；嵌套表格去掉四周边框（只留表头分隔线），
 /// 一是视觉上避免"表格套表格"的拥挤感，二是省下两侧竖线占用的宽度，
 /// 缓解嵌套时外层单元格里的空白间隙问题。
-fn apply_table_style(table: &mut Table, other_style: u8, nested: bool) {
+fn apply_table_style(table: &mut Table, use_markdown: bool, nested: bool) {
     if nested {
         // Style::psql()：无外框、无竖线，仅表头下一条横线，足够区分表头/数据
         table.with(Style::psql());
-    } else if other_style == 1 {
+    } else if use_markdown {
         table.with(Style::markdown());
-    } else if other_style == 2 {
-        table.with(Style::rounded());
     } else {
-        table.with(Style::modern_rounded());
+        table.with(Style::rounded());
     }
 }
 
-fn pprint_map(exprs: &BTreeMap<String, Expression>, with_color: bool, max_width: usize) -> Table {
+fn pprint_map(
+    exprs: &BTreeMap<String, Expression>,
+    with_color: bool,
+    max_width: usize,
+) -> Option<Table> {
     pprint_map_internal(
         Box::new(exprs.iter().map(|(k, v)| (k.clone(), v.clone()))),
         false,
@@ -211,7 +322,7 @@ pub fn pprint_hmap(
     exprs: &HashMap<String, Expression>,
     with_color: bool,
     max_width: usize,
-) -> Table {
+) -> Option<Table> {
     pprint_map_internal(
         Box::new(exprs.iter().map(|(k, v)| (k.clone(), v.clone()))),
         true,
@@ -231,7 +342,8 @@ fn render_field(val: &Expression, cell_width: usize) -> String {
         Expression::List(items) if is_list_of_records(items) => {
             render_value(val, cell_width, false, true)
         }
-        _ => val.to_string(),
+        Expression::Table(_) => render_value(val, cell_width, false, true),
+        _ => format!("{val:#}"),
     }
 }
 
@@ -268,11 +380,21 @@ fn render_value(val: &Expression, cell_width: usize, with_color: bool, nested: b
             val,
             cell_width,
         ),
-        _ => textwrap::fill(&format!("{val}"), cell_width),
+        Expression::Table(t) => try_render_sub_table(
+            || print_table_with_tabled(t, false, cell_width, nested),
+            val,
+            cell_width,
+        ),
+        _ => textwrap::fill(&format!("{val:#}"), cell_width),
     }
 }
 
-fn pprint_list(exprs: &[Expression], with_color: bool, max_width: usize, nested: bool) -> Table {
+fn pprint_list(
+    exprs: &[Expression],
+    with_color: bool,
+    max_width: usize,
+    nested: bool,
+) -> Option<Table> {
     let (rows, heads_opt) = TableRow {
         rows: exprs,
         max_width,
@@ -281,8 +403,20 @@ fn pprint_list(exprs: &[Expression], with_color: bool, max_width: usize, nested:
     .split_into_rows();
 
     if rows.is_empty() {
-        return Table::default();
+        return Some(Table::default());
     }
+
+    // 廉价预筛：列数 + 首行长度
+    if nested {
+        let cols = heads_opt.as_ref().map(|h| h.len()).unwrap_or(rows[0].len());
+        let first_row_len: usize = rows[0].iter().map(|c| visible_width(c)).sum();
+        let max_wraped_width: usize = rows[0].iter().map(|c| max_token_width(c)).sum();
+
+        if quick_reject(cols, first_row_len, max_width, max_wraped_width) {
+            return None;
+        }
+    }
+
     let mut builder;
 
     let has_header = match heads_opt {
@@ -313,9 +447,8 @@ fn pprint_list(exprs: &[Expression], with_color: bool, max_width: usize, nested:
         );
     }
 
-    apply_table_style(&mut table, if has_header { 2 } else { 0 }, nested);
-    fit_width(&mut table, max_width);
-    table
+    apply_table_style(&mut table, false, nested);
+    finalize_table(table, max_width, nested)
 }
 
 struct TableRow<'a> {
@@ -340,7 +473,7 @@ impl<'a> TableRow<'a> {
         let mut current_row = Vec::with_capacity(cols);
 
         if cols > 0 {
-            // per_cell_width 仅用作“复合值需要递归建子表时”的预算上限，
+            // per_cell_width 仅用作"复合值需要递归建子表时"的预算上限，
             // 不再用来提前截断标量字段——标量字段的实际宽度应由最终的
             // Width::wrap(max_width) 统一、按列实际内容智能分配，而不是
             // 建表前就被平均切分打断。
@@ -373,7 +506,7 @@ impl<'a> TableRow<'a> {
             return (result, heads);
         }
 
-        // 一唯表格
+        // 一维表格
         let mut current_len = 0;
         for (i, expr) in self.rows.iter().enumerate() {
             let col = match expr {
@@ -405,13 +538,11 @@ impl<'a> TableRow<'a> {
             if cols == 0 {
                 if !current_row.is_empty() && current_len + col_width > self.max_width {
                     cols = i;
-                    // dbg!(&cols);
                     result.push(current_row);
                     current_row = vec![];
                     current_len = 0;
                 }
             } else if i % cols == 0 {
-                // dbg!(&i);
                 result.push(current_row);
                 current_row = vec![];
                 current_len = 0;
