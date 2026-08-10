@@ -70,7 +70,7 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         merge => "deep merge maps, recurse on nested maps", "<map1> <map2> [<map3>...]"
 
         // 转换操作
-        map => "transform keys/values, fn(k,v)->[k,v]", "<map> <map_fn>"
+        map => "transform keys/values, fn(k,v)->[k,v]", "<map> <fn(k,v)>"
         to_list => "to list of [k,v] pairs", "<map>"
         to_hmap => "to hashMap (unordered)", "<map>"
     })

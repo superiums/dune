@@ -81,8 +81,8 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         unique => "dedupe, preserve order", "<list>"
         split_at => "split at index, returns [left,right]", "<list> <index>"
         split_first => "split head/tail, returns [head,rest]", "<list>"
-        sort => "sort, optional fn(a,b)->[-1/0/1]. e.g. sort list 'name'", "<list> [key_fn|±key...]"
-        group => "group by key fn or map field, e.g.  fn(item)->string", "<list> <key_fn|key>"
+        sort => "sort, optional fn(a,b)->[-1/0/1]. e.g. sort list 'name'", "<list> [fn|±key...]"
+        group => "group by key fn or map field, e.g.  fn(item)->string", "<list> <fn|key>"
         remove_at => "remove n items from index", "<list> <index> [count=1]"
         remove => "remove item, default first-only", "<list> <item> [all=false]"
         set => "set value at existing index", "<list> <index> <value>"
@@ -104,9 +104,9 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         all => "all elements pass?", "<list> <fn>"
 
         // 转换操作
-        join => "join strings with separator", "<list> <separator>"
-        to_map => "to btreeMap, default pairs [k,v,k,v...]", "<list> [key_fn] [val_fn]"
-        to_hmap => "to hashMap, default pairs [k,v,k,v...]", "<list> [key_fn] [val_fn]"
+        join => "join strings with separator", "<list> [sep=' ']"
+        to_map => "to btreeMap, pairs [k,v,k,v...]", "<list> [fn(k,v)]"
+        to_hmap => "to hashMap, pairs [k,v,k,v...]", "<list> [fn(k,v)]"
         to_set => "to btreeSet", "<list>"
 
         // 结构操作
@@ -1228,10 +1228,14 @@ fn join(
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("join", &args, 2, ctx)?;
+    check_args_len("join", &args, 1..=2, ctx)?;
 
     let list = get_list_ref(&args[0], ctx)?;
-    let separator = get_string_ref(&args[1], ctx)?;
+    let separator = if args.len() > 1 {
+        get_string_ref(&args[1], ctx)?
+    } else {
+        " "
+    };
 
     let mut joined = String::new();
     for (i, item) in list.as_ref().iter().enumerate() {
@@ -1248,81 +1252,135 @@ fn to_map(
     env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_args_len("to_map", &args, 1..=3, ctx)?;
+    // 参数从 1..=3 (list, key_fn?, val_fn?) 收窄为 1..=2 (list, fn_item?)
+    check_args_len("to_map", &args, 1..=2, ctx)?;
     let mut it = args.into_iter();
     let list_exp = it.next().unwrap();
-    let key_fo = it.next().map(Rc::new);
-    let val_fo = it.next().map(Rc::new);
+    let fn_o = it.next().map(Rc::new);
     let list = get_list_ref(&list_exp, ctx)?;
 
-    if key_fo.is_none() && val_fo.is_none() {
+    // 无回调：仍按“相邻两两配对”处理，用 chunks(2) 避免奇数长度时越界 panic
+    if fn_o.is_none() {
         let mut map = BTreeMap::new();
-        for i in (0..list.len()).step_by(2) {
-            map.insert(list[i].to_string(), list[i + 1].clone());
+        for pair in list.as_ref().chunks(2) {
+            match pair {
+                [k, v] => {
+                    map.insert(k.to_string(), v.clone());
+                }
+                [k] => {
+                    return Err(RuntimeError::common(
+                        format!(
+                            "to_map: odd number of elements, key '{}' has no matching value",
+                            k
+                        )
+                        .into(),
+                        ctx.clone(),
+                        0,
+                    ));
+                }
+                _ => unreachable!(),
+            }
         }
         return Ok(Expression::from(map));
     }
 
+    // 有回调：只调用一次 fn_item(item)，要求返回 [key, value] 二元列表
+    let f = fn_o.unwrap();
     let mut map = BTreeMap::new();
     let state = &mut State::new();
     for item in list.as_ref().iter() {
-        let key = match key_fo {
-            Some(ref kf) => {
-                let r = kf.eval_apply(kf, std::slice::from_ref(item), state, env, 0)?;
-                match r {
-                    Expression::String(s) => s,
+        let r = f.eval_apply(&f, std::slice::from_ref(item), state, env, 0)?;
+        match r {
+            Expression::List(pair) if pair.as_ref().len() == 2 => {
+                let key = match &pair.as_ref()[0] {
+                    Expression::String(s) => s.clone(),
                     other => other.to_string(),
-                }
+                };
+                let value = pair.as_ref()[1].clone();
+                map.insert(key, value);
             }
-            None => item.to_string(),
-        };
-        let value = match val_fo {
-            Some(ref vf) => vf.eval_apply(vf, std::slice::from_ref(item), state, env, 0)?,
-            None => item.clone(),
-        };
-        map.insert(key, value);
+            Expression::Map(nm) => map.extend(nm.as_ref().clone()),
+            Expression::HMap(nm) => map.extend(nm.as_ref().clone()),
+
+            other => {
+                return Err(RuntimeError::common(
+                    format!(
+                        "to_map: callback must return a [key, value] pair, got: {}",
+                        other
+                    )
+                    .into(),
+                    ctx.clone(),
+                    0,
+                ));
+            }
+        }
     }
     Ok(Expression::from(map))
 }
+
 fn to_hmap(
     args: Vec<Expression>,
     env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_args_len("to_hmap", &args, 1..=3, ctx)?;
+    check_args_len("to_hmap", &args, 1..=2, ctx)?;
     let mut it = args.into_iter();
     let list_exp = it.next().unwrap();
-    let key_fo = it.next().map(Rc::new);
-    let val_fo = it.next().map(Rc::new);
+    let fn_o = it.next().map(Rc::new);
     let list = get_list_ref(&list_exp, ctx)?;
 
-    if key_fo.is_none() && val_fo.is_none() {
+    if fn_o.is_none() {
         let mut map = HashMap::new();
-        for i in (0..list.len()).step_by(2) {
-            map.insert(list[i].to_string(), list[i + 1].clone());
+        for pair in list.as_ref().chunks(2) {
+            match pair {
+                [k, v] => {
+                    map.insert(k.to_string(), v.clone());
+                }
+                [k] => {
+                    return Err(RuntimeError::common(
+                        format!(
+                            "to_hmap: odd number of elements, key '{}' has no matching value",
+                            k
+                        )
+                        .into(),
+                        ctx.clone(),
+                        0,
+                    ));
+                }
+                _ => unreachable!(),
+            }
         }
         return Ok(Expression::from(map));
     }
 
+    let f = fn_o.unwrap();
     let mut map = HashMap::new();
     let state = &mut State::new();
     for item in list.as_ref().iter() {
-        let key = match key_fo {
-            Some(ref kf) => {
-                let r = kf.eval_apply(kf, std::slice::from_ref(item), state, env, 0)?;
-
-                match r {
-                    Expression::String(s) => s,
+        let r = f.eval_apply(&f, std::slice::from_ref(item), state, env, 0)?;
+        match r {
+            Expression::List(pair) if pair.as_ref().len() == 2 => {
+                let key = match &pair.as_ref()[0] {
+                    Expression::String(s) => s.clone(),
                     other => other.to_string(),
-                }
+                };
+                let value = pair.as_ref()[1].clone();
+                map.insert(key, value);
             }
-            None => item.to_string(),
-        };
-        let value = match val_fo {
-            Some(ref vf) => vf.eval_apply(vf, std::slice::from_ref(item), state, env, 0)?,
-            None => item.clone(),
-        };
-        map.insert(key, value);
+            Expression::Map(nm) => map.extend(nm.as_ref().clone()),
+            Expression::HMap(nm) => map.extend(nm.as_ref().clone()),
+            other => {
+                return Err(RuntimeError::common(
+                    format!(
+                        "to_hmap: callback must return a [key, value] pair, got: {}",
+                        other
+                    )
+                    .into(),
+                    ctx.clone(),
+                    0,
+                ));
+            }
+        }
     }
     Ok(Expression::from(map))
 }
