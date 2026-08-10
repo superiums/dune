@@ -489,12 +489,12 @@ pub fn run_repl(env: &mut Environment) {
 
         let trimmed = line.trim();
 
-        if trimmed == "exit" {
-            break;
-        }
-
         if trimmed.is_empty() {
             continue;
+        }
+
+        if trimmed == "exit" {
+            break;
         }
 
         // Strip backslash-newline continuation markers

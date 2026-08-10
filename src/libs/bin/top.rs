@@ -288,7 +288,7 @@ fn exit(
         0
     } else {
         match args[0] {
-            Expression::Integer(n) => n as i32,
+            Expression::Integer(n) => n as u8,
             _ => {
                 return Err(RuntimeError::new(
                     RuntimeErrorKind::CustomError("exit code must be integer".into()),
@@ -298,7 +298,11 @@ fn exit(
             }
         }
     };
-    std::process::exit(code);
+    Err(RuntimeError::new(
+        RuntimeErrorKind::Exited(code),
+        ctx.clone(),
+        0,
+    ))
 }
 fn cd(
     args: Vec<Expression>,

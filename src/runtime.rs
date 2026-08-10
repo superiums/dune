@@ -1,5 +1,5 @@
 use crate::libs::pretty_printer;
-use crate::set_print_direct;
+use crate::{RuntimeErrorKind, set_print_direct};
 
 use crate::utils::{expand_home, is_cfm_mode};
 use crate::with_print_direct;
@@ -11,21 +11,22 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 use std::rc::Rc;
 
-pub fn run_file(pb: PathBuf, env: &mut Environment) -> bool {
+pub fn run_file(pb: PathBuf, env: &mut Environment) {
     match read_to_string(pb.clone()) {
         Ok(prelude) => {
             env.define(
                 "SCRIPT",
                 Expression::String(pb.to_string_lossy().to_string()),
             );
-            parse_and_eval(&prelude, env) == 0
+            let code = parse_and_eval(&prelude, env);
+            std::process::exit(code as i32);
         }
         Err(e) => {
             eprintln!(
                 "\x1b[31m[IO ERROR]\x1b[0mFailed to read file '{}':\n  {e}",
                 pb.display()
             );
-            false
+            std::process::exit(-1);
         }
     }
 }
@@ -140,23 +141,9 @@ pub fn parse_and_eval(text: &str, env: &mut Environment) -> u8 {
 
     match parsed {
         Ok(expr) => {
-            // rl.add_history_entry(text.as_str());
-            // if let Some(path) = &history_path {
-            //     if rl.save_history(path).is_err() {
-            //         eprintln!("Failed to save history");
-            //     }
-            // }
             let val = expr.eval_cmd(env);
-            // dbg!(env.get("cd"));
             match val {
                 Ok(Expression::None) => {}
-                // Ok(Expression::Builtin(b)) => {
-                //     println!(
-                //         "  >> [Builtin] {}\n\x1b[1;32mDescription\x1b[0m: {}\n\x1b[1;32mParams     \x1b[0m: {}\n",
-                //         b.name, b.help, b.hint
-                //     );
-                //     let _ = io::stdout().flush();
-                // }
                 Ok(m)
                     if matches!(
                         m,
@@ -177,6 +164,14 @@ pub fn parse_and_eval(text: &str, env: &mut Environment) -> u8 {
                             r => println!("\n  >> [{}] <<\n{}", r.type_name(), r),
                         };
                     }
+                }
+                Err(e) if let RuntimeErrorKind::Exited(code) = e.kind => {
+                    if code == 0 {
+                        println!("exited");
+                    } else {
+                        eprintln!("exited with code {code}");
+                    }
+                    return code; //e.code ?
                 }
                 Err(e) => {
                     let _ = io::stdout().flush();
@@ -243,8 +238,19 @@ pub fn init_config(env: &mut Environment) {
         if parse_and_eval(INTRO_PRELUDE, env) > 0 {
             eprintln!("Sorry, the config seems has some issue");
         }
-    } else if !run_file(profile, env) {
-        eprintln!("Error while loading config");
+    } else {
+        match read_to_string(profile.clone()) {
+            Ok(prelude) => {
+                env.define(
+                    "SCRIPT",
+                    Expression::String(profile.to_string_lossy().to_string()),
+                );
+                let _ = parse_and_eval(&prelude, env);
+            }
+            Err(_) => {
+                eprintln!("Failed to load config");
+            }
+        }
     }
 
     if let Some(pd) = env.get("LUME_PRINT_DIRECT") {

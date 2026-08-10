@@ -99,6 +99,8 @@ pub enum RuntimeErrorKind {
     BuiltinFailed(String, String),
     #[error("terminated")]
     Terminated,
+    #[error("exited with code {0}")]
+    Exited(u8),
     #[error("IO Error during {operation}:\n  {kind}: {message}")]
     IoDetailed {
         operation: Cow<'static, str>,
