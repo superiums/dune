@@ -12,5 +12,5 @@ let escape_csv=fish2csv.escape_csv
 
 for dir in dirs {
     println dir.green()
-    dir | Fs.ls() ?! | .map(f -> Fs.join(dir, f.name)) |> fish2csv.trans()
+    dir | fs.ls() ?! | .map(f -> fs.join(dir, f.name)) |> fish2csv.trans()
 }

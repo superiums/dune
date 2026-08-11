@@ -242,8 +242,8 @@ split_first <list>
 sum <num1> <num2>... | <array>
 swap <list> <i> <j>
 take <list> <count>
-to_hmap <list> [key_fn] [val_fn]
-to_map <list> [key_fn] [val_fn]
+to_hmap <list> [fn(k,v)]
+to_map <list> [fn(k,v)]
 to_set <list>
 transpose <matrix>
 unique <list>

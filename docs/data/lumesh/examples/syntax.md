@@ -74,7 +74,9 @@ fn my_func() { ... }`
 - `expr ?>` - Override print (data channel)
 - `expr ?!` - Terminate on error
 - `expr ?~` - Convert error to boolean
-- `expr ?: handler_func` - Handle error with function/default_value
+- `expr &: next` - execute after success
+- `expr _!` - Terminate on empty
+- `expr _: default` - execute while on empty
   use `debug data` or `ddebug data` to debug data structure
 
 ### Output Handling

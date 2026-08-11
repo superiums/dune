@@ -462,9 +462,9 @@
 	swap two elements by index
 - take <list> <count>
 	first n elements
-- to_hmap <list> [key_fn] [val_fn]
+- to_hmap <list> [fn(k,v)]
 	to hashMap, default pairs [k,v,k,v...]
-- to_map <list> [key_fn] [val_fn]
+- to_map <list> [fn(k,v)]
 	to btreeMap, default pairs [k,v,k,v...]
 - to_set <list>
 	to btreeSet

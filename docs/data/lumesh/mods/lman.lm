@@ -4,7 +4,7 @@
 fn update(){
     println 'checking latest version...'
     let url = 'https://api.github.com/repos/superiums/lumesh/releases/latest'
-    let data = (curl -fsL $url ?: eprintln 'network err' && exit)
+    let data = curl -fsL $url ?: {eprintln 'network err'; exit 1}
     let js = from.json(data)
     let latest = js.tag_name | .strip_prefix('c') | .strip_prefix('v')
 
