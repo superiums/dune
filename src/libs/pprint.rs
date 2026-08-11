@@ -235,7 +235,7 @@ fn pprint_map_internal<'a>(
     let table_padding = COLS * 3 + 1 + 5;
     let available_width = max_width.saturating_sub(table_padding);
 
-    let key_column_width = 12.min(available_width / 3);
+    let key_column_width = 12.min(available_width / 4);
     let value_budget = available_width.saturating_sub(key_column_width);
 
     // tabled::Table::new 必须拿到全部行才能算列宽，加上 is_hmap 要排序，
@@ -477,7 +477,23 @@ impl<'a> TableRow<'a> {
             // 不再用来提前截断标量字段——标量字段的实际宽度应由最终的
             // Width::wrap(max_width) 统一、按列实际内容智能分配，而不是
             // 建表前就被平均切分打断。
-            let per_cell_width = (self.max_width / cols.max(1)).saturating_sub(self.col_padding);
+            let score_sum = self
+                .rows
+                .iter()
+                .map(|x| {
+                    if matches!(
+                        x,
+                        Expression::List(_) | Expression::Map(_) | Expression::HMap(_)
+                    ) {
+                        3
+                    } else {
+                        1
+                    }
+                })
+                .sum::<usize>();
+
+            let per_cell_width =
+                ((self.max_width / score_sum) * 3).saturating_sub(self.col_padding);
 
             for expr in self.rows.iter() {
                 match expr {
