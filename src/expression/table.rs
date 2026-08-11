@@ -2,7 +2,7 @@ use crate::{Expression, RuntimeErrorKind};
 use std::fmt;
 
 /// Table
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct TableData {
     headers: Vec<String>,
     rows: Vec<Vec<Expression>>,
@@ -189,81 +189,87 @@ impl TableData {
     }
 }
 
-impl fmt::Display for TableData {
+impl fmt::Debug for TableData {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if f.alternate() {
-            // 美化格式输出
-            if self.headers.is_empty() {
-                return write!(f, "[]");
-            }
+        // 美化格式输出
+        if self.headers.is_empty() {
+            return write!(f, "[]");
+        }
 
-            // 计算每列的最大宽度
-            let mut col_widths: Vec<usize> = self.headers.iter().map(|h| h.len()).collect();
+        // 计算每列的最大宽度
+        let mut col_widths: Vec<usize> = self.headers.iter().map(|h| h.len()).collect();
 
-            for row in &self.rows {
-                for (i, cell) in row.iter().enumerate() {
-                    if i < col_widths.len() {
-                        let cell_str = cell.to_string();
-                        col_widths[i] = col_widths[i].max(cell_str.len());
-                    }
+        for row in &self.rows {
+            for (i, cell) in row.iter().enumerate() {
+                if i < col_widths.len() {
+                    let cell_str = cell.to_string();
+                    col_widths[i] = col_widths[i].max(cell_str.len());
                 }
             }
+        }
 
-            // 输出表头
-            writeln!(
-                f,
-                "{}",
-                "─".repeat(col_widths.iter().sum::<usize>() + col_widths.len() * 3 - 1)
-            )?;
-            for (i, header) in self.headers.iter().enumerate() {
+        // 输出表头
+        writeln!(
+            f,
+            "{}",
+            "─".repeat(col_widths.iter().sum::<usize>() + col_widths.len() * 3 - 1)
+        )?;
+        for (i, header) in self.headers.iter().enumerate() {
+            if i > 0 {
+                write!(f, " │ ")?;
+            }
+            write!(f, "{:width$}", header, width = col_widths[i])?;
+        }
+        writeln!(f)?;
+        writeln!(
+            f,
+            "{}",
+            "─".repeat(col_widths.iter().sum::<usize>() + col_widths.len() * 3 - 1)
+        )?;
+
+        // 输出数据行
+        for row in &self.rows {
+            for (i, cell) in row.iter().enumerate() {
                 if i > 0 {
                     write!(f, " │ ")?;
                 }
-                write!(f, "{:width$}", header, width = col_widths[i])?;
+                write!(f, "{:width$}", cell.to_string(), width = col_widths[i])?;
             }
             writeln!(f)?;
+        }
+
+        if !self.rows.is_empty() {
             writeln!(
                 f,
                 "{}",
                 "─".repeat(col_widths.iter().sum::<usize>() + col_widths.len() * 3 - 1)
             )?;
-
-            // 输出数据行
-            for row in &self.rows {
-                for (i, cell) in row.iter().enumerate() {
-                    if i > 0 {
-                        write!(f, " │ ")?;
-                    }
-                    write!(f, "{:width$}", cell.to_string(), width = col_widths[i])?;
-                }
-                writeln!(f)?;
-            }
-
-            if !self.rows.is_empty() {
-                writeln!(
-                    f,
-                    "{}",
-                    "─".repeat(col_widths.iter().sum::<usize>() + col_widths.len() * 3 - 1)
-                )?;
-            }
-        } else {
-            // 紧凑格式输出
-            writeln!(f, "[")?;
-            if !self.headers.is_empty() {
-                write!(f, "  [{}]", self.headers.join(", "))?;
-            }
-            for row in &self.rows {
-                write!(
-                    f,
-                    ",\n  [{}]",
-                    row.iter()
-                        .map(|cell| cell.to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )?;
-            }
-            write!(f, "\n]")?;
         }
         Ok(())
+    }
+}
+impl fmt::Display for TableData {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // 紧凑格式输出
+        writeln!(f, "{{")?;
+
+        writeln!(f, "  headers: [")?;
+        writeln!(f, "    {}", self.headers.join(", "))?;
+        writeln!(f, "  ]\n")?;
+
+        writeln!(f, "  rows: [")?;
+        for row in &self.rows {
+            writeln!(
+                f,
+                "    [{}]",
+                row.iter()
+                    .map(|cell| cell.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            )?;
+        }
+        writeln!(f, "  ]")?;
+
+        writeln!(f, "}}")
     }
 }

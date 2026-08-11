@@ -193,17 +193,16 @@ fn debug(
 ) -> Result<Expression, RuntimeError> {
     let mut results = Vec::new();
     for x in args.iter() {
-        let expr_repr = format!("{x:?}");
         let y = x.eval_with_assign(state, env);
         let mut map = BTreeMap::new();
-        map.insert("expr".to_string(), Expression::String(expr_repr));
+        map.insert("expr".to_string(), Expression::String(format!("{x:?}")));
         match y {
             Ok(r) => {
                 map.insert(
                     "type".to_string(),
                     Expression::String(r.type_name().to_string()),
                 );
-                map.insert("value".to_string(), r);
+                map.insert("value".to_string(), Expression::String(format!("{r:?}")));
             }
             Err(e) => {
                 map.insert("type".to_string(), Expression::String("Err".to_string()));
@@ -224,10 +223,10 @@ fn ddebug(
 ) -> Result<Expression, RuntimeError> {
     let mut results = Vec::new();
     for x in args.iter() {
-        let expr_repr = format!("{x:#}");
+        // let expr_repr = format!("{x:#}");
         let y = x.eval_with_assign(state, env);
         let mut map = BTreeMap::new();
-        map.insert("expr".to_string(), Expression::String(expr_repr));
+        map.insert("expr".to_string(), x.clone());
         match y {
             Ok(r) => {
                 map.insert(

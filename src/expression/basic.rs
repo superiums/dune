@@ -661,13 +661,14 @@ impl Expression {
             Self::TimeDef(t) => write!(f, "{}t'{t}'", idt(i)),
             Self::Blank => write!(f, "{}_", idt(i)),
             Self::Shift => write!(f, "{}shift", idt(i)),
-            Self::Table(t) => write!(f, "{}{t:?}", idt(i)),
+            Self::Table(t) => write!(f, "{}{:#}", idt(i), t),
         }
     }
 }
 
 // Expression 辅助函数
 impl Expression {
+    /// Debug 实现
     fn fmt_indent(&self, f: &mut fmt::Formatter, indent: usize) -> fmt::Result {
         let prefix = idt(indent);
         match &self {
@@ -948,7 +949,7 @@ impl Expression {
             Self::Property(obj, prop) => {
                 writeln!(f, "{}Property〈", prefix)?;
                 obj.fmt_indent(f, indent + 1)?;
-                writeln!(f, "\n{}.{prop}", idt(indent + 1))?;
+                writeln!(f, "\n{}Prop〈{prop}〉", idt(indent + 1))?;
                 writeln!(f, "{}〉", prefix)
             }
 
@@ -1016,7 +1017,7 @@ impl Expression {
             Self::ModuleCall(mo, func) => {
                 write!(f, "{}ModuleCall〈{}::{}〉", prefix, mo.join("::"), func)
             }
-            Self::Table(t) => write!(f, "{prefix}Table〈\n{t:#}\n{prefix}〉"),
+            Self::Table(t) => write!(f, "{prefix}Table〈\n{t}\n{prefix}〉"),
         }
     }
 
@@ -1133,74 +1134,7 @@ impl Expression {
     pub fn execute(&self, args: Vec<Self>) -> Self {
         Self::Command(Rc::new(self.clone()), Rc::new(args))
     }
-    // 参数合并方法
-    // pub fn replace_or_append_arg(&self, arg: Expression) -> Expression {
-    //     let mut found = false;
-    //     match self {
-    //         Expression::Apply(f, existing_args) => {
-    //             let new_args = existing_args
-    //                 .iter()
-    //                 .map(|a| match a {
-    //                     Self::Blank => {
-    //                         found = true;
-    //                         arg.clone()
-    //                     }
-    //                     _ => a.clone(),
-    //                 })
-    //                 .collect();
-    //             if found {
-    //                 Expression::Apply(f.clone(), Rc::new(new_args))
-    //             } else {
-    //                 self.append_args(vec![arg])
-    //             }
-    //         }
-    //         Expression::Command(f, existing_args) => {
-    //             let new_args = existing_args
-    //                 .iter()
-    //                 .map(|a| match a {
-    //                     Self::Blank => {
-    //                         found = true;
-    //                         arg.clone()
-    //                     }
-    //                     _ => a.clone(),
-    //                 })
-    //                 .collect();
-    //             if found {
-    //                 Expression::Command(f.clone(), Rc::new(new_args))
-    //             } else {
-    //                 self.append_args(vec![arg])
-    //             }
-    //         }
-    //         Expression::Chain(base, calls) => {
-    //             if calls.is_empty() {
-    //                 Expression::Chain(base.clone(), calls.clone())
-    //             } else {
-    //                 let (call, others) = calls.split_at(1);
-    //                 let mut new_args: Vec<Expression> = call[0]
-    //                     .args
-    //                     .iter()
-    //                     .map(|a| match a {
-    //                         Self::Blank => {
-    //                             found = true;
-    //                             arg.clone()
-    //                         }
-    //                         _ => a.clone(),
-    //                     })
-    //                     .collect();
-    //                 if !found {
-    //                     new_args.push(arg);
-    //                 }
-    //                 let mut new_calls = vec![ChainCall {
-    //                     method: call[0].method.clone(),
-    //                     args: new_args,
-    //                 }];
-    //                 new_calls.extend_from_slice(others);
-    //                 Expression::Chain(base.clone(), new_calls)
-    //             }
-    //         }
-    //         _ => Expression::Command(Rc::new(self.clone()), Rc::new(vec![arg])), //report error?
-    //     }
-    // }
+
     /// please make sure only use with Apply/Command
     pub fn append_args(&self, args: &[Expression]) -> Expression {
         match self {

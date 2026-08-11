@@ -151,18 +151,18 @@ where
 {
     // 空间太小，直接不画表格，连 build 都不必调用
     if cell_width < MIN_TABLE_WIDTH {
-        return textwrap::fill(&format!("{fallback_val:#}"), cell_width.max(1));
+        return textwrap::fill(&format!("{fallback_val}"), cell_width.max(1));
     }
 
     let sub = match build() {
         Some(t) => t.to_string(),
-        None => return textwrap::fill(&format!("{fallback_val:#}"), cell_width),
+        None => return textwrap::fill(&format!("{fallback_val}"), cell_width),
     };
 
     // 兜底：即使自然宽度把关通过了，wrap 之后如果内容本身仍然超宽
     // （例如单个超长 token），仍然放弃表格形式
     if visible_width(&sub) > cell_width {
-        return textwrap::fill(&format!("{fallback_val:#}"), cell_width);
+        return textwrap::fill(&format!("{fallback_val}"), cell_width);
     }
 
     sub
@@ -343,7 +343,7 @@ fn render_field(val: &Expression, cell_width: usize) -> String {
             render_value(val, cell_width, false, true)
         }
         Expression::Table(_) => render_value(val, cell_width, false, true),
-        _ => format!("{val:#}"),
+        _ => format!("{val}"),
     }
 }
 
@@ -385,7 +385,7 @@ fn render_value(val: &Expression, cell_width: usize, with_color: bool, nested: b
             val,
             cell_width,
         ),
-        _ => textwrap::fill(&format!("{val:#}"), cell_width),
+        _ => textwrap::fill(&format!("{val}"), cell_width),
     }
 }
 
