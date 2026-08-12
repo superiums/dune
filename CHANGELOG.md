@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.18.1]
+- update tree-sitter
+- fix cursor/hint adjustment
+- optimize width for complex item in list
+- fix nested table display in debug
+- doc update
+- unify fn for list.to_map
+- improve nested pprint
+- support exit code
+- improve pprint
+
 ## [0.18.0]
 - add terminate on empty `_!` for pipe
 `'' _! | print 'go'` will terminate the pipe for empty data on left
