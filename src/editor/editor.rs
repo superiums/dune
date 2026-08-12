@@ -1394,8 +1394,11 @@ impl Editor {
             if i + 1 < lines_before_cursor.len() {
                 cursor_row += extra + (1 + (line_visual_w.saturating_sub(1) / vis_width) as u16);
             } else {
-                cursor_row += extra + (line_visual_w / vis_width) as u16;
-                cursor_col = (line_visual_w % vis_width) as u16;
+                // FIX: was `(line_visual_w / vis_width, line_visual_w % vis_width)`,
+                // which wrongly wrapped when line_visual_w is an exact multiple of vis_width.
+                let (rows, col) = wrap_row_col(line_visual_w, vis_width);
+                cursor_row += extra + rows;
+                cursor_col = col;
             }
         }
 
@@ -1416,8 +1419,10 @@ impl Editor {
                 end_row += extra + visual_rows_per_line[i] as u16;
                 end_col = 0;
             } else {
-                end_row += extra + (line_visual_w / vis_width) as u16;
-                end_col = line_visual_w % vis_width;
+                // FIX: same deferred-wrap adjustment as cursor_row/cursor_col above.
+                let (rows, col) = wrap_row_col(line_visual_w, vis_width);
+                end_row += extra + rows;
+                end_col = col as usize;
             }
         }
 
@@ -1589,6 +1594,14 @@ impl Editor {
 }
 
 // ---- 工具函数 ----
+fn wrap_row_col(w: usize, vis_width: usize) -> (u16, u16) {
+    if vis_width == 0 {
+        return (0, w as u16);
+    }
+    let rows = w.saturating_sub(1) / vis_width;
+    let col = (w.saturating_sub(rows * vis_width)).min(vis_width.saturating_sub(1));
+    (rows as u16, col as u16)
+}
 
 fn strip_ansi(s: &str) -> String {
     let mut result = String::new();
