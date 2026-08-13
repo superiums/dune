@@ -576,7 +576,7 @@ fn split_first(
 }
 
 /// 排序键：描述如何从一个元素中取出用于比较的值，以及排序方向。
-enum SortKey {
+pub enum SortKey {
     /// Map/HMap 字段名 + 是否升序
     Field(String, bool),
     /// List 内部索引（已转换为非负值）+ 是否升序
@@ -592,7 +592,7 @@ impl SortKey {
     ///   "field"            -> Field(field, true)        默认升序
     ///   正整数 n            -> Index(n, true)            用于 List，按下标 n 升序
     ///   负整数 -n           -> Index(n, false)           用于 List，按下标 n 降序
-    fn parse(expr: &Expression, ctx: &Expression) -> Result<Self, RuntimeError> {
+    pub fn parse(expr: &Expression, ctx: &Expression) -> Result<Self, RuntimeError> {
         match expr {
             Expression::Integer(i) => Ok(SortKey::Index(i.unsigned_abs() as usize, i >= &0)),
             Expression::Symbol(s) | Expression::String(s) => match s.as_str() {
@@ -640,6 +640,13 @@ impl SortKey {
     fn is_asc(&self) -> bool {
         match self {
             SortKey::Whole(a) | SortKey::Field(_, a) | SortKey::Index(_, a) => *a,
+        }
+    }
+
+    pub fn get_field(self) -> Option<String> {
+        match self {
+            SortKey::Field(f, _) => Some(f),
+            _ => None,
         }
     }
 }

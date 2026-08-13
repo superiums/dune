@@ -1,6 +1,6 @@
 use crate::expression::table::TableData;
 use crate::libs::bin::into_lib::csv as to_csv;
-use crate::libs::bin::list_lib;
+use crate::libs::bin::list_lib::{self, SortKey};
 use crate::libs::helper::{
     check_args_len, check_exact_args_len, get_integer_arg, get_integer_ref, get_table_arg,
 };
@@ -18,7 +18,7 @@ pub fn regist_lazy() -> LazyModule {
         get_map, rows_map, first_map, last_map,
         rows, first, last, get,
         grep, position, rposition, filter,
-        sort,
+        sort, group,
         push,
 
         is_empty,get_cell,slice,from_maps,
@@ -47,7 +47,8 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         position => "first row index matching cell/fn(row_map)->bool", "<table> <cell|fn> [start=0]"
         rposition => "last row index matching cell/fn(row_map)->bool", "<table> <cell|fn> [start=0]"
         filter => "filter rows by cell/fn(row_map)->bool", "<table> <cell|fn>"
-        sort => "sort, optional fn(a,b)->[-1/0/1]. e.g. sort table 'name'", "<list> [key_fn|±key...]"
+        sort => "sort, optional fn(a,b)->[-1/0/1]. e.g. sort table 'name'", "<table> [key_fn|±key...]"
+        group => "group table via keys", "<table> [±key...]"
         // sort_by => "simple sort by column", "<table> <col>"
         push => "append a row", "<table> <list|set>"
 
@@ -422,6 +423,73 @@ pub fn sort(
         depth: 0,
     })?;
     Ok(Expression::Table(t))
+}
+pub fn group(
+    args: Vec<Expression>,
+    env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_args_len("group", &args, 1.., ctx)?;
+    let mut it = args.into_iter();
+    let list = it.next().unwrap();
+    let ops = it.collect::<Vec<_>>();
+
+    // seek keys
+    let keys = match ops.len() {
+        0 => None,
+        1 => {
+            let key_arg = ops.iter().next().unwrap();
+            match key_arg {
+                Expression::List(items) => {
+                    let keys = items
+                        .as_ref()
+                        .iter()
+                        .map(|e| SortKey::parse(e, ctx))
+                        .collect::<Result<Vec<_>, _>>()?;
+                    Some(keys)
+                }
+                other => Some(vec![SortKey::parse(&other, ctx)?]),
+            }
+        }
+        _ => {
+            // 3 个及以上参数：每个都是一个独立的 sort key，
+            // 支持 "+field"/"-field"/"+"/"-"/整数索引 任意混合
+            let keys = ops
+                .iter()
+                .map(|e| SortKey::parse(e, ctx))
+                .collect::<Result<Vec<_>, _>>()?;
+            Some(keys)
+        }
+    };
+
+    if let Some(key_vec) = keys {
+        let groups = key_vec
+            .into_iter()
+            .filter_map(|k| k.get_field())
+            .collect::<Vec<_>>();
+        if !groups.is_empty() {
+            // prepare
+            let mut t = get_table_arg(list, ctx)?;
+            let target = t.to_map_vec();
+
+            // sort
+            let sorted = list_lib::sort_vec(target, ops.clone(), env, ctx)?;
+
+            t.set_rows_vec(sorted).map_err(|e| RuntimeError {
+                kind: e,
+                context: ctx.clone(),
+                depth: 0,
+            })?;
+            // group
+            t.set_groups(groups.as_slice());
+            return Ok(Expression::Table(t));
+        }
+    }
+    Err(RuntimeError::common(
+        "no valid key was found for group".to_string().into(),
+        ctx.clone(),
+        0,
+    ))
 }
 // pub fn sort_by(
 //     args: Vec<Expression>,

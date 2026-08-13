@@ -6,20 +6,40 @@ use std::fmt;
 pub struct TableData {
     headers: Vec<String>,
     rows: Vec<Vec<Expression>>,
+    groups: Vec<usize>,
 }
 
 impl TableData {
     /// 创建新的表格
     pub fn new(headers: Vec<String>, rows: Vec<Vec<Expression>>) -> Self {
-        Self { headers, rows }
+        Self {
+            headers,
+            rows,
+            groups: vec![],
+        }
     }
     pub fn with_header(headers: Vec<String>) -> Self {
         Self {
             headers,
             rows: Vec::new(),
+            groups: vec![],
         }
     }
 
+    /// 添加group标记
+    pub fn set_groups(&mut self, groups: &[String]) {
+        self.groups = self.column_indexes(groups);
+        self.groups.sort_by(|a, b| b.cmp(a)); // 逆序很重要
+        self.groups.dedup(); // 去重很重要
+    }
+
+    pub fn groups(&self) -> &[usize] {
+        &self.groups
+    }
+
+    pub fn is_grouped(&self) -> bool {
+        !self.groups.is_empty()
+    }
     /// 添加新行
     pub fn push_row(&mut self, row: Vec<Expression>) {
         // 确保行的列数与表头一致，不足则填充 None
@@ -132,6 +152,7 @@ impl TableData {
         TableData {
             headers: self.headers.clone(),
             rows: filtered_rows,
+            groups: self.groups.clone(),
         }
     }
 
@@ -189,72 +210,141 @@ impl TableData {
     }
 }
 
-impl fmt::Debug for TableData {
+// impl fmt::Debug for TableData {
+// fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+// }
+impl fmt::Display for TableData {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // 美化格式输出
-        if self.headers.is_empty() {
-            return write!(f, "[]");
-        }
+        if f.alternate() {
+            // 美化格式输出
+            let headers = if self.groups.is_empty() {
+                self.headers.clone()
+            } else {
+                let mut h = self.headers.clone();
+                let _ = self
+                    .groups
+                    .clone()
+                    .into_iter()
+                    .map(|g| h.swap_remove(g))
+                    .collect::<Vec<_>>();
+                h
+            };
+            if headers.is_empty() {
+                return write!(f, "[]");
+            }
 
-        // 计算每列的最大宽度
-        let mut col_widths: Vec<usize> = self.headers.iter().map(|h| h.len()).collect();
+            // 计算每列的最大宽度
+            let mut col_widths: Vec<usize> = headers.iter().map(|h| h.len()).collect();
 
-        for row in &self.rows {
-            for (i, cell) in row.iter().enumerate() {
-                if i < col_widths.len() {
-                    let cell_str = cell.to_string();
-                    col_widths[i] = col_widths[i].max(cell_str.len());
+            if self.groups.is_empty() {
+                for row in &self.rows {
+                    for (i, cell) in row.iter().enumerate() {
+                        if i < col_widths.len() {
+                            let cell_str = cell.to_string();
+                            col_widths[i] = col_widths[i].max(cell_str.len());
+                        }
+                    }
+                }
+            } else {
+                for row in &self.rows {
+                    let mut row = row.clone();
+                    let _ = self
+                        .groups
+                        .clone()
+                        .into_iter()
+                        .map(|g| row.swap_remove(g))
+                        .collect::<Vec<_>>();
+                    for (i, cell) in row.iter().enumerate() {
+                        if i < col_widths.len() {
+                            let cell_str = cell.to_string();
+                            col_widths[i] = col_widths[i].max(cell_str.len());
+                        }
+                    }
                 }
             }
-        }
 
-        // 输出表头
-        writeln!(
-            f,
-            "{}",
-            "─".repeat(col_widths.iter().sum::<usize>() + col_widths.len() * 3 - 1)
-        )?;
-        for (i, header) in self.headers.iter().enumerate() {
-            if i > 0 {
-                write!(f, " │ ")?;
-            }
-            write!(f, "{:width$}", header, width = col_widths[i])?;
-        }
-        writeln!(f)?;
-        writeln!(
-            f,
-            "{}",
-            "─".repeat(col_widths.iter().sum::<usize>() + col_widths.len() * 3 - 1)
-        )?;
-
-        // 输出数据行
-        for row in &self.rows {
-            for (i, cell) in row.iter().enumerate() {
-                if i > 0 {
-                    write!(f, " │ ")?;
-                }
-                write!(f, "{:width$}", cell.to_string(), width = col_widths[i])?;
-            }
-            writeln!(f)?;
-        }
-
-        if !self.rows.is_empty() {
+            // 输出表头
             writeln!(
                 f,
                 "{}",
                 "─".repeat(col_widths.iter().sum::<usize>() + col_widths.len() * 3 - 1)
             )?;
+            for (i, header) in headers.iter().enumerate() {
+                if i > 0 {
+                    write!(f, " │ ")?;
+                }
+                write!(f, "{:width$}", header, width = col_widths[i])?;
+            }
+            writeln!(f)?;
+            writeln!(
+                f,
+                "{}",
+                "─".repeat(col_widths.iter().sum::<usize>() + col_widths.len() * 3 - 1)
+            )?;
+
+            // 输出数据行
+            if self.groups.is_empty() {
+                for row in &self.rows {
+                    for (i, cell) in row.iter().enumerate() {
+                        if i > 0 {
+                            write!(f, " │ ")?;
+                        }
+                        write!(f, "{:width$}", cell.to_string(), width = col_widths[i])?;
+                    }
+                    writeln!(f)?;
+                }
+            } else {
+                let mut current_group: Vec<Expression> = vec![];
+                for row in &self.rows {
+                    let mut row = row.clone();
+                    let labels = self
+                        .groups
+                        .clone()
+                        .into_iter()
+                        .map(|g| row.swap_remove(g))
+                        .collect::<Vec<_>>();
+                    if labels != current_group {
+                        writeln!(
+                            f,
+                            "───── {} ─────",
+                            labels
+                                .iter()
+                                .map(|g| g.to_string())
+                                .collect::<Vec<_>>()
+                                .join(" ")
+                        )?;
+
+                        current_group = labels;
+                    }
+                    for (i, cell) in row.iter().enumerate() {
+                        if i > 0 {
+                            write!(f, " │ ")?;
+                        }
+                        write!(f, "{:width$}", cell.to_string(), width = col_widths[i])?;
+                    }
+                    writeln!(f)?;
+                }
+            }
+
+            if !self.rows.is_empty() {
+                writeln!(
+                    f,
+                    "{}",
+                    "─".repeat(col_widths.iter().sum::<usize>() + col_widths.len() * 3 - 1)
+                )?;
+            }
+            return Ok(());
         }
-        Ok(())
-    }
-}
-impl fmt::Display for TableData {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+
         // 紧凑格式输出
         writeln!(f, "{{")?;
 
         writeln!(f, "  headers: [")?;
         writeln!(f, "    {}", self.headers.join(", "))?;
+        writeln!(f, "  ]\n")?;
+
+        writeln!(f, "  groups: [")?;
+        writeln!(f, "    {:?}", self.groups)?;
         writeln!(f, "  ]\n")?;
 
         writeln!(f, "  rows: [")?;

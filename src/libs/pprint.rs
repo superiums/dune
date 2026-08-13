@@ -5,6 +5,7 @@ use tabled::{
     settings::{
         Color, Modify, Style, Width,
         object::{Columns, Rows},
+        panel::HorizontalPanel,
         peaker::PriorityMax,
     },
 };
@@ -182,7 +183,14 @@ fn print_table_with_tabled(
     max_width: usize,
     nested: bool,
 ) -> Option<Table> {
-    let headers = table.headers();
+    let group_idx = table.groups(); // 新增的访问器，已按降序排列
+    let all_headers = table.headers();
+
+    // 1. 剔除分组列后的表头（顺序与 swap_remove 语义一致）
+    let mut headers = all_headers.to_vec();
+    for &g in group_idx {
+        headers.swap_remove(g);
+    }
     let cols = headers.len();
 
     let mut rows_iter = table.rows().iter();
@@ -197,18 +205,36 @@ fn print_table_with_tabled(
         return None;
     }
 
+    let mut current_group: Vec<String> = vec![];
+    let mut panels: Vec<(usize, String)> = vec![];
     let mut builder = Builder::with_capacity(table.row_count(), cols);
-    builder.push_record(headers);
-    if !first_row.is_empty() {
-        builder.push_record(first_row);
-    }
-    for row in rows_iter {
+    builder.push_record(&headers);
+
+    for row in table.rows() {
+        let mut row = row.clone();
+        let labels: Vec<String> = group_idx
+            .iter()
+            .map(|&g| row.swap_remove(g).to_string())
+            .collect();
+
+        if !group_idx.is_empty() && labels != current_group {
+            // 此刻 builder 里已有的记录数（含表头）就是这一分组标签应插入的行号
+            panels.push((builder.count_records(), labels.join(" ")));
+            current_group = labels;
+        }
         builder.push_record(row.iter().map(|x| x.to_string()));
     }
 
     let mut built = builder.build();
     if with_color {
         built.modify(Rows::first(), Color::FG_BLUE);
+    }
+
+    if table.is_grouped() {
+        for (idx, label) in panels.into_iter().rev() {
+            built.with(HorizontalPanel::new(idx, format!("───── {} ─────", label)));
+            // built.modify(Rows::one(idx), Border::new().bottom('─'));
+        }
     }
     apply_table_style(&mut built, false, nested);
 
