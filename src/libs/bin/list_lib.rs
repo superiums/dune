@@ -82,7 +82,7 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         split_at => "split at index, returns [left,right]", "<list> <index>"
         split_first => "split head/tail, returns [head,rest]", "<list>"
         sort => "sort, optional fn(a,b)->[-1/0/1]. e.g. sort list 'name'", "<list> [fn|±key...]"
-        group => "group by key fn or map field, e.g.  fn(item)->string", "<list> <fn|key>"
+        group => "group by key fn or map field, e.g.  fn(item)->string", "<list> <fn|key> [keep=false]"
         remove_at => "remove n items from index", "<list> <index> [count=1]"
         remove => "remove item, default first-only", "<list> <item> [all=false]"
         set => "set value at existing index", "<list> <index> <value>"
@@ -767,11 +767,12 @@ fn group(
     env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("group", &args, 2, ctx)?;
+    check_args_len("group", &args, 2..=3, ctx)?;
     let mut it = args.into_iter();
     let list_expr = it.next().unwrap();
     let list = get_list_ref(&list_expr, ctx)?;
     let key_func = it.next().unwrap();
+    let keep_group_field = it.next().is_some_and(|x| x.is_truthy());
 
     let mut groups: BTreeMap<String, Vec<Expression>> = BTreeMap::new();
 
@@ -804,10 +805,36 @@ fn group(
                     }
                 };
                 if let Some(key) = keyitem {
-                    groups
-                        .entry(key.to_string())
-                        .or_default()
-                        .push(item.clone());
+                    let new_item = if keep_group_field {
+                        item.clone()
+                    } else {
+                        match item {
+                            Expression::Map(m) => {
+                                let n = m
+                                    .iter()
+                                    .filter(|(k, _)| *k != &kk)
+                                    .map(|(k, v)| (k.clone(), v.clone()))
+                                    .collect::<BTreeMap<_, _>>();
+                                Expression::from(n)
+                            }
+                            Expression::HMap(m) => {
+                                let n = m
+                                    .iter()
+                                    .filter(|(k, _)| *k != &kk)
+                                    .map(|(k, v)| (k.clone(), v.clone()))
+                                    .collect::<BTreeMap<_, _>>();
+                                Expression::from(n)
+                            }
+                            _ => {
+                                return Err(RuntimeError::common(
+                                    "group by key can only apply to a map".to_string().into(),
+                                    ctx.clone(),
+                                    0,
+                                ));
+                            }
+                        }
+                    };
+                    groups.entry(key.to_string()).or_default().push(new_item);
                 } else {
                     return Err(RuntimeError::common(
                         format!("no such key found in map: `{k}`").into(),

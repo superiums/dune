@@ -257,6 +257,29 @@ fn pprint_map_internal<'a>(
     max_width: usize,
     nested: bool,
 ) -> Option<Table> {
+    // is_hmap 排序、以及"首元素结构判断"都需要拿到全部数据，这次 Vec 物化无法避免。
+    let mut entries: Vec<(String, Expression)> = items.collect();
+    if is_hmap {
+        entries.sort_by(|a, b| a.0.cmp(&b.0));
+    }
+
+    // 顶层 + 首元素的值是"记录列表"（如 {directory: [{...}, {...}], file: [...]}）
+    // => 模仿 group 面板样式：外层 key 当 panel 标题，内层记录展开为多行、共用同一套表头
+    let use_panel = !nested
+        && entries
+            .first()
+            .map(|(_, v)| matches!(v, Expression::List(items) if is_list_of_records(items)))
+            .unwrap_or(false);
+
+    if use_panel {
+        if let Some(t) =
+            pprint_map_of_record_lists_as_panels(&entries, is_hmap, with_color, max_width)
+        {
+            return Some(t);
+        }
+        // 表头提取失败等极端情况，回退到原有两列逻辑
+    }
+
     const COLS: usize = 2;
     let table_padding = COLS * 3 + 1 + 5;
     let available_width = max_width.saturating_sub(table_padding);
@@ -264,20 +287,14 @@ fn pprint_map_internal<'a>(
     let key_column_width = 12.min(available_width / 4);
     let value_budget = available_width.saturating_sub(key_column_width);
 
-    // tabled::Table::new 必须拿到全部行才能算列宽，加上 is_hmap 要排序，
-    // 这一次 Vec 物化无法避免（库限制）。
-    let mut rows: Vec<KeyValueRow> = items
+    let rows: Vec<KeyValueRow> = entries
+        .into_iter()
         .map(|(key, val)| {
             let value = render_field(&val, value_budget);
             KeyValueRow { key, value }
         })
         .collect();
 
-    if is_hmap {
-        rows.sort();
-    }
-
-    // 只用首行做廉价预筛，避免在明显没救的情况下构建 Table::new
     if nested {
         if let Some(first) = rows.first() {
             let first_row_len = visible_width(&first.key) + visible_width(&first.value);
@@ -304,6 +321,100 @@ fn pprint_map_internal<'a>(
 
     apply_table_style(&mut table, is_hmap, nested);
     finalize_table(table, max_width, nested)
+}
+
+/// 顶层 map 中第一个值是"记录列表"（每个元素都是 Map/HMap，即 is_list_of_records）时使用：
+/// 用第一条记录的 key 顺序作为整张表的公共表头，
+/// 外层 key（如 directory/file/symlink）作为 panel 标题，
+/// 该 key 对应的记录列表逐条展开为多行，字段按表头对齐、缺失留空。
+/// 若某个顶层条目的值不是记录列表（混合结构），退化成单独一行（首列放值，其余列留空），
+/// 同样打 panel 标签以维持结构一致。
+fn pprint_map_of_record_lists_as_panels(
+    entries: &[(String, Expression)],
+    is_hmap: bool,
+    with_color: bool,
+    max_width: usize,
+) -> Option<Table> {
+    // 表头只看"第一个顶层条目"的第一条记录，符合"只检测第一个元素"的要求
+    let headers: Vec<String> = match entries.first() {
+        Some((_, Expression::List(items))) => match items.first() {
+            Some(Expression::Map(m)) => m.keys().cloned().collect(),
+            Some(Expression::HMap(m)) => {
+                let mut ks: Vec<String> = m.keys().cloned().collect();
+                ks.sort();
+                ks
+            }
+            _ => return None,
+        },
+        _ => return None,
+    };
+
+    let cols = headers.len();
+    if cols == 0 {
+        return None;
+    }
+
+    let col_budget = (max_width.saturating_sub(cols * 3 + 1)) / cols.max(1);
+
+    let mut builder = Builder::with_capacity(entries.len() * 4, cols);
+    builder.push_record(headers.clone());
+
+    // (插入点行号, panel 标题)，插入点 = 该分组第一行落地前 builder 已有的记录数（含表头）
+    let mut panels: Vec<(usize, String)> = vec![];
+
+    for (key, val) in entries {
+        match val {
+            Expression::List(items) if is_list_of_records(items) => {
+                panels.push((builder.count_records(), key.clone()));
+                for item in items.iter() {
+                    let row: Vec<String> = headers
+                        .iter()
+                        .map(|h| {
+                            let field = match item {
+                                Expression::Map(m) => m.get(h),
+                                Expression::HMap(m) => m.get(h),
+                                _ => None,
+                            };
+                            field
+                                .map(|v| render_field(v, col_budget))
+                                .unwrap_or_default()
+                        })
+                        .collect();
+                    builder.push_record(row);
+                }
+            }
+            other => {
+                // 混合结构：该顶层条目不是记录列表，退化成单独一行
+                panels.push((builder.count_records(), key.clone()));
+                let mut row = vec![render_field(other, col_budget)];
+                row.resize(cols, String::new());
+                builder.push_record(row);
+            }
+        }
+    }
+
+    let mut table = builder.build();
+
+    if with_color {
+        table.modify(Rows::first(), Color::FG_BLUE);
+    }
+    table.with(
+        Modify::new(Rows::first()).with(tabled::settings::format::Format::content(|s| {
+            s.to_uppercase()
+        })),
+    );
+    if is_hmap {
+        // HMap 场景仍保留 key 列（此处即表头列本身不需要单独截断，
+        // 因为列内容已是有限字段名而非任意长 key）
+    }
+
+    // 倒序插入，避免前面插入点被后面 panel 顶行下移
+    for (idx, label) in panels.into_iter().rev() {
+        table.with(HorizontalPanel::new(idx, format!("───── {} ─────", label)));
+    }
+
+    apply_table_style(&mut table, is_hmap, false);
+    finalize_table(table, max_width, false)
 }
 
 /// 只有当表格自然宽度超过预算时才强制 wrap；
