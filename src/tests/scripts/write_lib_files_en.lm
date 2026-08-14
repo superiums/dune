@@ -11,10 +11,10 @@ date: {time.now()}
 ---
 	`
 	if lib == tops {
-			help $lib | .strip_ansi() | regex.replace_all(g'(?m)^([a-z])','- $1') | `{head}\n## ` + _ >> `/tmp/full/{lib}.md`
+			help $lib | .strip_ansi() | regex.replace_all(g'(?m)^([a-z].+)','- `$1`') | `{head}\n## ` + _ >> `/tmp/full/{lib}.md`
 			continue
 	}
 
-	help $lib | .strip_ansi() | .replace(`{lib}.`,'- ') | `{head}\n## ` + _ >> `/tmp/full/{lib}.md`
+	help $lib | .strip_ansi() | .replace(`{lib}.`,'- ') | regex.replace_all(g'(?m)^- ([a-z].+)','- `$1`') | `{head}\n## ` + _ >> `/tmp/full/{lib}.md`
 	# help $lib | .strip_ansi() | .replace(`{lib}.`,'') | .lines() | .filter(x -> !x.starts_with("\t")) | .join("\n") | `{head}\n## ` + _ >> `/tmp/lite/{lib}.md`
 }
