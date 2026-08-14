@@ -42,6 +42,8 @@
 	eval file in forked env
 - include <path>
 	eval file in current env
+- is_empty <expr>
+	is empty?
 - jobs [-k id]
 	list/kill jobs
 - len <list|set|map|table|range|string|bytes>
@@ -276,6 +278,8 @@
 	remove path, recursive for dirs
 - rmdir <path>
 	remove empty dir
+- size <path>
+	get file size
 - stem <path>
 	file name without extension
 - symlink <source> <link_path>
@@ -400,7 +404,7 @@
 	list from range
 - get <list> <index>
 	nth element, negative index from end
-- group <list> <key_fn|key>
+- group <list> <fn|key>
 	group by key fn or map field, e.g.  fn(item)->string
 - insert <list> <index> <value>
 	insert value at index
@@ -408,7 +412,7 @@
 	is empty?
 - items <list>
 	index-value pairs
-- join <list> <separator>
+- join <list> [sep=' ']
 	join strings with separator
 - last <list> [n=1]
 	last n elements
@@ -448,7 +452,7 @@
 	skip first n elements
 - slice <list> <start> <end>
 	sub-list [start,end), negative index ok
-- sort <list> [key_fn|±key...]
+- sort <list> [fn|±key...]
 	sort, optional fn(a,b)->[-1/0/1]. e.g. sort list 'name'
 - splice <list> <start> <delete_count> [items...]
 	delete & optionally insert at index, returns new list
@@ -463,9 +467,9 @@
 - take <list> <count>
 	first n elements
 - to_hmap <list> [fn(k,v)]
-	to hashMap, default pairs [k,v,k,v...]
+	to hashMap, pairs [k,v,k,v...]
 - to_map <list> [fn(k,v)]
-	to btreeMap, default pairs [k,v,k,v...]
+	to btreeMap, pairs [k,v,k,v...]
 - to_set <list>
 	to btreeSet
 - transpose <matrix>
@@ -496,6 +500,8 @@
 	log level is enabled?
 - level [int]
 	get/set the log level
+- levels 
+	view all levels
 - trace <msg>
 	log trace
 - warn <msg>
@@ -534,7 +540,7 @@
 	last key-value pair by key order, returns [k,v]
 - len <map>
 	map size
-- map <map> <map_fn>
+- map <map> <fn(k,v)>
 	transform keys/values, fn(k,v)->[k,v]
 - merge <map1> <map2> [<map3>...]
 	deep merge maps, recurse on nested maps
@@ -696,8 +702,8 @@
 	first match, returns {start,end,found}
 - find_all <pattern> <text>
 	all matches, list of {start,end,found}
-- from <pattern_string> <flags>
-	build regex from string and flags
+- from <pattern_string> [i|m|s|x|R|U]
+	build regex from string pattern
 - is_match <pattern> <text>
 	contains a match?
 - named_captures <pattern> <text>
@@ -920,10 +926,10 @@
 	defined in scope chain?
 - dirs 
 	system directories map
-- error_codes 
-	list Lume error codes
 - env [var]
 	root env map, or var value
+- error_codes 
+	list lume error codes
 - has <var>
 	defined in current scope?
 - info 

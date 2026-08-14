@@ -711,7 +711,7 @@ fn get_base_color_code(name: &str, ctx: &Expression) -> Result<usize, RuntimeErr
         "GREEN" => 32,
         "BROWN" => 33,
         "BLUE" => 34,
-        "PURPLe" => 35,
+        "PURPLE" => 35,
         "CYAN" => 36,
         "GRAY" => 37,
         _ => {

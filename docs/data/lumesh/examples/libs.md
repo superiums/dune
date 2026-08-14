@@ -32,6 +32,7 @@ get_var <var>
 help [libs|tops|doc|<lib>|<lib>.<func>|<top_func>]
 import <path>
 include <path>
+is_empty <expr>
 jobs [-k id]
 len <list|set|map|table|range|string|bytes>
 not <boolean>...
@@ -149,6 +150,7 @@ read <file>
 read_link <link_path>
 rm <path>
 rmdir <path>
+size <path>
 stem <path>
 symlink <source> <link_path>
 tail <file> [n=10]
@@ -211,11 +213,11 @@ flatten <collection>
 fold <list> <fn> [init=0]
 from <range>
 get <list> <index>
-group <list> <key_fn|key>
+group <list> <fn|key>
 insert <list> <index> <value>
 is_empty <list>
 items <list>
-join <list> <separator>
+join <list> [sep=' ']
 last <list> [n=1]
 len <list>
 map <list> <fn>
@@ -235,7 +237,7 @@ set <list> <index> <value>
 shuffle <list>
 skip <list> <count>
 slice <list> <start> <end>
-sort <list> [key_fn|±key...]
+sort <list> [fn|±key...]
 splice <list> <start> <delete_count> [items...]
 split_at <list> <index>
 split_first <list>
@@ -259,6 +261,7 @@ error <msg>
 info <msg>
 is_enabled <level>
 level [int]
+levels 
 trace <msg>
 warn <msg>
 ### map
@@ -278,7 +281,7 @@ is_empty <map>
 keys <map>
 last <map>
 len <map>
-map <map> <map_fn>
+map <map> <fn(k,v)>
 merge <map1> <map2> [<map3>...]
 remove <map> <key>
 set <map> <key> <value>
@@ -359,7 +362,7 @@ capture <pattern> <text>
 captures <pattern> <text>
 find <pattern> <text>
 find_all <pattern> <text>
-from <pattern_string> [flag]
+from <pattern_string> [i|m|s|x|R|U]
 is_match <pattern> <text>
 named_captures <pattern> <text>
 replace <text> <pattern> <replacement>
@@ -471,8 +474,8 @@ yellow <string>
 ### sys
 defined <var>
 dirs 
-error_codes
 env [var]
+error_codes 
 has <var>
 info 
 max_runtime [depth]

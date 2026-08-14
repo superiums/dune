@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.18.2]
+- add group support for table
+both `table.group [cols...]` and pprint supported group
+- log module improved:
+  + log to file supported: `log.file`
+  + log timestamp added
+  + log level in str supported
+
+
 ## [0.18.1]
 - update tree-sitter
 - fix cursor/hint adjustment
