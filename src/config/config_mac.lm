@@ -101,7 +101,7 @@ if IS_INTERACTIVE {
             fix_typos
         }
 
-        let ex = { ui.pick $m.keys() 'Fuzzy Execute' ?! | $m.at() }
+        let ex = { ui.pick $m.keys() 'Fuzzy Execute' ?! | $m.get() }
         ex($b)
     } #?: e -> eprint e.msg
 
@@ -124,7 +124,7 @@ if IS_INTERACTIVE {
     let edit_file = (b) -> {let e = sys.has('EDITOR') ? $EDITOR : 'vi'; fd -t file | ui.pick('edit file:') | $e _}
     let search_content = (b) -> {
         let t = len($b)>0 ? $b : ui.text 'search in filetype:' ?: 'all'
-        ui.text 'search:' | rg -t $t --line-number --column --no-heading --smart-case --color=never -- _ | ui.pick 'select' ?! | .split(':') | .at(0) | open -- _
+        ui.text 'search:' | rg -t $t --line-number --column --no-heading --smart-case --color=never -- _ | ui.pick 'select' ?! | .split(':') | .get(0) | open -- _
     }
     let git_commit = (b) -> {
         git add -A;
@@ -158,7 +158,7 @@ if IS_INTERACTIVE {
             search_content,
             git_commit,
         }
-        let ex = { ui.pick $m.keys() 'Fuzzy Execute' ?! | $m.at() }
+        let ex = { ui.pick $m.keys() 'Fuzzy Execute' ?! | $m.get() }
         if ex {ex('')}
     } ?: e -> print e.msg
 
@@ -192,7 +192,7 @@ if IS_INTERACTIVE {
     # ## ---ai---
     # ## default AI Helper settings. following is default.
     let base = fs.dir_name($SCRIPT)
-    let syntax = fs.read($base + '/syntax.md')
+    let syntax = fs.read($base + '/syntax.md') ?: ''
     set LUME_AI_CONFIG = {
     #     host: 'localhost:11434',
     #     api_key: '',

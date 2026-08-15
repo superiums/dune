@@ -5,8 +5,7 @@ if IS_INTERACTIVE {
     ⚡┓
       ┃ ┓┏┏┳┓┏┓
       ┗┛┗┻┛┗┗┗ '
-    print logo.clr(rand.int(1,230)) 'lightweight'.clr(38) 'ultimate'.clr(48) 'modern'.clr(51) 'efficient'.clr(45)
-
+    print $logo
 
     # ## welcome msg
     # set LUME_WELCOME= 'Welcome to Lumesh!'
@@ -21,17 +20,17 @@ if IS_INTERACTIVE {
         lazy: 0,
         continuation: "... ",
         template: string.blue('$CWD_SHORT') + '|' + string.green('$CFM_TAG') + '|' + string.blue('$STRICT_TAG') + '❯  '.bold().yellow(),
-    #   template: (dir,ctx) -> {
-    #     string.blue($dir) + ' |'.green().bold() \
-    #     + ($ctx.cfm ? 'CFM'.green() + '|' : '') \
-    #     + ($ctx.strict ? 'S'.yellow() + '| ' : '' ) \
-    #     + (if (fs.exists '.git') {git branch --show-current | .cyan()} else '') \
-    #     + '> '.green().bold()
-    # }
+        # template: (dir,ctx) -> {
+        #   string.blue($dir) + ' |'.green().bold() \
+        #   + ($ctx.cfm ? 'CFM'.green() + '|' : '') \
+        #   + ($ctx.strict ? 'S'.yellow() + '| ' : '' ) \
+        #   + (if (fs.exists '.git') {git branch --show-current | .cyan()} else '') \
+        #   + '> '.green().bold()
+        # }
     }
 
     # ## base theme for syntax: 'one_dark', 'ayu_dark', 'light'
-    LUME_THEME = 'ayu_dark'
+    # LUME_THEME = 'ayu_dark'
 
     # ## syntax theme modify
     # LUME_THEME_CONFIG = {
@@ -57,20 +56,14 @@ if IS_INTERACTIVE {
     # set LUME_CFM = none
 
     # ## history file
-    # set LUME_HISTORY_FILE = '~\AppData\lumesh\lume_histroy'
+    let cache = sys.dirs().cache + '/lumesh'
+    # set LUME_HISTORY_FILE = ''
 
     # == completion
-    # set LUME_COMPLETION_DIR = '~\AppData\lumesh\completions'
-    set LUME_COMPLETION_CYCLE = true
+    # set LUME_COMPLETION_DIR = ''
 
     # ## report compute result type and values. default True.
-    # set LUME_PRINT_DIRECT= False
-
-
-    # ## sudo cmd for Alt+s
-    # set LUME_SUDO_CMD = 'doas'
-
-    # ## key bindings
+    # set LUME_PRINT_DIRECT= false
 
     # ## key bindings
     # Key format: "MODIFIER_key" (order CTRL_ALT_SHIFT: e.g., "CTRL_ALT_k", "CTRL_q", "ALT_h")
@@ -80,10 +73,10 @@ if IS_INTERACTIVE {
     #         fn receive one arg as current buffer.
 
     # ### cmdmark manage
-    let save_cmdmark = (b) -> {if !$b {b = ui.text('mark cmd:')}; $b.trim()+"\n" >> '~/.cache/lumesh/cmdmark'; println "\t[MARKED]"}
-    let select_cmdmark = (b) -> { fs.read ~/.cache/lumesh/cmdmark ?! | .lines() | ui.pick('select cmdmark:') }
-    let save_dirmark = (b) -> if !fs.read(~/.cache/lumesh/dirmark).lines().contains(cwd()) ?: true { cwd()+"\n" >> '~/.cache/lumesh/dirmark'; println "\t[MARKED]"}
-    let select_dirmark = (b) -> { fs.read ~/.cache/lumesh/dirmark ?! | .lines() | ui.pick('select dirmark:') | 'cd ' + _ }
+    let save_cmdmark = (b) -> {if !$b {b = ui.text('mark cmd:')}; $b.trim()+"\n" >> $cache + '/cmdmark'; println "\t[MARKED]"}
+    let select_cmdmark = (b) -> { fs.read $cache + '/cmdmark' ?! | .lines() | ui.pick('select cmdmark:') }
+    let save_dirmark = (b) -> if !fs.read($cache + '/dirmark').lines().contains(cwd()) ?: true { cwd()+"\n" >> $cache + '/dirmark'; println "\t[MARKED]"}
+    let select_dirmark = (b) -> { fs.read $cache + '/dirmark' ?! | .lines() | ui.pick('select dirmark:') | 'cd ' + _ }
     let timestamp = "'" + time.now().to_string('%Y-%m-%d %H:%M:%S') + "'"
     let fix_typos = (b) -> $b.replace('gerp', 'grep').replace('mroe', 'more').replace('les', 'less')
 
@@ -112,21 +105,18 @@ if IS_INTERACTIVE {
     }
 
     # ### functions for slash bindings
-    let select_cmdmark = (b) -> { fs.read ~/.cache/lumesh/cmdmark ?! | .lines() | ui.pick('select cmdmark:') | eval_str() }
-    let select_dirmark = (b) -> { fs.read ~/.cache/lumesh/dirmark ?! | .lines() | ui.pick('select dirmark:') | cd _ }
-    let fuzzy_go = (b) -> {let base = $b ~: g'~|/' ? $b : './'; let max = $b == '/' ? 2 : 5; fd -t d --max-depth $max . $base | ui.pick('Fuzzy Go:') ?! | cd _}
-    let open_file = (b) -> {fd -t file | ui.pick('select file:') ?! |start 'edit' _}
-    let edit_file = (b) -> {let e = sys.has('EDITOR') ? $EDITOR : 'notepad'; fd -t file | ui.pick('edit file:') | $e _}
-    let search_content = (b) -> {
-        let t = len($b)>0 ? $b : ui.text 'search in filetype:' ?: 'all'
-        ui.text 'search:' | rg -t $t --line-number --column --no-heading --smart-case --color=never -- _ | ui.pick 'select' ?! | .split(':') | .at(0) | start 'edit' _
+    let select_cmdmark = (b) -> { fs.read $cache + '/cmdmark' ?! | .lines() | ui.pick('select cmdmark:') | eval_str() }
+    let select_dirmark = (b) -> { fs.read $cache + '/dirmark' ?! | .lines() | ui.pick('select dirmark:') | cd _ }
+    let fuzzy_go = (b) -> {let base = $b ~: g'~|/' ? $b : './'; fs.ls -p $base | where($type=='directory') | select('path') | ui.pick('Fuzzy Go:') ?! | cd _}
+    let open_file = (b) -> {fs.ls '.' | where($type=='file') | select('name') | ui.pick('select file:') ?! |start 'edit' _}
+    let edit_file = (b) -> {let e = sys.has('EDITOR') ? $EDITOR : 'notepad'; fs.ls '.' | where($type=='file') | ui.pick('edit file:') | $e _}
     }
     let git_commit = (b) -> {
         git add -A;
         ui.text('commit message:') ?! | git commit -m _
     }
 
-    # ## use `/key arg`to execute; `/hist`,`/history`,`/cds`,`/q` already builtin, never use these keys
+    # ## use `/key arg`to execute; `/h`,`/hm`,`/hh`,`/history`,`/cds`,`/q` already builtin, never use these keys
     set LUME_SLASH_BINDINGS = {
         sm: save_cmdmark,
         sd: save_dirmark,
@@ -135,7 +125,6 @@ if IS_INTERACTIVE {
         g: fuzzy_go,
         o: open_file,
         e: edit_file,
-        sc: search_content,
         cm: git_commit,
     }
 
@@ -150,7 +139,6 @@ if IS_INTERACTIVE {
             fuzzy_go,
             open_file,
             edit_file,
-            search_content,
             git_commit,
         }
         let ex = { ui.pick $m.keys() 'Fuzzy Execute' ?! | $m.at() }
@@ -171,8 +159,6 @@ if IS_INTERACTIVE {
     alias int = into.int()
     alias str = into.string()
     alias each = list.map()
-    alias sort = list.sort()
-    alias group = list.group()
     alias table = into.table()
     alias format = string.format()
     alias join = list.join()
@@ -186,17 +172,17 @@ if IS_INTERACTIVE {
     alias cp = fs.cp()
     alias head = fs.head()
     alias tail = fs.tail()
-    alias is_dir = fs.is_dir()
-    alias is_file = fs.is_file()
+    alias isdir = fs.is_dir()
+    alias isfile = fs.is_file()
     alias basename = fs.base_name()
     alias dirname = fs.dir_name()
     alias doc = explorer https://www.lumesh.cc.cd
-    alias config = vi about.info().prelude
+    alias config = notepad (about.info().prelude)
 
     # ## ---ai---
     # ## default AI Helper settings. following is default.
     let base = fs.dir_name($SCRIPT)
-    let syntax = fs.read($base + '/syntax.md')
+    let syntax = fs.read($base + '/syntax.md') ?: ''
     set LUME_AI_CONFIG = {
     #     host: 'localhost:11434',
     #     api_key: '',
@@ -212,19 +198,26 @@ if IS_INTERACTIVE {
     # ## ---update---
     fn update(){
         println 'checking latest version...'
-        let url = 'https://codeberg.org/santo/lumesh/releases/latest'
-        let ver = (curl -s $url ?: eprintln 'network err' && exit |  regex.find(r'\d[\d\.]+') )
-        ver = ver[found]
-        let latest = ($ver.split('.').join('').to_int() ?: 0)
-        if $latest > 0 {
-          let current = (about.version())
-          current = $current.split('.').join('').to_int()
-          if $latest > $current {
-              print 'Found new version: ' $ver.green()
+        let url = 'https://api.github.com/repos/superiums/lumesh/releases/latest'
+        let data = curl -fsL $url ?: {eprintln 'network err'; exit 1}
+        let js = from.json(data)
+        let latest = js.tag_name | .strip_prefix('c') | .strip_prefix('v')
+
+        if $latest {
+
+          let current = about.version()
+          let c = $latest.split('.').zip($current.split('.'))
+          let p = c.any(p -> p[0].to_int() > p[1].to_int() ?.)
+          if p {
+              print 'Found new version: ' $latest.green()
+
               if ui.confirm('download [normal edition for windows] now?') {
                   println 'download...'
-                  fs.mkdir 'C:\Program Files(x86)\lumesh'
-                  curl -o 'C:\Program Files(x86)\lumesh\lume' `https://codeberg.org/santo/lumesh/releases/download/v${ver}/lume-windows.exe`
+                  let dir = about.bin()
+                  let asset_name = 'lume-x86_64-pc-windows-gnu.exe'
+                  let download_url = 'https://github.com/superiums/lumesh/releases/download/' + $js + '/' + $asset_name
+                  curl -o ~/Downloads/lume $download_url
+                  fs.cp ~/Downloads/lume $dir ?: print 'You may need to cp ~/Downloads/lume to ' $dir
               } else {
                   println 'you may download it manually:' $url
               }
