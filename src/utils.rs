@@ -125,7 +125,6 @@ pub fn unescape_str(s: &str, skip_quote: bool) -> String {
                 'n' => result.push('\n'),
                 'r' => result.push('\r'),
                 't' => result.push('\t'),
-                '0' => result.push('\0'),
                 'a' => result.push('\x07'),       // 响铃
                 'b' => result.push('\x08'),       // 退格
                 'f' => result.push('\x0c'),       // 换页

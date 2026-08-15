@@ -38,7 +38,7 @@ pub fn regist_lazy() -> LazyModule {
 }
 pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
     reg_info!({
-        ls => "list dir contents", "[-l|a|h|t|L|c|u|m|p|?] [path]"
+        ls => "list dir contents", "[-l|s|a|h|t|L|c|u|g|m|p|d|?] [path]"
         glob => "match files by pattern", "<pattern>"
         tree => "dir tree as nested map", "[depth=3] [path]"
         abs => "absolute path", "<path>"
