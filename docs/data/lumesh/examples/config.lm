@@ -31,8 +31,8 @@ if IS_INTERACTIVE {
     set LUME_PROMPT_SETTINGS = {
         starship: false,
         lazy: 1,
-        prompt_continuation: "... ",
-        prompt_template: string.blue('$CWD_SHORT') + '|' + string.green('$CFM_TAG') + '|' + string.blue('$STRICT_TAG') + '❯  '.bold().yellow(),
+        continuation: "... ",
+        template: string.blue('$CWD_SHORT') + '|' + string.green('$CFM_TAG') + '|' + string.blue('$STRICT_TAG') + '❯  '.bold().yellow(),
     #   prompt_template: (dir,ctx) -> {
     #     string.blue($dir) + ' |'.green().bold() \
     #     + ($ctx.cfm ? 'CFM'.green() + '|' : '') \

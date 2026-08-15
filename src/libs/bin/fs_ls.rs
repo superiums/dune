@@ -259,7 +259,10 @@ fn build_row(
         let path_str = base_path
             .map(|p| p.join(&name))
             .unwrap_or_else(|| full_path.to_path_buf());
-        row.push(Expression::String(path_str.to_string_lossy().into_owned()));
+        let path_final = dunce::canonicalize(&path_str).unwrap_or(full_path.to_path_buf());
+        row.push(Expression::String(
+            path_final.to_string_lossy().into_owned(),
+        ));
     }
 
     Ok(row)
