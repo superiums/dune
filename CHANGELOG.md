@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.3]
+- fix `\0` unescape
+- fix at -> get
+- update completions data
+- update config
+especially for windows
+
 ## [0.18.2]
 - add group support for table
 both `table.group [cols...]` and pprint supported group
