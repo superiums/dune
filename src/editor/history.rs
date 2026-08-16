@@ -91,6 +91,12 @@ impl History {
             is_multi_dir: false,
             is_temp: true,
         });
+
+        if self.entries.len() > self.max_entries {
+            self.entries.remove(0);
+        }
+        self.index = None;
+        self.saved_line.clear();
     }
     /// 添加一条历史记录，使用 self.current_dir 作为执行路径。
     /// 调用前须先调用 set_current_dir。
