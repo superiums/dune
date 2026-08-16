@@ -1,5 +1,5 @@
 use crate::libs::pretty_printer;
-use crate::{RuntimeErrorKind, set_print_direct};
+use crate::{RuntimeErrorKind, set_print_ast, set_print_direct};
 
 use crate::utils::{expand_home, is_cfm_mode};
 use crate::with_print_direct;
@@ -253,6 +253,9 @@ pub fn init_config(env: &mut Environment) {
         }
     }
 
+    if let Some(ast) = env.get("LUME_PRINT_AST") {
+        set_print_ast(ast.is_truthy());
+    }
     if let Some(pd) = env.get("LUME_PRINT_DIRECT") {
         set_print_direct(pd.is_truthy());
     }

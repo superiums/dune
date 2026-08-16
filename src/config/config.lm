@@ -73,8 +73,10 @@ if IS_INTERACTIVE {
     # ## completion
     # set LUME_COMPLETION_DIR = '~/.local/share/lumesh/completions'
 
-    # ## report compute result type and values. default True.
+    # ## report compute result type and values.
     # set LUME_PRINT_DIRECT= false
+    # ## report ast while error
+    # set LUME_PRINT_AST= true
 
     # ## sudo cmd for Alt+s
     # set LUME_SUDO_CMD = 'doas'

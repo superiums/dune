@@ -1,7 +1,7 @@
 use std::{borrow::Cow, collections::BTreeMap};
 
 // ============== 运行时错误部分 ==============
-use crate::{Expression, Int, LmError};
+use crate::{Expression, Int, LmError, with_print_ast};
 use common_macros::b_tree_map;
 use thiserror::Error;
 
@@ -168,11 +168,14 @@ impl std::fmt::Display for RuntimeError {
             "{}Expression[{}]{}: {}",
             BLUE_START, self.depth, RESET, self.context,
         )?;
-        writeln!(
-            f,
-            "{}SyntaxTree[{}]{}: {}{:?}{}",
-            BLUE_START, self.depth, RESET, DIM_START, self.context, RESET
-        )
+        if with_print_ast(|b| b) {
+            writeln!(
+                f,
+                "{}SyntaxTree[{}]{}: {}{:?}{}",
+                BLUE_START, self.depth, RESET, DIM_START, self.context, RESET
+            )?;
+        }
+        Ok(())
     }
 }
 

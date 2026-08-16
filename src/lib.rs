@@ -74,6 +74,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 use std::cell::RefCell;
 
 thread_local! {
+    static PRINT_AST: RefCell<bool> = const {RefCell::new(false)};
     static PRINT_DIRECT: RefCell<bool> = const {RefCell::new(true)};
     // static CFM_ENABLED: RefCell<bool> = const {RefCell::new(false)};
     static CFM_CONFIG: RefCell<Option<bool>> = const {RefCell::new(None)};
@@ -84,6 +85,13 @@ thread_local! {
 }
 
 // 辅助函数
+pub fn with_print_ast<R>(f: impl FnOnce(bool) -> R) -> R {
+    PRINT_AST.with(|v| f(*v.borrow()))
+}
+pub fn set_print_ast(value: bool) {
+    PRINT_AST.with(|v| *v.borrow_mut() = value);
+}
+
 pub fn with_print_direct<R>(f: impl FnOnce(bool) -> R) -> R {
     PRINT_DIRECT.with(|v| f(*v.borrow()))
 }

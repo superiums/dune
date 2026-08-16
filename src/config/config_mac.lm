@@ -68,9 +68,10 @@ if IS_INTERACTIVE {
     # set LUME_COMPLETION_DIR = '~/Library/Application Support/completions'
     set LUME_COMPLETION_CYCLE = false
 
-    # ## report compute result type and values. default true.
+    # ## report compute result type and values.
     # set LUME_PRINT_DIRECT= false
-
+    # ## report ast while error
+    # set LUME_PRINT_AST= true
 
     # ## sudo cmd for Alt+s
     # set LUME_SUDO_CMD = 'doas'

@@ -4,8 +4,8 @@ use crate::libs::BuiltinInfo;
 use crate::libs::helper::{check_exact_args_len, get_integer_ref};
 use crate::{
     CFM_CONFIG, Environment, Expression, Int, LmError, MAX_RUNTIME_RECURSION, MAX_SYNTAX_RECURSION,
-    MAX_USEMODE_RECURSION, PRINT_DIRECT, RuntimeError, STRICT_ENABLED, SyntaxError,
-    set_cfm_enabled, set_print_direct, set_strict_enabled,
+    MAX_USEMODE_RECURSION, PRINT_AST, PRINT_DIRECT, RuntimeError, STRICT_ENABLED, SyntaxError,
+    set_cfm_enabled, set_print_ast, set_print_direct, set_strict_enabled,
 };
 use std::collections::BTreeMap;
 
@@ -23,6 +23,7 @@ pub fn regist_lazy() -> LazyModule {
         max_runtime,
         max_usemode,
         set_cfm,
+        set_ast,
         set_pdm,
         set_strict
     })
@@ -45,6 +46,7 @@ pub fn regist_info() -> BTreeMap<&'static str, BuiltinInfo> {
         max_runtime => "get/set max runtime recursion depth", "[depth]"
         max_usemode => "get/set max use-mode recursion depth", "[depth]"
         set_cfm => "set Cmd First Mode", "<boolean|none>"
+        set_ast => "enable/disable print ast while error", "<boolean>"
         set_pdm => "enable/disable print direct mode", "<boolean>"
         set_strict => "enable/disable strict mode", "<boolean>"
     })
@@ -109,6 +111,7 @@ fn modes(
         )),
         String::from("strict") => STRICT_ENABLED.with_borrow(|c|format!("{}",c)),
         String::from("pdm") => PRINT_DIRECT.with_borrow(|c|format!("{}",c)),
+        String::from("ast") => PRINT_AST.with_borrow(|c|format!("{}",c)),
     }))
 }
 
@@ -244,6 +247,21 @@ fn set_cfm(
         _ => "AUTO",
     };
     println!("\x1b[38;5;141m[Cmd First Mode: {}]\x1b[0m", tag);
+    Ok(Expression::None)
+}
+fn set_ast(
+    args: Vec<Expression>,
+    _env: &mut Environment,
+    ctx: &Expression,
+) -> Result<Expression, RuntimeError> {
+    check_exact_args_len("set_ast", &args, 1, ctx)?;
+    let b = args[0].is_truthy();
+    set_print_ast(b);
+    if b {
+        println!("\x1b[38;5;141m[Print AST while Error: ON]\x1b[0m");
+    } else {
+        println!("\x1b[38;5;209m[Print AST while Error: OFF]\x1b[0m");
+    }
     Ok(Expression::None)
 }
 fn set_pdm(
