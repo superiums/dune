@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.4]
+- add controller for ast print
+  + add `LUME_PRINT_AST`
+  + add `sys.set_ast`
+  + update `sys.modes`
+- fix editor histroy index while add_temp record
+
 ## [0.18.3]
 - fix `\0` unescape
 - fix at -> get
