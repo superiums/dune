@@ -1,5 +1,8 @@
 # Changelog
 
+## [0.18.5]
+- release cargo.lock to allow merge with void linux
+
 ## [0.18.4]
 - add controller for ast print
   + add `LUME_PRINT_AST`
