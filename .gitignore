@@ -1,7 +1,6 @@
 /target*
 history.txt
 *.cast
-*.lock
 /target*
 .history*
 /wiki
