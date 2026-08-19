@@ -2194,7 +2194,7 @@ mod from_tests {
 
     #[test]
     fn test_from_bytes() {
-        let e: Expression = vec![104, 101, 108, 108, 111u8].into();
+        let e: Expression = Expression::Bytes(vec![104, 101, 108, 108, 111u8].into());
         match e {
             Expression::Bytes(b) => assert_eq!(b, b"hello"),
             _ => panic!("Expected Bytes"),
