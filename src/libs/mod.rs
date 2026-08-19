@@ -123,9 +123,9 @@ fn no_lib_err(lib: &'static str, f: &str, ctx: &Expression) -> RuntimeError {
         depth: 0,
     }
 }
+
 /// lazy load builtin.
 /// note: this always clone builtin
-
 pub fn get_builtin_optimized(
     lib_name: &str,
     fn_name: &str,
@@ -287,7 +287,6 @@ pub fn get_lib_completions(prefix: &str) -> Option<Vec<&str>> {
 }
 
 /// 类型名称
-
 fn get_belong_lib_name(exp: &Expression) -> Option<Cow<'static, str>> {
     match exp {
         Expression::List(_) | Expression::Range(..) => Some("list".into()),

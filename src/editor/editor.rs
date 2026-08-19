@@ -1352,10 +1352,8 @@ impl Editor {
                 if i == 0 {
                     // 把多行 prompt 按 \n 拆开，逐行 MoveTo，不让 \n 字节进入 Stdout 缓冲区
                     let prompt_lines: Vec<&str> = self.prompt.split('\n').collect();
-                    let mut prow = render_row;
-                    for pline in &prompt_lines {
+                    for (prow, pline) in (render_row..).zip(prompt_lines.iter()) {
                         queue!(stdout, MoveTo(0, prow), Print(pline)).map_err(ReadlineError::Io)?;
-                        prow += 1;
                     }
                 } else {
                     queue!(stdout, MoveTo(0, render_row), Print(&self.cont_prompt))
@@ -1432,20 +1430,21 @@ impl Editor {
         // ── 7. hint 显示（Bug3修正：渲染在文本末尾，而非光标处）──────────────
         if !self.is_ai_hinting
             && self.show_hint
-                && let Some(ref hinter) = self.hinter {
-                    let byte_end = line.len();
-                    if !line.trim().is_empty()
-                        && let Some(hint) = hinter.hint(&line, byte_end)
-                    {
-                        self.current_hint = Some(hint);
-                    } else if !line.trim().is_empty()
-                        && let Some(hint) = self.history.search_hint(&line)
-                    {
-                        self.current_hint = Some(hint);
-                    } else {
-                        self.current_hint = None;
-                    }
-                }
+            && let Some(ref hinter) = self.hinter
+        {
+            let byte_end = line.len();
+            if !line.trim().is_empty()
+                && let Some(hint) = hinter.hint(&line, byte_end)
+            {
+                self.current_hint = Some(hint);
+            } else if !line.trim().is_empty()
+                && let Some(hint) = self.history.search_hint(&line)
+            {
+                self.current_hint = Some(hint);
+            } else {
+                self.current_hint = None;
+            }
+        }
 
         if let Some(ref hint) = self.current_hint.clone() {
             let display = strip_ansi(hint);

@@ -852,14 +852,14 @@ fn build_select_fns(
 /// data pick
 /// 关键设计说明：
 ///
-/// cfg key	类型	说明
-/// msg	String	提示语
-/// starting_date	DateTime / "YYYY-MM-DD"	初始光标日期
-/// min_date / max_date	DateTime / "YYYY-MM-DD"	可选范围
-/// week_start	Integer 0-6 或 "Mon" 等	每周起始日
-/// vim_mode	Boolean	hjkl 导航
-/// help_message	String	底部帮助文字
-/// formatter	Lambda |dt| ...	接收 DateTime，返回 String
+/// cfg key         类型      说明
+/// msg             String   提示语
+/// starting_date   DateTime "YYYY-MM-DD" 初始光标日期
+/// min_/max_date   DateTime "YYYY-MM-DD" 可选范围
+/// week_start      Integer  0-6 或 "Mon" 等 每周起始日
+/// vim_mode        Boolean  hjkl 导航
+/// help_message    String   底部帮助文字
+/// formatter       Lambda   |dt| ...  接收 DateTime，返回 String
 fn date_pick(
     args: Vec<Expression>,
     env: &mut Environment,

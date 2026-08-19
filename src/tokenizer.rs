@@ -562,13 +562,12 @@ fn alpha_dispatch(
                 };
             }
 
-            if second == '#'
-                && matches!(first, 'r' | 'g' | 't' | 's' | 'b') {
-                    let result = hashed_literal(&first)(input);
-                    if let Ok(hs) = result {
-                        return Ok(hs);
-                    }
+            if second == '#' && matches!(first, 'r' | 'g' | 't' | 's' | 'b') {
+                let result = hashed_literal(&first)(input);
+                if let Ok(hs) = result {
+                    return Ok(hs);
                 }
+            }
 
             #[cfg(windows)]
             if let Ok(r) = map_valid_token(win_abpath_tag, TokenKind::StringRaw)(input) {
@@ -577,9 +576,10 @@ fn alpha_dispatch(
 
             // keyword should only in ctx::Start/Space, not in ctx::Open, like `regex.match`
             if (ctx == Ctx::Start || ctx == Ctx::Space)
-                && let Ok(r) = map_valid_token(any_keyword, TokenKind::Keyword)(input) {
-                    return Ok(r);
-                }
+                && let Ok(r) = map_valid_token(any_keyword, TokenKind::Keyword)(input)
+            {
+                return Ok(r);
+            }
 
             // try others
             alt((
@@ -607,19 +607,20 @@ fn hashed_literal(
 ) -> impl FnMut(Input<'_>) -> TokenizationResult<'_, (Token, Diagnostic)> {
     move |input: Input<'_>| {
         if let Some((after_r, _)) = input.strip_prefix(&prefix.to_string())
-            && let Some((hashes, quote)) = hash_quote_prefix(after_r) {
-                let kind = match (prefix, quote) {
-                    ('r', '\'') => TokenKind::StringRaw,
-                    ('r', '"') => TokenKind::StringLiteral,
-                    ('r', '`') => TokenKind::StringTemplate,
-                    ('g', _) => TokenKind::Regex,
-                    ('t', _) => TokenKind::Time,
-                    ('s', _) => TokenKind::StringSafe,
-                    ('b', _) => TokenKind::Bytes,
-                    _ => return Err(NOT_FOUND),
-                };
-                return parse_hashed_string(input, hashes, quote, kind);
-            }
+            && let Some((hashes, quote)) = hash_quote_prefix(after_r)
+        {
+            let kind = match (prefix, quote) {
+                ('r', '\'') => TokenKind::StringRaw,
+                ('r', '"') => TokenKind::StringLiteral,
+                ('r', '`') => TokenKind::StringTemplate,
+                ('g', _) => TokenKind::Regex,
+                ('t', _) => TokenKind::Time,
+                ('s', _) => TokenKind::StringSafe,
+                ('b', _) => TokenKind::Bytes,
+                _ => return Err(NOT_FOUND),
+            };
+            return parse_hashed_string(input, hashes, quote, kind);
+        }
         Err(NOT_FOUND)
     }
 }
@@ -1238,8 +1239,8 @@ fn punctuation_tag(punct: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResult
     move |input: Input<'_>| input.strip_prefix(punct).ok_or(NOT_FOUND)
 }
 
-/// Matches a keyword/operator that must NOT be followed by symbol characters.
-/// Prevents operators from merging into longer symbols (e.g. `&&` vs `&&&`).
+// Matches a keyword/operator that must NOT be followed by symbol characters.
+// Prevents operators from merging into longer symbols (e.g. `&&` vs `&&&`).
 // fn keyword_tag(keyword: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResult<'_> {
 //     move |input: Input<'_>| {
 //         input

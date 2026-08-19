@@ -110,9 +110,10 @@ impl History {
 
         // 1. 追加到日志文件（崩溃安全）
         if self.log_path.is_some()
-            && let Err(e) = self.append_log_entry(&entry, &path, order) {
-                eprintln!("Failed to append history log: {e}");
-            }
+            && let Err(e) = self.append_log_entry(&entry, &path, order)
+        {
+            eprintln!("Failed to append history log: {e}");
+        }
 
         // 2. 更新内存索引
         if let Some(pos) = self.entries.iter().position(|e| e.command == entry) {
@@ -352,7 +353,7 @@ impl History {
         matched.sort_by_key(|e| e.weight);
         matched.into_iter().map(|e| e.command.clone()).collect()
     }
-    /// 多结果 fuzzy 搜索：使用 dir_score 排序（本目录专属命令排前）
+    ///// 多结果 fuzzy 搜索：使用 dir_score 排序（本目录专属命令排前）
     // pub fn search_fuzzy(&self, query: &str) -> Vec<String> {
     //     let mut matched: Vec<&HistoryEntry> = self
     //         .entries

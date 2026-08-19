@@ -32,8 +32,10 @@ pub fn parse_ls_args(
     env: &mut Environment,
     ctx: &Expression,
 ) -> Result<(Vec<PathBuf>, LsOptions), RuntimeError> {
-    let mut options = LsOptions::default();
-    options.detailed = true; //default
+    let mut options = LsOptions {
+        detailed: true,
+        ..Default::default()
+    };
 
     let mut paths = Vec::new();
     for arg in args {
