@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.18.6]
+- clippy
+- update dependencies
+- update test
+- remove derive of tabled in pprint
+
 ## [0.18.5]
 - release cargo.lock to allow merge with void linux
 

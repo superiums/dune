@@ -349,6 +349,4 @@ chmod +x ./script.lm
 
 ---
 
-![Star Trend](https://starchart.cc/superiums/lumesh.svg)
-
 **Start your Lumesh journey now and say goodbye to Bash's historical baggage.**

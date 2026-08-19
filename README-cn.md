@@ -42,7 +42,7 @@ for k in "${!map[@]}"; do echo "$k: ${map[$k]}"; done
 set -e
 some_command || echo "failed"
 
-# Bash：想处理一个 JSON 列表？先装 jq，再写一堆管道，再祈祷不出错  [header-1](#header-1)
+# Bash：想处理一个 JSON 列表？先装 jq，再写一堆管道，再祈祷不出错
 result=$(cat data.json | jq -r '.[] | select(.age > 18) | .name' 2>/dev/null) || echo "failed"  
   
 ```
@@ -348,6 +348,6 @@ chmod +x ./script.lm
 
 ---
 
-![Star 趋势](https://starchart.cc/superiums/lumesh.svg)
+<!--![Star 趋势](https://starchart.cc/superiums/lumesh.svg)-->
 
 **现在就开始你的 Lumesh 之旅，告别 Bash 的历史包袱。**
