@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 use tabled::{
-    Table, Tabled,
+    Table,
     builder::Builder,
     settings::{
         Color, Modify, Style, Width,
@@ -135,14 +135,6 @@ pub fn pretty_formatter(arg: &Expression) -> String {
             .unwrap_or_else(|| format!("{arg:#}")),
         _ => format!("{arg:#}"),
     }
-}
-
-#[derive(Tabled, PartialEq, Eq, PartialOrd, Ord)]
-struct KeyValueRow {
-    #[tabled(rename = "KEY")]
-    key: String,
-    #[tabled(rename = "VALUE")]
-    value: String,
 }
 
 /// 尝试用子表格渲染，宽度不够/结构不适合时回退成 Display 文本
@@ -287,25 +279,32 @@ fn pprint_map_internal<'a>(
     let key_column_width = 12.min(available_width / 4);
     let value_budget = available_width.saturating_sub(key_column_width);
 
-    let rows: Vec<KeyValueRow> = entries
+    // 不再依赖 #[derive(Tabled)] 的 KeyValueRow，直接产出 (key, value) 字符串对，
+    // 交给 Builder 手工拼表头 + 数据行。
+    let rows: Vec<(String, String)> = entries
         .into_iter()
         .map(|(key, val)| {
             let value = render_field(&val, value_budget);
-            KeyValueRow { key, value }
+            (key, value)
         })
         .collect();
 
     if nested {
-        if let Some(first) = rows.first() {
-            let first_row_len = visible_width(&first.key) + visible_width(&first.value);
-            let max_wraped_width = max_token_width(&first.key) + max_token_width(&first.value);
+        if let Some((key, value)) = rows.first() {
+            let first_row_len = visible_width(key) + visible_width(value);
+            let max_wraped_width = max_token_width(key) + max_token_width(value);
             if quick_reject(COLS, first_row_len, max_width, max_wraped_width) {
                 return None;
             }
         }
     }
 
-    let mut table = Table::new(rows);
+    let mut builder = Builder::with_capacity(rows.len() + 1, COLS);
+    builder.push_record(["KEY", "VALUE"]);
+    for (key, value) in rows {
+        builder.push_record([key, value]);
+    }
+    let mut table = builder.build();
 
     if is_hmap {
         if with_color {
