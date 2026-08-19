@@ -364,7 +364,7 @@ impl Expression {
                         // state.clear(State::IN_ASSIGN);
                         // state.set_local_var(name.to_string(), value);
                         // return Ok(Self::None);
-                        state.remove_local_var(&name);
+                        state.remove_local_var(name);
                     }
                     // 检查env
                     if env.has(name) {

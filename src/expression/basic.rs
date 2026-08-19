@@ -734,7 +734,7 @@ impl Expression {
             Self::Export(name, expr) => {
                 write!(f, "{}Export〈{}〉", prefix, name)?;
                 if let Some(exp) = expr {
-                    write!(f, " =\n")?;
+                    writeln!(f, " =")?;
                     exp.fmt_indent(f, indent + 1)?;
                 }
                 Ok(())

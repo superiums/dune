@@ -483,7 +483,7 @@ fn map(
         match new_kv {
             Expression::List(ls) => {
                 new_map.insert(
-                    ls.get(0).map_or(k.clone(), |nk| nk.to_string()),
+                    ls.first().map_or(k.clone(), |nk| nk.to_string()),
                     ls.get(1).cloned().unwrap_or(Expression::None),
                 );
             }

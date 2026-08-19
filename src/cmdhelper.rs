@@ -133,10 +133,10 @@ fn scan_path_cmds(dir: &Path) -> Vec<String> {
 //  line: &str,
 // pos: usize,
 pub fn should_trigger_path_completion(line: &str, pos: usize) -> bool {
-    if let Some(_) = line[..pos].rfind(' ') {
+    if line[..pos].rfind(' ').is_some() {
         return false;
     }
-    if let Some(_) = line[..pos].find(is_separator) {
+    if line[..pos].find(is_separator).is_some() {
         return true;
     }
     false

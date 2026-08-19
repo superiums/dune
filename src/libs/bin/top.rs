@@ -441,7 +441,7 @@ fn print(
     let mut stdout = std::io::stdout().lock();
     for x in args.iter() {
         let _ = match x {
-            Expression::Bytes(b) => stdout.write_all(&b),
+            Expression::Bytes(b) => stdout.write_all(b),
             _ => write!(&mut stdout, "{x} "),
         };
     }
@@ -461,7 +461,7 @@ fn println(
     let mut stdout = std::io::stdout().lock();
     for x in args.iter() {
         let _ = match x {
-            Expression::Bytes(b) => stdout.write_all(&b),
+            Expression::Bytes(b) => stdout.write_all(b),
             _ => writeln!(&mut stdout, "{x}"),
         };
     }
@@ -488,7 +488,7 @@ fn eprint(
     for (i, x) in args.iter().enumerate() {
         let s = format!("\x1b[38;5;9m{x}\x1b[m\x1b[0m");
         let _ = match x {
-            Expression::Bytes(b) => stderr.write_all(&b),
+            Expression::Bytes(b) => stderr.write_all(b),
             _ => {
                 if i < args.len() - 1 {
                     write!(&mut stderr, "{s} ")
@@ -542,22 +542,20 @@ fn read(
             }
             "-n" => {
                 i += 1;
-                if i < args.len() {
-                    if let Ok(n) = args[i].to_string().parse::<usize>() {
+                if i < args.len()
+                    && let Ok(n) = args[i].to_string().parse::<usize>() {
                         max_chars = Some(n);
                     }
-                }
             }
             "-s" => {
                 silent = true;
             }
             "-t" => {
                 i += 1;
-                if i < args.len() {
-                    if let Ok(t) = args[i].to_string().parse::<f64>() {
+                if i < args.len()
+                    && let Ok(t) = args[i].to_string().parse::<f64>() {
                         timeout_secs = Some(t);
                     }
-                }
             }
             _ => {
                 // 兼容旧行为：单个非选项参数视为 prompt
@@ -618,40 +616,36 @@ fn read(
             _ => break None, // 超时或错误
         }
 
-        match crossterm::event::read() {
-            Ok(Event::Key(key)) => match key.code {
-                KeyCode::Enter => {
+        if let Ok(Event::Key(key)) = crossterm::event::read() { match key.code {
+            KeyCode::Enter => {
+                if !silent {
+                    println!();
+                }
+                break Some(chars.iter().collect::<String>());
+            }
+            KeyCode::Char(c) => {
+                if !silent {
+                    print!("{c}");
+                    let _ = std::io::stdout().flush();
+                }
+                chars.push(c);
+                if chars.len() >= max {
                     if !silent {
                         println!();
                     }
                     break Some(chars.iter().collect::<String>());
                 }
-                KeyCode::Char(c) => {
+            }
+            KeyCode::Backspace
+                if !chars.is_empty() => {
+                    chars.pop();
                     if !silent {
-                        print!("{c}");
+                        print!("\x08 \x08");
                         let _ = std::io::stdout().flush();
                     }
-                    chars.push(c);
-                    if chars.len() >= max {
-                        if !silent {
-                            println!();
-                        }
-                        break Some(chars.iter().collect::<String>());
-                    }
                 }
-                KeyCode::Backspace => {
-                    if !chars.is_empty() {
-                        chars.pop();
-                        if !silent {
-                            print!("\x08 \x08");
-                            let _ = std::io::stdout().flush();
-                        }
-                    }
-                }
-                _ => {}
-            },
             _ => {}
-        }
+        } }
     };
 
     crossterm::terminal::disable_raw_mode().map_err(|e| {

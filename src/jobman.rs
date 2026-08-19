@@ -85,10 +85,9 @@ pub fn list_jobs() -> Vec<(u32, u32, String, JobStatus)> {
 
 /// kill 指定 job（用于 `kill %1` 之类的场景）
 pub fn kill_job(job_id: u32) -> bool {
-    if let Ok(mut jobs) = JOBS.lock() {
-        if let Some(job) = jobs.iter_mut().find(|j| j.id == job_id) {
+    if let Ok(mut jobs) = JOBS.lock()
+        && let Some(job) = jobs.iter_mut().find(|j| j.id == job_id) {
             return job.child.kill().is_ok();
         }
-    }
     false
 }

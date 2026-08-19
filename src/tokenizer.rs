@@ -511,7 +511,7 @@ fn underscore_dispatch(input: Input<'_>, ctx: Ctx) -> TokenizationResult<'_, (To
                         .strip_prefix("_")
                         .filter(|(rest, _)| {
                             rest.is_empty()
-                                || rest.starts_with(&[' ', '\n', ')', ']', '}', ':', ';'])
+                                || rest.starts_with([' ', '\n', ')', ']', '}', ':', ';'])
                                 || rest.starts_with("..")
                         })
                         .ok_or(NOT_FOUND)
@@ -562,14 +562,13 @@ fn alpha_dispatch(
                 };
             }
 
-            if second == '#' {
-                if matches!(first, 'r' | 'g' | 't' | 's' | 'b') {
+            if second == '#'
+                && matches!(first, 'r' | 'g' | 't' | 's' | 'b') {
                     let result = hashed_literal(&first)(input);
                     if let Ok(hs) = result {
                         return Ok(hs);
                     }
                 }
-            }
 
             #[cfg(windows)]
             if let Ok(r) = map_valid_token(win_abpath_tag, TokenKind::StringRaw)(input) {
@@ -577,11 +576,10 @@ fn alpha_dispatch(
             }
 
             // keyword should only in ctx::Start/Space, not in ctx::Open, like `regex.match`
-            if ctx == Ctx::Start || ctx == Ctx::Space {
-                if let Ok(r) = map_valid_token(any_keyword, TokenKind::Keyword)(input) {
+            if (ctx == Ctx::Start || ctx == Ctx::Space)
+                && let Ok(r) = map_valid_token(any_keyword, TokenKind::Keyword)(input) {
                     return Ok(r);
                 }
-            }
 
             // try others
             alt((
@@ -592,7 +590,7 @@ fn alpha_dispatch(
         }
         None => {
             // symbol with one char
-            return symbol_literal(ctx, last_ctx, is_cfm)(input);
+            symbol_literal(ctx, last_ctx, is_cfm)(input)
         }
     }
 }
@@ -608,8 +606,8 @@ fn hashed_literal(
     prefix: &char,
 ) -> impl FnMut(Input<'_>) -> TokenizationResult<'_, (Token, Diagnostic)> {
     move |input: Input<'_>| {
-        if let Some((after_r, _)) = input.strip_prefix(&prefix.to_string()) {
-            if let Some((hashes, quote)) = hash_quote_prefix(after_r) {
+        if let Some((after_r, _)) = input.strip_prefix(&prefix.to_string())
+            && let Some((hashes, quote)) = hash_quote_prefix(after_r) {
                 let kind = match (prefix, quote) {
                     ('r', '\'') => TokenKind::StringRaw,
                     ('r', '"') => TokenKind::StringLiteral,
@@ -622,7 +620,6 @@ fn hashed_literal(
                 };
                 return parse_hashed_string(input, hashes, quote, kind);
             }
-        }
         Err(NOT_FOUND)
     }
 }
@@ -636,7 +633,7 @@ fn parse_hashed_string<'a>(
 ) -> TokenizationResult<'a, (Token, Diagnostic)> {
     let open_len = 1 + hashes + 1;
     let close_delim: String = std::iter::once(quote)
-        .chain(std::iter::repeat('#').take(hashes))
+        .chain(std::iter::repeat_n('#', hashes))
         .collect();
 
     let src = input.as_ref();
@@ -867,7 +864,7 @@ fn last_path_tag(punct: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResult<'
             }
             i += (b as char).len_utf8();
         }
-        return Ok(input.split_at(i));
+        Ok(input.split_at(i))
     }
 }
 
@@ -1051,7 +1048,7 @@ fn number_literal(input: Input<'_>) -> TokenizationResult<'_, (Token, Diagnostic
     // Original numeric literal parsing
     let bytes = input.as_ref().as_bytes();
     let mut i = 0;
-    if bytes.get(0) == Some(&b'.') {
+    if bytes.first() == Some(&b'.') {
         i += 1;
     }
     // skip leading digits
@@ -1401,10 +1398,10 @@ fn is_symbol_char_cfm(c: char, is_param_ctx: bool, is_cmd_ctx: bool) -> bool {
         );
     }
     // other ? same to cfm off
-    return matches!(
+    matches!(
         c,
         'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '~' | '?' | '&' | '#' | '$' | '@' | '-' | '/' | '\\'
-    );
+    )
 }
 
 /// Main tokenization entry point.

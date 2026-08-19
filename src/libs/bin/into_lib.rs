@@ -222,7 +222,7 @@ fn split_line<'a>(line: &'a str, regex: &Option<Regex>) -> Vec<&'a str> {
     }
 }
 
-fn split_line_limited<'a>(line: &'a str, regex: &Option<Regex>, max_cols: usize) -> Vec<String> {
+fn split_line_limited(line: &str, regex: &Option<Regex>, max_cols: usize) -> Vec<String> {
     match regex {
         Some(re) => re.splitn(line, max_cols).map(|x| x.to_string()).collect(),
         None => {
@@ -279,15 +279,15 @@ pub fn int(
             let x = x.replace('_', "");
             let int = if x.starts_with("0x") {
                 Int::from_str_radix(&x, 16).map_err(|_| {
-                    RuntimeError::common(format!("invalid Hex number").into(), ctx.clone(), 0)
+                    RuntimeError::common("invalid Hex number".to_string().into(), ctx.clone(), 0)
                 })
             } else if x.starts_with("0o") {
                 Int::from_str_radix(&x, 8).map_err(|_| {
-                    RuntimeError::common(format!("invalid Oct number").into(), ctx.clone(), 0)
+                    RuntimeError::common("invalid Oct number".to_string().into(), ctx.clone(), 0)
                 })
             } else if x.starts_with("0b") {
                 Int::from_str_radix(&x, 2).map_err(|_| {
-                    RuntimeError::common(format!("invalid Bin number").into(), ctx.clone(), 0)
+                    RuntimeError::common("invalid Bin number".to_string().into(), ctx.clone(), 0)
                 })
             } else {
                 x.parse::<Int>().map_err(|_| {

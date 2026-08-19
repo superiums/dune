@@ -1430,9 +1430,9 @@ impl Editor {
         let used_rows = (end_row - self.prompt_row) as usize + 1;
 
         // ── 7. hint 显示（Bug3修正：渲染在文本末尾，而非光标处）──────────────
-        if !self.is_ai_hinting {
-            if self.show_hint {
-                if let Some(ref hinter) = self.hinter {
+        if !self.is_ai_hinting
+            && self.show_hint
+                && let Some(ref hinter) = self.hinter {
                     let byte_end = line.len();
                     if !line.trim().is_empty()
                         && let Some(hint) = hinter.hint(&line, byte_end)
@@ -1446,8 +1446,6 @@ impl Editor {
                         self.current_hint = None;
                     }
                 }
-            }
-        }
 
         if let Some(ref hint) = self.current_hint.clone() {
             let display = strip_ansi(hint);

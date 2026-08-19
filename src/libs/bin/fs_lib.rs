@@ -451,7 +451,7 @@ fn size(
 ) -> Result<Expression, RuntimeError> {
     check_exact_args_len("size", &args, 1, ctx)?;
     let p = get_string_ref(&args[0], ctx)?;
-    let path = utils::abs(&p, env);
+    let path = utils::abs(p, env);
     let metadata = std::fs::metadata(&path)
         .map_err(|e| RuntimeError::from_io_error(e, "read metadata".into(), args[0].clone(), 0))?;
     Ok(Expression::FileSize(FileSize::from_bytes(metadata.len())))
@@ -698,7 +698,7 @@ fn touch(
 ) -> Result<Expression, RuntimeError> {
     check_exact_args_len("touch", &args, 1, ctx)?;
     let p = get_string_ref(&args[0], ctx)?;
-    let path = utils::abs(&p, env);
+    let path = utils::abs(p, env);
 
     if path.exists() {
         let file = std::fs::File::open(&path)
@@ -723,7 +723,7 @@ fn chmod(
 
     check_exact_args_len("chmod", &args, 2, ctx)?;
     let p = get_string_ref(&args[0], ctx)?;
-    let path = utils::abs(&p, env);
+    let path = utils::abs(p, env);
     let mode = get_integer_ref(&args[1], ctx)? as u32;
 
     let perms = std::fs::Permissions::from_mode(mode);
@@ -754,7 +754,7 @@ fn chown(
 ) -> Result<Expression, RuntimeError> {
     check_exact_args_len("chown", &args, 3, ctx)?;
     let p = get_string_ref(&args[0], ctx)?;
-    let path = utils::abs(&p, env);
+    let path = utils::abs(p, env);
     let uid = get_integer_ref(&args[1], ctx)?;
     let gid = get_integer_ref(&args[2], ctx)?;
 
@@ -787,9 +787,9 @@ fn symlink(
 ) -> Result<Expression, RuntimeError> {
     check_exact_args_len("symlink", &args, 2, ctx)?;
     let src_s = get_string_ref(&args[0], ctx)?;
-    let src = utils::abs(&src_s, env);
+    let src = utils::abs(src_s, env);
     let dst_s = get_string_ref(&args[1], ctx)?;
-    let dst = join_current_path(&dst_s, env);
+    let dst = join_current_path(dst_s, env);
 
     #[cfg(unix)]
     {
@@ -816,7 +816,7 @@ fn read_link(
 ) -> Result<Expression, RuntimeError> {
     check_exact_args_len("read_link", &args, 1, ctx)?;
     let p = get_string_ref(&args[0], ctx)?;
-    let path = utils::abs(&p, env);
+    let path = utils::abs(p, env);
 
     let target = std::fs::read_link(&path)
         .map_err(|e| RuntimeError::from_io_error(e, "read_link".into(), args[0].clone(), 0))?;

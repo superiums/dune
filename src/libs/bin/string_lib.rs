@@ -186,7 +186,7 @@ fn is_ascii(
 ) -> Result<Expression, RuntimeError> {
     check_exact_args_len("is_ascii", &args, 1, ctx)?;
     let text = get_string_ref(&args[0], ctx)?;
-    Ok(Expression::Boolean(text.chars().all(|c| c.is_ascii())))
+    Ok(Expression::Boolean(text.is_ascii()))
 }
 
 fn is_ascii_control(
@@ -663,7 +663,6 @@ pub fn sort(
     let base_str = get_string_arg(data, ctx)?;
     let target: Vec<Expression> = base_str
         .lines()
-        .into_iter()
         .map(|line| Expression::String(line.to_string()))
         .collect();
 
@@ -674,7 +673,7 @@ pub fn sort(
         .map(|item| item.to_string())
         .collect::<Vec<_>>()
         .join("\n");
-    return Ok(Expression::String(r));
+    Ok(Expression::String(r))
 }
 fn insert(
     args: Vec<Expression>,
@@ -1097,7 +1096,7 @@ fn colors(
         let mut stdout = std::io::stdout().lock();
 
         for (i, (text, (r, g, b))) in COLOR_MAP.iter().enumerate() {
-            let pad_len = (20 as usize).saturating_sub(text.len());
+            let pad_len = 20_usize.saturating_sub(text.len());
             let padding: String = std::iter::repeat_n(" ", pad_len).collect();
             write!(
                 &mut stdout,

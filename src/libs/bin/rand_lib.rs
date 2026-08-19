@@ -13,7 +13,7 @@ use std::collections::BTreeMap;
 
 thread_local! {
     // 默认 None，表示使用系统熵源（ThreadRng）；调用 rand.seed 后固定为可复现序列
-    static SEEDED_RNG: RefCell<Option<StdRng>> = RefCell::new(None);
+    static SEEDED_RNG: RefCell<Option<StdRng>> = const { RefCell::new(None) };
 }
 
 // 统一的随机源获取入口：所有随机函数都应通过这里拿 rng，

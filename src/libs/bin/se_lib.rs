@@ -140,7 +140,7 @@ fn assert(
     state: &mut State,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_args_len("assert", &args, 1..=3, ctx)?;
+    check_args_len("assert", args, 1..=3, ctx)?;
 
     let a1 = args[0].eval_with_assign(state, env)?;
     let fail = {
@@ -175,7 +175,7 @@ fn when(
     state: &mut State,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("when", &args, 2, ctx)?;
+    check_exact_args_len("when", args, 2, ctx)?;
 
     if args[0].eval_with_assign(state, env)?.is_truthy() {
         return args[1].eval_with_assign(state, env);
@@ -251,7 +251,7 @@ fn symof(
     _state: &mut State,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("symof", &args, 1, ctx)?;
+    check_exact_args_len("symof", args, 1, ctx)?;
     let t = args[0].type_name();
     Ok(Expression::from(t))
 }
@@ -475,6 +475,6 @@ fn quote(
     _state: &mut State,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    check_exact_args_len("quote", &args, 1, ctx)?;
+    check_exact_args_len("quote", args, 1, ctx)?;
     Ok(Expression::Quote(Rc::new(args[0].clone())))
 }

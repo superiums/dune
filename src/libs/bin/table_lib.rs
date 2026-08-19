@@ -100,7 +100,7 @@ fn get_column(
             .iter()
             .position(|x| x == &s)
             .ok_or(RuntimeError::common(
-            format!("column {} not found", &s).into(),
+            format!("column {} not found", s).into(),
             ctx.clone(),
             0,
         ))?,
@@ -210,7 +210,7 @@ fn first_map(
                     Expression::from(map)
                 })
                 .collect::<Vec<_>>();
-            return Ok(Expression::from(r));
+            Ok(Expression::from(r))
         }
         _ => {
             let row = t.rows().first();
@@ -295,7 +295,7 @@ fn last_map(
                     Expression::from(map)
                 })
                 .collect::<Vec<_>>();
-            return Ok(Expression::from(r));
+            Ok(Expression::from(r))
         }
         _ => {
             let row = t.rows().last();
@@ -438,7 +438,7 @@ pub fn group(
     let keys = match ops.len() {
         0 => None,
         1 => {
-            let key_arg = ops.iter().next().unwrap();
+            let key_arg = ops.first().unwrap();
             match key_arg {
                 Expression::List(items) => {
                     let keys = items
@@ -448,7 +448,7 @@ pub fn group(
                         .collect::<Result<Vec<_>, _>>()?;
                     Some(keys)
                 }
-                other => Some(vec![SortKey::parse(&other, ctx)?]),
+                other => Some(vec![SortKey::parse(other, ctx)?]),
             }
         }
         _ => {
@@ -649,7 +649,7 @@ fn filter(
                 .into_iter()
                 .filter(|row| {
                     target
-                        .eval_apply(&target, &[row.clone()], state, env, 0)
+                        .eval_apply(&target, std::slice::from_ref(row), state, env, 0)
                         .is_ok_and(|r| r.is_truthy())
                 })
                 // .cloned()

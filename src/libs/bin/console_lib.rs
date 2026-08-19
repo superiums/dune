@@ -191,7 +191,7 @@ fn raw_mode(
                 0,
             )
         })?;
-        return Ok(Expression::Boolean(r));
+        Ok(Expression::Boolean(r))
     } else {
         if args[0].is_truthy() {
             enable_raw_mode().map_err(|_| {
@@ -202,7 +202,7 @@ fn raw_mode(
                 RuntimeError::common("Failed to disable raw mode".into(), ctx.clone(), 0)
             })?;
         }
-        return Ok(Expression::None);
+        Ok(Expression::None)
     }
 }
 
@@ -222,7 +222,7 @@ fn alt_screen(
             RuntimeError::common("Failed to leave alternate screen".into(), ctx.clone(), 0)
         })?;
     }
-    return Ok(Expression::None);
+    Ok(Expression::None)
 }
 
 fn line_wrap(
@@ -241,7 +241,7 @@ fn line_wrap(
             RuntimeError::common("Failed to disable line wrap".into(), ctx.clone(), 0)
         })?;
     }
-    return Ok(Expression::None);
+    Ok(Expression::None)
 }
 
 // Cursor Control Functions
@@ -455,8 +455,8 @@ fn read_line(
     _env: &mut Environment,
     ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    if let Some(prompt) = args.get(0) {
-        println!("{}", prompt.to_string())
+    if let Some(prompt) = args.first() {
+        println!("{}", prompt)
     }
     let mut input = String::new();
     std::io::stdin().read_line(&mut input).map_err(|e| {

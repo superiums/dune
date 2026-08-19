@@ -422,7 +422,7 @@ fn any(
     let mut state = State::new();
     for item in set.iter() {
         if predicate
-            .eval_apply(predicate, &vec![item.clone()], &mut state, env, 0)?
+            .eval_apply(predicate, std::slice::from_ref(item), &mut state, env, 0)?
             .is_truthy()
         {
             return Ok(Expression::Boolean(true));
@@ -443,7 +443,7 @@ fn all(
     let mut state = State::new();
     for item in set.iter() {
         if !predicate
-            .eval_apply(predicate, &vec![item.clone()], &mut state, env, 0)?
+            .eval_apply(predicate, std::slice::from_ref(item), &mut state, env, 0)?
             .is_truthy()
         {
             return Ok(Expression::Boolean(false));

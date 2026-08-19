@@ -761,7 +761,7 @@ fn make_caller(
     move |args: Vec<Expression>| {
         let mut state = crate::eval::State::new();
         let mut env_ref = env_cell.borrow_mut();
-        func.eval_apply(&func, &args, &mut state, &mut *env_ref, 0)
+        func.eval_apply(&func, &args, &mut state, &mut env_ref, 0)
             .ok()
     }
 }
@@ -783,10 +783,7 @@ fn cfg_get_usize(
 }
 
 fn cfg_get_bool(m: &BTreeMap<String, Expression>, key: &str) -> Option<bool> {
-    match m.get(key) {
-        Some(v) => Some(v.is_truthy()),
-        None => None,
-    }
+    m.get(key).map(|v| v.is_truthy())
 }
 
 fn cfg_get_str<'a>(m: &'a BTreeMap<String, Expression>, key: &str) -> Option<&'a str> {

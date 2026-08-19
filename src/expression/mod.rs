@@ -286,7 +286,7 @@ impl PartialOrd for Expression {
             (Self::Integer(a), Self::Integer(b)) => a.partial_cmp(b),
             (Self::Float(a), Self::Float(b)) => a.partial_cmp(b),
             (Self::Float(a), Self::Integer(b)) => a.partial_cmp(&(*b as f64)),
-            (Self::Integer(a), Self::Float(b)) => (&(*a as f64)).partial_cmp(b),
+            (Self::Integer(a), Self::Float(b)) => (*a as f64).partial_cmp(b),
             (Self::Range(r, s), Self::Range(r2, s2)) => {
                 match (r.start.partial_cmp(&r2.start), r.end.partial_cmp(&r2.end)) {
                     // 首尾相同，step越大的，越小
@@ -394,7 +394,7 @@ impl PartialOrd for Expression {
 impl Ord for Expression {
     fn cmp(&self, other: &Self) -> Ordering {
         self.partial_cmp(other)
-            .unwrap_or_else(|| self.type_name().cmp(&other.type_name()))
+            .unwrap_or_else(|| self.type_name().cmp(other.type_name()))
     }
 }
 

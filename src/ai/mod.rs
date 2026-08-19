@@ -126,10 +126,7 @@ pub fn init_ai(ai_cfg: Expression) -> MockAIClient {
                 _ => "".into(),
             },
             session_id,
-            api_key: match cfg_map.as_ref().get("api_key") {
-                Some(h) => Some(h.to_string()),
-                _ => None,
-            },
+            api_key: cfg_map.as_ref().get("api_key").map(|h| h.to_string()),
             #[cfg(feature = "ai-https")]
             agent,
         },

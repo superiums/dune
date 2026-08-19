@@ -40,7 +40,7 @@ pub fn parse_with_mode(input: &str) -> Result<Expression, SyntaxError> {
                 // 验证符号不是数字或特殊字符
                 if s.chars().any(|c| c.is_control() || c == '\0') {
                     return Err(SyntaxError {
-                        source: format!("{input}").into(),
+                        source: input.to_string().into(),
                         kind: SyntaxErrorKind::InvalidCmdSymbol(input.to_string()),
                     });
                 }
@@ -53,14 +53,14 @@ pub fn parse_with_mode(input: &str) -> Result<Expression, SyntaxError> {
             Ok(Expression::String(s)) if !s.ends_with("/") && s.contains("/") => {
                 if s.chars().any(|c| c.is_control() || c == '\0') {
                     return Err(SyntaxError {
-                        source: format!("{input}").into(),
+                        source: input.to_string().into(),
                         kind: SyntaxErrorKind::InvalidCmdSymbol(input.to_string()),
                     });
                 }
                 // 验证路径格式
                 if s.contains("..") && !s.starts_with("../") {
                     return Err(SyntaxError {
-                        source: format!("{input}").into(),
+                        source: input.to_string().into(),
                         kind: SyntaxErrorKind::InvalidCmdSymbol(input.to_string()),
                     });
                 }
@@ -180,13 +180,13 @@ pub fn parse_and_eval(text: &str, env: &mut Environment) -> u8 {
                 }
             }
 
-            return 0;
+            0
         }
 
         Err(e) => {
             let _ = io::stdout().flush();
             eprintln!("\x1b[31m[PARSE ERROR]\x1b[0m\n{e}");
-            return e.code();
+            e.code()
         }
     }
 }

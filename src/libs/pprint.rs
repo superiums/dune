@@ -263,14 +263,13 @@ fn pprint_map_internal<'a>(
             .map(|(_, v)| matches!(v, Expression::List(items) if is_list_of_records(items)))
             .unwrap_or(false);
 
-    if use_panel {
-        if let Some(t) =
+    if use_panel
+        && let Some(t) =
             pprint_map_of_record_lists_as_panels(&entries, is_hmap, with_color, max_width)
         {
             return Some(t);
         }
         // 表头提取失败等极端情况，回退到原有两列逻辑
-    }
 
     const COLS: usize = 2;
     let table_padding = COLS * 3 + 1 + 5;
@@ -289,15 +288,14 @@ fn pprint_map_internal<'a>(
         })
         .collect();
 
-    if nested {
-        if let Some((key, value)) = rows.first() {
+    if nested
+        && let Some((key, value)) = rows.first() {
             let first_row_len = visible_width(key) + visible_width(value);
             let max_wraped_width = max_token_width(key) + max_token_width(value);
             if quick_reject(COLS, first_row_len, max_width, max_wraped_width) {
                 return None;
             }
         }
-    }
 
     let mut builder = Builder::with_capacity(rows.len() + 1, COLS);
     builder.push_record(["KEY", "VALUE"]);
@@ -639,12 +637,12 @@ impl<'a> TableRow<'a> {
                         }
                     }
                     Expression::HMap(a) => {
-                        for (_, v) in a.iter() {
+                        for v in a.values() {
                             current_row.push(render_field(v, per_cell_width));
                         }
                     }
                     Expression::Map(a) => {
-                        for (_, v) in a.iter() {
+                        for v in a.values() {
                             current_row.push(render_field(v, per_cell_width));
                         }
                     }

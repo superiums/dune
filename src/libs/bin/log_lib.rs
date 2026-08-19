@@ -66,14 +66,14 @@ fn levels(
     _env: &mut Environment,
     _ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
-    return Ok(Expression::from(b_tree_map! {
+    Ok(Expression::from(b_tree_map! {
         String::from("none") => NONE,
          String::from("error") => ERROR,
          String::from("warn") => WARN,
          String::from("info") => INFO,
          String::from("debug") => DEBUG,
          String::from("trace") => TRACE
-    }));
+    }))
 }
 
 fn get_level(level: &str) -> u8 {
@@ -103,7 +103,7 @@ fn level(
             *LOG_LEVEL.write().unwrap() = *level as u8;
         }
         Expression::String(level) | Expression::Symbol(level) => {
-            *LOG_LEVEL.write().unwrap() = get_level(&level.to_lowercase().as_str());
+            *LOG_LEVEL.write().unwrap() = get_level(level.to_lowercase().as_str());
         }
         _ => {
             return Err(RuntimeError::new(
@@ -155,10 +155,10 @@ fn is_level_enabled(
     match &args[0] {
         Expression::Integer(level) => Ok(Expression::Boolean(is_log_level_enabled(*level as u8))),
         Expression::String(level) | Expression::Symbol(level) => Ok(Expression::Boolean(
-            is_log_level_enabled(get_level(&level.to_lowercase().as_str())),
+            is_log_level_enabled(get_level(level.to_lowercase().as_str())),
         )),
         _ => {
-            return Err(RuntimeError::new(
+            Err(RuntimeError::new(
                 RuntimeErrorKind::TypeError {
                     expected: "String/Integer".into(),
                     sym: args[0].to_string(),
@@ -166,7 +166,7 @@ fn is_level_enabled(
                 },
                 ctx.clone(),
                 0,
-            ));
+            ))
         }
     }
 }

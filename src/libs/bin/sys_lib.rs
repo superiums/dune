@@ -102,13 +102,11 @@ fn modes(
     _ctx: &Expression,
 ) -> Result<Expression, RuntimeError> {
     Ok(Expression::from(hash_map! {
-        String::from("cfm") => CFM_CONFIG.with_borrow(|c|format!("{}",
-            match c{
+        String::from("cfm") => CFM_CONFIG.with_borrow(|c|(match c{
                 Some(true) => "ON",
                 Some(false)=>"OFF",
                 _=>"AUTO"
-            }
-        )),
+            }).to_string()),
         String::from("strict") => STRICT_ENABLED.with_borrow(|c|format!("{}",c)),
         String::from("pdm") => PRINT_DIRECT.with_borrow(|c|format!("{}",c)),
         String::from("ast") => PRINT_AST.with_borrow(|c|format!("{}",c)),

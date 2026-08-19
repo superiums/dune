@@ -94,8 +94,8 @@ fn exec_single_cmd(
     })?;
 
     // 写入输入
-    if let Some(input) = input {
-        if let Some(mut stdin) = child.stdin.take() {
+    if let Some(input) = input
+        && let Some(mut stdin) = child.stdin.take() {
             // take() 拿走所有权
             stdin.write_all(&input).map_err(|e| {
                 RuntimeError::from_io_error(
@@ -107,7 +107,6 @@ fn exec_single_cmd(
             })?;
             // stdin 在这里超出作用域被 drop，管道写端关闭 -> 子进程读到 EOF
         }
-    }
     // 非管道模式下，若需要把 stderr 合并到 stdout，用独立线程并发转发，避免与 stdout/stdin 读写产生死锁
     let stderr_thread = if !pipe_out && mode & 4 != 0 {
         child.stderr.take().map(|mut stderr| {
@@ -300,7 +299,7 @@ pub fn handle_command(
                 }
             }
             Expression::SymbolRaw(s) => {
-                cmd_args.push(s.into());
+                cmd_args.push(s);
             }
             Expression::String(st) => {
                 let s = expand_home(&st).to_string();

@@ -149,7 +149,7 @@ fn to_base64(
 ) -> Result<Expression, RuntimeError> {
     check_exact_args_len("to_base64", &args, 1, ctx)?;
     let bytes = get_bytes_ref(&args[0], ctx)?;
-    let mut out = String::with_capacity((bytes.len() + 2) / 3 * 4);
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {
         let b0 = chunk[0];
         let b1 = *chunk.get(1).unwrap_or(&0);

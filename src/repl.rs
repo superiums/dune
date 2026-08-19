@@ -527,23 +527,23 @@ pub fn run_repl(env: &mut Environment) {
                 };
             } else if let Some(query) = rest.strip_prefix(' ') {
                 // quick jump
-                if let Some(cd_cmd) = editor.history().search_fuzzy_one_cd(query) {
-                    if parse_and_eval(&cd_cmd, &mut shared_env.lock().unwrap()) == 0 {
-                        // update current dir in history
-                        let cwd = get_current_path(&mut shared_env.lock().unwrap());
-                        editor
-                            .history_mut()
-                            .set_current_dir(cwd.to_string_lossy().to_string());
-                        pe.set_dir_cache(cwd);
-                        // must after
-                        editor.history_mut().add(cd_cmd);
-                    }
+                if let Some(cd_cmd) = editor.history().search_fuzzy_one_cd(query)
+                    && parse_and_eval(&cd_cmd, &mut shared_env.lock().unwrap()) == 0
+                {
+                    // update current dir in history
+                    let cwd = get_current_path(&mut shared_env.lock().unwrap());
+                    editor
+                        .history_mut()
+                        .set_current_dir(cwd.to_string_lossy().to_string());
+                    pe.set_dir_cache(cwd);
+                    // must after
+                    editor.history_mut().add(cd_cmd);
                 }
             } else if rest == "q" {
                 break;
             } else if rest == "cds" {
                 let cmd = "ui.pick $PATH_SESSION 'cd to:' ?! | cd _";
-                parse_and_eval(&cmd, &mut shared_env.lock().unwrap());
+                parse_and_eval(cmd, &mut shared_env.lock().unwrap());
             } else {
                 // slash bindings
                 let (key, arg) = rest.split_once(' ').unwrap_or((rest, ""));
@@ -559,7 +559,7 @@ pub fn run_repl(env: &mut Environment) {
                             let mut forked_env = shared_env.lock().unwrap().fork();
                             forked_env.define("HISTORY", Expression::from(history));
                             let cmd =
-                                format!("$HISTORY | ui.pick('select history') ?! | eval_str()");
+                                "$HISTORY | ui.pick('select history') ?! | eval_str()".to_string();
                             parse_and_eval(&cmd, &mut forked_env);
                         }
                     }
@@ -574,7 +574,7 @@ pub fn run_repl(env: &mut Environment) {
                             let mut forked_env = shared_env.lock().unwrap().fork();
                             forked_env.define("HISTORY", Expression::from(history_here));
                             let cmd =
-                                format!("$HISTORY | ui.pick('select history') ?! | eval_str()");
+                                "$HISTORY | ui.pick('history here') ?! | eval_str()".to_string();
                             parse_and_eval(&cmd, &mut forked_env);
                         }
                     }
@@ -588,8 +588,8 @@ pub fn run_repl(env: &mut Environment) {
                         if !history_multi_dir.is_empty() {
                             let mut forked_env = shared_env.lock().unwrap().fork();
                             forked_env.define("HISTORY", Expression::from(history_multi_dir));
-                            let cmd =
-                                format!("$HISTORY | ui.pick('select history') ?! | eval_str()");
+                            let cmd = "$HISTORY | ui.pick('history multi dir') ?! | eval_str()"
+                                .to_string();
                             parse_and_eval(&cmd, &mut forked_env);
                         }
                     }
@@ -612,9 +612,9 @@ pub fn run_repl(env: &mut Environment) {
                     // custom slash bindings
                     _ => {
                         if let Some(r) = slash_bindings.clone().and_then(|m| {
-                            m.as_ref().get(key).and_then(|exp| {
-                                Some(exp.apply(vec![Expression::String(arg.to_string())]))
-                            })
+                            m.as_ref()
+                                .get(key)
+                                .map(|exp| exp.apply(vec![Expression::String(arg.to_string())]))
                         }) {
                             let _ = r.eval(&mut shared_env.lock().unwrap());
                         } else {

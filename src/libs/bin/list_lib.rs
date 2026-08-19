@@ -228,7 +228,7 @@ fn first(
 ) -> Result<Expression, RuntimeError> {
     check_args_len("first", &args, 1..=2, ctx)?;
     let mut it = args.iter();
-    let list = get_list_ref(&it.next().unwrap(), ctx)?;
+    let list = get_list_ref(it.next().unwrap(), ctx)?;
     match it.next() {
         Some(Expression::Integer(i)) if *i > 1 => {
             let r = list
@@ -252,7 +252,7 @@ fn last(
 ) -> Result<Expression, RuntimeError> {
     check_args_len("last", &args, 1..=2, ctx)?;
     let mut it = args.iter();
-    let list = get_list_ref(&it.next().unwrap(), ctx)?;
+    let list = get_list_ref(it.next().unwrap(), ctx)?;
     match it.next() {
         Some(Expression::Integer(i)) if *i > 1 => {
             let r = list
@@ -757,7 +757,7 @@ pub fn sort_vec(
         sorted.sort_by(|a, b| compare_by_keys(&keys, a, b));
     } else {
         // 未指定 key：直接复用 Expression 自身实现的全序 Ord
-        sorted.sort_by(|a, b| a.cmp(b));
+        sorted.sort();
     }
     Ok(sorted)
 }
@@ -812,7 +812,7 @@ fn group(
                             Expression::Map(m) => {
                                 let n = m
                                     .iter()
-                                    .filter(|(k, _)| *k != &kk)
+                                    .filter(|(k, _)| *k != kk)
                                     .map(|(k, v)| (k.clone(), v.clone()))
                                     .collect::<BTreeMap<_, _>>();
                                 Expression::from(n)
@@ -820,7 +820,7 @@ fn group(
                             Expression::HMap(m) => {
                                 let n = m
                                     .iter()
-                                    .filter(|(k, _)| *k != &kk)
+                                    .filter(|(k, _)| *k != kk)
                                     .map(|(k, v)| (k.clone(), v.clone()))
                                     .collect::<BTreeMap<_, _>>();
                                 Expression::from(n)

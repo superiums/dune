@@ -109,11 +109,10 @@ impl History {
         let path = self.current_dir.clone();
 
         // 1. 追加到日志文件（崩溃安全）
-        if self.log_path.is_some() {
-            if let Err(e) = self.append_log_entry(&entry, &path, order) {
+        if self.log_path.is_some()
+            && let Err(e) = self.append_log_entry(&entry, &path, order) {
                 eprintln!("Failed to append history log: {e}");
             }
-        }
 
         // 2. 更新内存索引
         if let Some(pos) = self.entries.iter().position(|e| e.command == entry) {
@@ -640,7 +639,7 @@ impl History {
 
         for cmd in ordered_cmds {
             if let Some((weight, last_path, last_order)) = agg.remove(&cmd) {
-                let is_multi_dir = path_sets.get(&cmd).map_or(false, |s| s.len() > 1);
+                let is_multi_dir = path_sets.get(&cmd).is_some_and(|s| s.len() > 1);
                 self.entries.push(HistoryEntry {
                     command: cmd,
                     weight,
@@ -768,10 +767,7 @@ fn fuzzy_match_score(query: &str, target: &str) -> Option<i64> {
             .position(|&c| c == q)
             .map(|rel| t_idx + rel);
 
-        let idx = match found {
-            Some(idx) => idx,
-            None => return None, // 找不到，说明不满足按序子序列匹配
-        };
+        let idx = found?;
 
         if first_match_idx.is_none() {
             first_match_idx = Some(idx);

@@ -307,7 +307,7 @@ impl PrattParser {
                             return Err(SyntaxErrorKind::failure(
                                 input.get_str_slice(),
                                 "operator or separator",
-                                Some(format!("{operator}")),
+                                Some(operator.to_string()),
                                 Some("numbers/data cannot be followed by symbols without an operator"),
                             ));
                         }
@@ -447,10 +447,10 @@ impl PrattParser {
                         ))
                     }
                     _ => {
-                        return Err(nom::Err::Failure(SyntaxErrorKind::UnknownOperator(
+                        Err(nom::Err::Failure(SyntaxErrorKind::UnknownOperator(
                             op.to_string(),
                             input.get_str_slice(),
-                        )));
+                        )))
                     }
                 }
             }
@@ -944,7 +944,7 @@ fn parse_control_flow(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, Synt
     let keyword = input
         .first()
         .map(|t| t.text(input))
-        .ok_or_else(|| nom::Err::Error(SyntaxErrorKind::NoExpression))?;
+        .ok_or(nom::Err::Error(SyntaxErrorKind::NoExpression))?;
 
     match keyword {
         "if" => parse_if_flow(input),
@@ -2168,7 +2168,7 @@ fn parse_statement(mut input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, Syn
     let keyword = input
         .first()
         .map(|t| t.text(input))
-        .ok_or_else(|| nom::Err::Error(SyntaxErrorKind::NoExpression))?;
+        .ok_or(nom::Err::Error(SyntaxErrorKind::NoExpression))?;
     match keyword {
         "fn" => parse_fn_declare(input), // 函数声明（仅语句级）这里的作用是允许函数嵌套
         "use" => parse_use_statement(input), //允许语句中间按需use
@@ -2499,7 +2499,7 @@ fn parse_lets(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorK
     let keyword = input
         .first()
         .map(|t| t.text(input))
-        .ok_or_else(|| nom::Err::Error(SyntaxErrorKind::NoExpression))?;
+        .ok_or(nom::Err::Error(SyntaxErrorKind::NoExpression))?;
     let (input, pattern) = match keyword {
         "[" => parse_array_destructure(input)?,
         "{" => parse_map_destructure(input)?,
@@ -2578,15 +2578,15 @@ fn parse_declare(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErr
     ))(input)?;
 
     // 构建右侧表达式
-    let value = value_expr.map_or(Rc::new(Expression::None), |v| Rc::new(v));
-    return if symbols.len() == 1 {
+    let value = value_expr.map_or(Rc::new(Expression::None), Rc::new);
+    if symbols.len() == 1 {
         Ok((input, Expression::Declare(symbols[0].clone(), value)))
     } else {
         let assignments = (0..symbols.len())
             .map(|i| Expression::Declare(symbols[i].clone(), value.clone()))
             .collect();
         Ok((input, Expression::Sequence(assignments)))
-    };
+    }
 }
 
 fn parse_del(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxErrorKind> {
