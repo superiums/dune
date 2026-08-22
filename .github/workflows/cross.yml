@@ -276,7 +276,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: ${{ matrix.asset_name }}-ai-https
+          files: ${{ matrix.asset_name }}
 
   # ── lume-se (script engine, no CLI, no AI) ────────────────────────────────────
   build_se:
