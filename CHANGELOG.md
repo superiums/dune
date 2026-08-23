@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.18.7]
+- fix set strict
+- read and clear env before clone in repl
+- fix release assests name
+
 ## [0.18.6]
 - clippy
 - update dependencies
