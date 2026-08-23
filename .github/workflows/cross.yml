@@ -269,7 +269,7 @@ jobs:
           toolchain: nightly
 
       - name: Rename binary
-        run: cp target/${{ matrix.target }}/release/${{ matrix.binary_name }} ${{ matrix.asset_name }}-ai-https
+        run: cp target/${{ matrix.target }}/release/${{ matrix.binary_name }} ${{ matrix.asset_name }}
 
       - name: Upload binary
         uses: softprops/action-gh-release@v1
