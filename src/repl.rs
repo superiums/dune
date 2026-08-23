@@ -365,6 +365,25 @@ pub fn run_repl(env: &mut Environment) {
     // editor.set_sudo_cmd(&hotkey_sudo);
     editor.bind_sequence(KeyEvent::Alt('s'), Cmd::ToggleSudo(hotkey_sudo));
 
+    // --------slash bindings-------
+    let slash_bindings = if let Some(Expression::Map(m)) = env.get("LUME_SLASH_BINDINGS") {
+        Some(m)
+    } else {
+        None
+    };
+    let slash_menu = env.get("LUME_SLASH_MENU");
+    env.undefine("LUME_SLASH_BINDINGS");
+    env.undefine("LUME_SLASH_MENU");
+
+    // Custom hotkeys LUME_HOT_BINDINGS
+    let hotkey_bindings = env.get("LUME_HOT_BINDINGS");
+    env.undefine("LUME_HOT_BINDINGS");
+
+    // =======prompt=======
+    let pe = get_prompt_engine(env.get("LUME_PROMPT_SETTINGS"));
+    env.undefine("LUME_PROMPT_SETTINGS");
+    editor.set_cont_prompt(&pe.get_prompt_continuation());
+
     // Set up validator for multiline input
     struct LumeValidator;
     impl Validator for LumeValidator {
@@ -384,10 +403,6 @@ pub fn run_repl(env: &mut Environment) {
     // Share env with the editor callback via Rc<Mutex<>> so the callback
     // can fork a live snapshot of the current environment at hotkey time.
     let shared_env = Rc::new(Mutex::new(env.clone()));
-
-    // Custom hotkeys LUME_HOT_BINDINGS
-    let hotkey_bindings = env.get("LUME_HOT_BINDINGS");
-    env.undefine("LUME_HOT_BINDINGS");
 
     if let Some(Expression::Map(bindings)) = hotkey_bindings {
         for (k, v) in bindings.iter() {
@@ -433,6 +448,7 @@ pub fn run_repl(env: &mut Environment) {
             }
         }
     }
+
     let _abbr_map: HashMap<String, String> = match _abbr {
         Some(Expression::Map(ab)) => ab
             .iter()
@@ -448,20 +464,6 @@ pub fn run_repl(env: &mut Environment) {
         .history_mut()
         .set_current_dir(get_current_path_string(&mut shared_env.lock().unwrap()));
 
-    // =======prompt=======
-    let pe = get_prompt_engine(env.get("LUME_PROMPT_SETTINGS"));
-    env.undefine("LUME_PROMPT_SETTINGS");
-    editor.set_cont_prompt(&pe.get_prompt_continuation());
-
-    // --------slash bindings-------
-    let slash_bindings = if let Some(Expression::Map(m)) = env.get("LUME_SLASH_BINDINGS") {
-        Some(m)
-    } else {
-        None
-    };
-    let slash_menu = env.get("LUME_SLASH_MENU");
-    env.undefine("LUME_SLASH_BINDINGS");
-    env.undefine("LUME_SLASH_MENU");
     // =======main loop=======
     let mut status: u8 = 0;
     let mut duration = 0;
