@@ -220,7 +220,7 @@ fn env_config(env: &mut Environment, aioff: bool) {
 
     // strict
     if let Some(strict) = env.get("LUME_STRICT") {
-        set_cfm(strict.is_truthy(), env);
+        set_strict(strict.is_truthy(), env);
     }
 
     // ai off
